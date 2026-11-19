@@ -698,9 +698,17 @@ export function parseLayoutCSS(sheets, diagnostic) {
       // decide whether text can change size when the file arrives (the font-swap rule).
       if (node.type === 'atrule' && node.name.toLowerCase() === 'font-face') {
         const descriptor = name => (node.nodes ?? []).find(d => d.type === 'decl' && d.prop.toLowerCase() === name)?.value.trim();
-        const family = descriptor('font-family')?.replace(/^["']|["']$/g, '');
-        if (!family) { problem('U_LAYOUT_CSS', '@font-face needs a font-family', node.source.start.line); continue; }
-        fontFaces.push({ family, display: (descriptor('font-display') ?? 'auto').toLowerCase(), local: /^\s*local\(/i.test(descriptor('src') ?? ''),
+        // F113: Chromium, Firefox and WebKit ignore an @font-face with no font-family, an invalid family name, no src or a
+        // src item that is neither url() nor local() (measured: it is not in document.fonts); it is ignored here too. An
+        // invalid font-display is dropped (the face keeps auto).
+        const rawFamily = descriptor('font-family'), src = descriptor('src');
+        const faceProblem = rawFamily === undefined ? 'it has no font-family' : (b => b && `the family name ${b} is not valid unquoted`)(familyProblem(rawFamily)) || (/,/.test(rawFamily.replace(/(["']).*?\1/g, '')) ? 'font-family names one family, not a list' : null)
+          || (src === undefined ? 'it has no src' : postcss.list.comma(src).find(item => !/^(?:url|local)\(/i.test(item.trim())) !== undefined ? `the src item ${postcss.list.comma(src).find(item => !/^(?:url|local)\(/i.test(item.trim())).trim()} is neither url() nor local()` : null);
+        if (faceProblem) { note('W_CSS_FONT_FACE_INVALID', { problem: faceProblem, ignored: true, file: filename, line: node.source.start.line }); continue; }
+        const family = rawFamily.replace(/^["']|["']$/g, '');
+        let display = (descriptor('font-display') ?? 'auto').toLowerCase();
+        if (!['auto', 'block', 'swap', 'fallback', 'optional'].includes(display)) { note('W_CSS_FONT_FACE_INVALID', { problem: `font-display ${display} is not auto, block, swap, fallback or optional`, family, file: filename, line: node.source.start.line }); display = 'auto'; }
+        fontFaces.push({ family, display, local: /^\s*local\(/i.test(descriptor('src') ?? ''),
           embedded: (() => { const urls = [...(descriptor('src') ?? '').matchAll(/url\(\s*(["']?)([^"')]*)/gi)].map(m => m[2]); return urls.length > 0 && urls.every(u => /^data:/i.test(u)); })(),
           overrides: ['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override'].filter(name => descriptor(name) !== undefined), file: filename, line: node.source.start.line });
         continue;

@@ -1299,3 +1299,15 @@ test('F112: a higher-specificity declaration in an earlier (or any) layer loses 
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_LAYER_OVERRIDDEN'), css).toBe(reported);
   }
 });
+
+test('F113: an @font-face the browser ignores is reported, and an invalid font-display falls back to auto', async ({page}) => {
+  for (const [rule, registered, display] of [['font-family: F; src: local(Arial)', true, 'auto'], ['src: local(Arial)', false], ['font-family: F', false], ['font-family: 3D Font; src: local(Arial)', false],
+    ["font-family: 'F'; src: Arial", false], ['font-family: F; src: local(Arial); font-display: fast', true, 'auto'], ['font-family: F; src: local(Arial); font-display: swap', true, 'swap']]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>@font-face { ${rule}; }</style></head><body><div>x</div></body></html>`);
+    const faces = await page.evaluate(() => [...document.fonts].map(f => f.display));
+    expect(faces.length, rule).toBe(registered ? 1 : 0);
+    if (registered) expect(faces[0], rule).toBe(display);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `@font-face { ${rule}; }*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_FONT_FACE_INVALID'), rule).toBe(!registered || /fast/.test(rule));
+  }
+});

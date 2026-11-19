@@ -1228,3 +1228,16 @@ test('F112: a declaration with the higher specificity that loses only because of
   // the analysis itself is the browser's: the unlayered 20px wins
   assert.equal(run('@layer base{#x.a{width:40px}}.a{width:20px}', html).sizes.find(s => s.box === '#x').rect.inlineSize.constant, '20');
 });
+
+test('F113: an @font-face the browser ignores is not used; an invalid font-display is auto', async () => {
+  const {parseLayoutCSS} = await import('../src/layout/css.mjs');
+  const faces = rule => { const r = parseLayoutCSS([{css: `@font-face { ${rule}; }`, file: 'a.css'}], () => {}); return [r.fontFaces.map(f => `${f.family}/${f.display}`), r.notes.filter(n => n.code === 'W_CSS_FONT_FACE_INVALID').map(n => n.problem)]; };
+  // measured in Chromium, Firefox and WebKit: not in document.fonts
+  for (const rule of ['src: local(Arial)', 'font-family: F', 'font-family: 3D Font; src: local(Arial)', "font-family: 'F'; src: Arial"]) {
+    const [list, problems] = faces(rule);
+    assert.deepEqual(list, [], rule);
+    assert.equal(problems.length, 1, rule);
+  }
+  assert.deepEqual(faces('font-family: F; src: local(Arial); font-display: fast'), [['F/auto'], ['font-display fast is not auto, block, swap, fallback or optional']]);
+  assert.deepEqual(faces("font-family: 'F'; src: url(f.woff2) format('woff2'), local(F); font-display: swap"), [['F/swap'], []]);
+});
