@@ -200,8 +200,27 @@ export function createCssMistakes({ report, facts, tools }) {
       css: found.map(key => ({ property: name(key), file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
       message: `${box.label}: a <br> is a line break, not a box: ${parts.join('; ')}. Space the lines with margin or padding on the elements around it (or split the text into blocks)` });
   }
+  // F121: in a drop-down (a select without multiple or size > 1) the options' font-size, padding, margin, width, height
+  // and line-height do not change the control's size (measured in Chromium, Firefox and WebKit); the open menu is drawn
+  // by the browser, which takes few of them, differently in each. Size the select itself. appearance: base-select (customizable
+  // select, Chromium) does style them; it is skipped, as is a list box.
+  function optionInert(box, style, ancestors) {
+    if (!['option', 'optgroup'].includes(box.tag) || box.pseudo || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.select)) return;
+    const select = (ancestors ?? []).findLast(a => a.box?.tag === 'select');
+    if (!select) return;
+    const attrs = select.box.attributes ?? {}, size = Number(attrs.size ?? 1);
+    if (Object.hasOwn(attrs, 'multiple') || size > 1 || /base-select/.test(String(select.style?.appearance ?? ''))) return;
+    const keys = ['font-size', 'line-height', 'inline-size', 'block-size', 'min-inline-size', 'min-block-size', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left'];
+    const idle = ['0', '0px', 'auto', 'normal', 'none'];
+    const found = keys.filter(key => { const src = style.$sources?.[key], parent = select.style?.$sources?.[key]; return src && !(parent && parent.file === src.file && parent.line === src.line && parent.selector === src.selector) && !idle.includes(String(style[key])) && !['initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(src.specified ?? '').trim().toLowerCase()); });
+    if (!found.length) return;
+    const name = key => ({ 'inline-size': 'width', 'block-size': 'height', 'min-inline-size': 'min-width', 'min-block-size': 'min-height' })[key] ?? key;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, select: select.box.label, properties: found.map(name), css: found.map(key => ({ property: name(key), file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+      message: `${box.label}: ${found.map(key => `${name(key)}: ${style.$sources[key].specified ?? style[key]}`).join(', ')} ${found.length === 1 ? 'does' : 'do'} not change the size of ${select.box.label}: it is a drop-down, and its open menu is drawn by the browser, which takes few of these (differently in each browser). Size and pad the select itself` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    optionInert(box, style, ancestors);
     brStyled(box, style);
     wrapRestored(box, style);
     outOfFlowFlexInert(box, style);
@@ -666,5 +685,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

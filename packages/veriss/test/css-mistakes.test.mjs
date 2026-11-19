@@ -1326,3 +1326,11 @@ test('F120: styles on a <br> work in one browser or none (display: none is not r
   assert.equal(hit('br{padding:10px}')[0].browsers, undefined);
   for (const css of ['br{display:none}', 'br{margin:0}', '.a{line-height:30px}', '']) assert.equal(hit(css).length, 0, css);
 });
+
+test('F121: sizes and spacing on the options of a drop-down do not change the select (a list box and base-select are skipped)', () => {
+  const hit = (css, attrs = '') => codes(run(`.s{width:100px;height:30px}${css}`, `<label>L <select class="s" ${attrs}><option>xxxxx</option><option>y</option></select></label>`), 'W_LAYOUT_DECLARATION_INERT').filter(w => w.select);
+  assert.deepEqual(hit('option{font-size:40px}')[0].properties, ['font-size']);
+  assert.equal(hit('option{padding:30px}').length, 2);
+  assert.match(hit('option{height:80px}')[0].message, /height: 80px does not change the size of \.s: it is a drop-down/);
+  for (const [css, attrs] of [['option{padding:30px}', 'multiple'], ['option{padding:30px}', 'size="4"'], ['select{font-size:20px}', ''], ['option{color:red}', ''], ['option{padding:0}', '']]) assert.equal(hit(css, attrs).length, 0, `${css} ${attrs}`);
+});

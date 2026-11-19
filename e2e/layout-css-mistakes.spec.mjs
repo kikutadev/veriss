@@ -1414,3 +1414,14 @@ test('F120: margin on a <br> spaces lines in Firefox only, line-height in WebKit
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BR_STYLED'), css).toBe(reported);
   }
 });
+
+test('F121: font-size, padding, width and height on the options leave a drop-down select the same size', async ({page}) => {
+  const size = async css => { await page.setContent(`<!doctype html><style>*{margin:0}${css}</style><select><option>xxxxx</option><option>y</option></select>`); return page.evaluate(() => { const r = document.querySelector('select').getBoundingClientRect(); return [r.width, r.height]; }); };
+  const plain = await size('');
+  for (const css of ['option{font-size:40px}', 'option{padding:30px}', 'option{width:300px}', 'option{height:80px}', 'option{line-height:60px}']) {
+    expect(await size(css), css).toEqual(plain);
+    const r = analyzeHTML('<html lang="en"><body><label>L <select class="s"><option>xxxxx</option><option>y</option></select></label></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.select), css).toBe(true);
+  }
+  expect(await size('select{font-size:40px}')).not.toEqual(plain);
+});
