@@ -1117,3 +1117,35 @@ test('F98: aspect-ratio does nothing on table cells and rows or on non-replaced 
   expect(r.status).toBe('verified');
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('aspect-ratio'))).toBe(true);
 });
+
+test('F99, F100: an invalid unquoted font-family or a font shorthand without size or family drops the declaration', async ({page}) => {
+  const computed = async decl => {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>.a{font-size:30px;font-family:monospace}.a{${decl}}</style></head><body><div class="a">x</div></body></html>`);
+    return page.evaluate(() => getComputedStyle(document.querySelector('.a')).fontSize);
+  };
+  for (const [decl, dropped] of [['font:16px Font Awesome 5 Free', true], ['font-family:Foo, 3D Bar, serif', true], ['font:16px -2x, serif', true], ['font:16px a.b', true], ['font:16px', true], ['font:bold Arial', true], ['font:italic 16px', true],
+    ['font:16px "Font Awesome 5 Free"', false], ['font:16px Foo-3, serif', false], ['font:16px serif', false], ['font-family:Segoe UI, Roboto', false], ['font:italic bold 16px/1.5 Georgia, serif', false]]) {
+    const browser = await computed(decl);
+    // a dropped font shorthand leaves 30px; a dropped font-family leaves the size alone either way, so check its family
+    if (decl.startsWith('font:')) expect(browser, decl).toBe(dropped ? '30px' : '16px');
+    else expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).fontFamily) === 'monospace', decl).toBe(dropped);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;font-size:30px;width:1em}.a{${decl}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, decl).toBe('verified');
+    if (decl.startsWith('font:')) expect(r.sizes.find(s => s.box === '.a').rect.inlineSize.constant, decl).toBe(dropped ? '30' : '16');
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_FONT_INVALID'), decl).toBe(dropped);
+  }
+});
+
+test('F104: list-style-image on an element that is not a list item does nothing', async ({page}) => {
+  const base = '.a{width:100px;padding-left:40px;font:16px monospace}';
+  const svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><rect width="12" height="12" fill="red"/></svg>');
+  const img = `list-style-image:url("data:image/svg+xml,${svg}")`;
+  // shots taken once the image has had time to load
+  const loaded = async (css, html) => { const [boxes] = await pixelsAndBoxes(page, css, html); await page.waitForTimeout(200); return [boxes, (await page.screenshot({clip: {x: 0, y: 0, width: 300, height: 120}})).toString('base64')]; };
+  expect(await loaded(`${base}.a{${img}}`, '<div class="a">x</div>')).toEqual(await loaded(base, '<div class="a">x</div>'));
+  // on a list item it replaces the marker (so the check above is not vacuous; a ul gives the marker room to show)
+  expect(await loaded(`li{${img}}`, '<ul><li>x</li></ul>')).not.toEqual(await loaded('', '<ul><li>x</li></ul>'));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;${img}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('list-style-image'))).toBe(true);
+});

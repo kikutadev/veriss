@@ -78,6 +78,7 @@ export const recommended = {
   W_CSS_IMPORTANT_TYPO: ['warning', 'spell !important correctly: any other !word makes the browser drop the whole declaration'],
   W_CSS_CALC_OPERATOR_SPACE: ['warning', 'put spaces on both sides of + and - in calc() / min() / max() / clamp(): without them the browser drops the declaration'],
   W_CSS_UNITLESS_LENGTH: ['warning', 'give the length a unit (100px): a bare number other than 0 makes the browser drop the declaration'],
+  W_CSS_FONT_INVALID: ['warning', 'quote a family name that has a word starting with a digit, and give the font shorthand both a size and a family: otherwise the browser drops the declaration'],
   W_CSS_EMPTY_WHITESPACE: ['warning', 'remove the whitespace in the element, or use :not(:has(*))'],
   W_CSS_MEDIA_NEVER: ['warning', 'check the order of the bounds: min-width below max-width'],
   W_LAYOUT_SCROLLBAR_SHIFT: ['warning', 'keep the scrollbar gutter with html { scrollbar-gutter: stable }'],

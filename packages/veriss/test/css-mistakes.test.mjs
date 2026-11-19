@@ -1058,3 +1058,21 @@ test('F98: aspect-ratio on a table cell or row, or on a non-replaced inline elem
   assert.deepEqual(inert(run('.a{aspect-ratio:1;height:auto;width:100px}')), []);
   assert.deepEqual(inert(run('img{aspect-ratio:1;width:50px}', '<div class="a"><img src="x.png" alt="x"></div>')), []);
 });
+
+test('F99, F100: an invalid font-family or font shorthand drops the declaration (F99 was applied)', () => {
+  const size = css => { const r = run(`.a{font-size:30px;width:1em}${css}`); return [r.status, r.sizes?.find(s => s.box === '.a')?.rect.inlineSize.constant, codes(r, 'W_CSS_FONT_INVALID').length]; };
+  assert.deepEqual(size('.a{font:16px Font Awesome 5 Free}'), ['verified', '30', 1]);
+  assert.deepEqual(size('.a{font:16px}'), ['verified', '30', 1]);
+  assert.deepEqual(size('.a{font:bold Arial}'), ['verified', '30', 1]);
+  assert.deepEqual(size('.a{font-family:Foo, 3D Bar, serif}'), ['verified', '30', 1]);
+  assert.deepEqual(size('.a{font:16px "Font Awesome 5 Free"}'), ['verified', '16', 0]);
+  assert.deepEqual(size('.a{font-family:Segoe UI, Roboto}'), ['verified', '30', 0]);
+});
+
+test('F104: list-style-image on an element that is not a list item and has nothing inside does nothing', () => {
+  const inert = (css, html) => codes(run(css, html), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('list-style-image'));
+  assert.ok(inert('.a{list-style-image:linear-gradient(red,red)}'));
+  assert.ok(!inert('.a{list-style-image:none}'));
+  assert.ok(!inert('.a{display:list-item;list-style-image:linear-gradient(red,red)}'));
+  assert.ok(!inert('.a{list-style-image:linear-gradient(red,red);height:auto}li{height:20px}', '<ul class="a"><li></li></ul>'));
+});

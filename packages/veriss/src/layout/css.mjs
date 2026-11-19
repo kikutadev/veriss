@@ -1,5 +1,6 @@
 import postcss from 'postcss';
 import { calcOperatorProblem } from './calc-syntax.mjs';
+import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
 import { q, cmp, add, mul, div, exact, number } from './linear.mjs';
 import { parseCondition, preferenceValues } from './conditions.mjs';
@@ -605,6 +606,8 @@ function expand(property, value) {
     const color = parts.find(p => !/^(?:url|(?:repeating-)?(?:linear|radial|conic)-gradient|image-set)\(/.test(p) && !/^(?:none|repeat|repeat-x|repeat-y|no-repeat|space|round|scroll|fixed|local|top|bottom|left|right|center|border-box|padding-box|content-box|\d.*|\/|auto|cover|contain)$/.test(p)) ?? 'transparent';
     return [['background-color', color], ['background-image', image]];
   }
+  // F104: list-style-image is paint, kept only so the engine can tell one on a box with no marker.
+  if (property === 'list-style-image') return [[property, String(value).trim()]];
   if (decoration.test(property)) return [];
   throw new Error(`Unsupported layout property: ${property}`);
 }
@@ -633,7 +636,7 @@ function flexShorthand(value) {
 }
 
 export function parseLayoutCSS(sheets, diagnostic) {
-  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], unitlessLength = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], unitlessLength = [], fontInvalid = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
@@ -935,6 +938,11 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // (measured in Chromium, Firefox and WebKit). PostCSS keeps it in the value; it is dropped here and reported.
         { const bang = !declaration.prop.startsWith('--') && !declaration.important && /!\s*([a-z][\w-]*)\s*$/i.exec(declaration.value);
           if (bang && bang[1].toLowerCase() !== 'important') { importantTypo.push({ property: declaration.prop.toLowerCase(), value: declaration.value.trim(), word: bang[0].replace(/\s+/g, ''), selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F99 / F100: an unquoted family name that is not a run of identifiers (Font Awesome 5 Free), or a font shorthand
+        // without a size or a family, is invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
+        { const prop = declaration.prop.toLowerCase();
+          const problem = prop === 'font-family' ? (b => b && { family: b })(familyProblem(declaration.value)) : prop === 'font' ? fontShorthandProblem(declaration.value) : null;
+          if (problem) { fontInvalid.push({ property: prop, value: declaration.value.trim(), ...problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F93: a bare number other than 0 where only a length is allowed (width: 100) is invalid in standards mode — the
         // mode analysed here — so the browser drops the declaration (measured in Chromium, Firefox and WebKit; only quirks
         // mode, in WebKit, takes it as px).
@@ -975,7 +983,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
     if (!missingKeyframes.some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) missingKeyframes.push({ name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, unitlessLength, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
+  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, unitlessLength, fontInvalid, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
 }
 
 // The UA default family and the user's default font size are not author

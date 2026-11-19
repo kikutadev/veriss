@@ -13,12 +13,9 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 
 「現状」は今の解析器の結果。
 
-- [ ] **F99. 引用符のない `font-family` の不正な名前**(`Font Awesome 5 Free`、`3D Bar`、`a.b`): 数字(や `-` と数字)で始まる語や `.` を含む名前は識別子にならず、宣言ごと捨てられる。リストの 1 項目だけでも同じ(3 ブラウザで 14 通り実測)。現状: verified のまま適用していて、`font: 16px Font Awesome 5 Free` では font-size を 16px として計算する(**健全性のバグ**)
-- [ ] **F100. size か family のない `font` ショートハンド**(`font: 16px`、`font: bold Arial`、`font: italic 16px`): 宣言ごと捨てられる(3 ブラウザで実測)。現状: Unknown
 - [ ] **F101. grid の不正なトラック**(`repeat(auto-fill, 1fr)`、`minmax(1fr, 100px)`): auto-fill の繰り返しは固定の大きさ、minmax の最小は fr 不可で、宣言ごと捨てられる(3 ブラウザで実測)。現状: Unknown
 - [ ] **F102. どこからも読まれない `counter-increment` / `counter-reset`**: `counter()` / `counters()` で読むものがなければ見た目は変わらない(3 ブラウザで実測)。現状: 警告なし
 - [ ] **F103. inline-block の左右の `margin: auto`**: 0 になり中央に寄らない(3 ブラウザで実測)。現状: inline の行は Unknown。`text-align: center` を親に、と案内する
-- [ ] **F104. list-item でない要素の `list-style-image`**: F88 と同じ(3 ブラウザで実測)。現状: 警告なし
 - [ ] **F105. block の子の `justify-self`**: Chromium と WebKit は寄せるが Firefox は寄せない(実測)。現状: Unknown(健全)。ブラウザごとの違いとして警告する
 
 
@@ -56,3 +53,6 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 - F94. 表の行・行グループの `border-radius`
 - F96. 固定レイアウトの表で 1 行目以外のセルの `width`
 - F98. 表のセル・行と inline 要素の `aspect-ratio`
+- F99. 引用符のない `font-family` の不正な名前(健全性の修正)
+- F100. size か family のない `font` ショートハンド
+- F104. list-item でない要素の `list-style-image`
