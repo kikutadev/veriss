@@ -140,10 +140,45 @@ target は一意の要素 id、明示 target または paths による native pa
 range と region を保存する。host inset 0、同一 origin が必要。
 局所文書は独立 containing size、継承、閉じた cascade を生産者が確立し、
 local.assumptions と必要なら origin（inlineStart,blockStart の affine 平行移動）を明記する。
-外部モデルも生成元の根拠は信頼仮定。任意の DOM の自動切り出し、手書き矩形と実装の同値性、
+外部モデルも生成元の根拠は信頼仮定。下記の制限付き自動切り出し以外の任意の DOM、手書き矩形と実装の同値性、
 Canvas 内部の投影などを自動証明しない。LayoutIR 由来証拠は profile の署名を照合する。
 受け取った LayoutIR から分からない UA/フォント等は生産者が環境を証明範囲に束縛する信頼仮定。
 input / fontProfile は環境識別子で、未対応の pointer/hover media 分岐を勝手に成立させない。
+
+### 自動部分幾何 (independent rectangle projection)
+
+`domGeometry` は元の DOM/CSS 解析を先に行い、完全な矩形証拠が得られない対象ごとに
+独立した幾何の自動抽出を試みる。`partial:false` で従来の全入力解析のみとする。
+`bindings: {"surface":".viewport-canvas"}` のように、一意の単純な class/id へ名前を束縛できる。
+束縛を指定した対象は自動抽出経路を使う。手書き local または boxes と自動抽出を混ぜない。
+
+- 元の祖先チェーン、適用しうる規則とカスケード優先順位を維持する。
+  3値のセレクター判定で関連を否定できない未知規則は拒否し、Unknown 発生箇所だけを理由に規則を消さない。
+- 明示した寸法の通常ブロックと、両軸の基準位置およびサイズが決まる絶対/固定配置に限定。
+  除外した兄弟・内容への依存、未解決の継承・含有ブロック・外部 stylesheet、動的選択子、
+  geometry を変える animation、未対応の intrinsic sizing 等を拒否する。
+  疑似要素は生成しないか、全適用候補で通常フローから独立すると確認できる場合だけ除く。
+- 完全な standards-mode snapshot、閉じた author CSS、overlay scrollbar、初期スクロール位置、
+  horizontal-tb/ltr、明示した環境の両軸を前提とする。自動抽出は最大32対象。
+  残った縮約文書を既存の解析器で計算し、完全な LayoutIR の矩形と領域のみ relational/1 の証拠にする。
+  元の全ページ report、他の契約、見た目・hit-test・アクセシビリティの検査結果は変更しない。
+- 証拠は source=local-dom、仮定、被覆付き区分アフィン行または理由付き Unknown。
+  この方式は万能な CSS 依存解析でなく、対応外の入力で証明を拒否するための限定プロファイルである。
+
+ローカルビルドに対する繰返し確認（作業環境の browser supervisor 下で実行）:
+
+```sh
+node tools/eval-ui-build.mjs tools/ui-build-examples/sumi-no-tachi.json /path/to/dist /path/to/captures
+```
+
+JSON は model（状態・遷移・環境・契約）、points（実測点）、screens（state/click/wait/targets/event/from/settle）。
+手計算の寸法や固定 CSS ハッシュは不要。各状態の初回 snapshot と CSS を保存し、
+原本のハッシュ、契約、別の viewport 実測・比較を出力する。外部通信は遮断し、
+失敗した単純な外部 import の除外は offline 環境の仮定に限定する。
+同一状態の DOM と author cascade が全領域で不変、CSSOM mutation がないことは呼び出し側の前提。
+異なる点で幾何が一致しなければその証拠を Unknown に戻す。action の実測成功を形式証明としない。
+終了コード 0=全要求 verified、1=違反/実測失敗/捕捉エラー、2=Unknown。
+座標比較は丸めの差を許容する観測照合であり、有理数モデルの厳密証明とは区別する。
 
 ### 述語 AST と合成
 
@@ -199,7 +234,7 @@ const proof = await verifyObligationIR(createObligationIR(contract,{state,enviro
 verifyUI({model,evidence,observations}) は同じ IR 構築手順の簡易 API。
 model={version:1,component?,initial,states,transitions,profiles,definitions?,contracts}。
 manifest={model,evidence?,observations?,documents?}、documents の各項目:
-{state,profile,html,css,targets,local?,boxes?,fonts?,defaultFontSize?}。
+{state,profile,html,css,targets,bindings?,partial?,local?,boxes?,fonts?,defaultFontSize?}。
 ファイルパスは manifest 相対。CSS は順序を維持した完全な閉じた author cascade。
 fonts: {"Family":"font.ttf"} で boxes の既存テキスト契約を解決する。
 

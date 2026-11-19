@@ -164,3 +164,20 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 - Strict full-page runner exits 1 on Unknown; a small known-good fixture confirms exit 0 and Z3 verified across all 5 inputs. No deployed site changes.
 - Gate on `b4d04c0`: 6 unit groups failure 0, component-lint 4 runs unchanged, 348 E2E passed, supervisor exit 0 / 645 observed processes / remaining 0.
 - Whole-page blockers remaining include ancestor state selectors, View Transition pseudo-elements, preference-dependent geometry, SVG / paint effects, variable margins, external stylesheet/font data and native/mixed-content geometry. Full static verification is not complete.
+
+### 自動部分幾何の実入力評価 (2026-11-20)
+
+`domGeometry` の自動縮約を relational/1 に接続。元の全ページの Unknown を変更せず、手書きの矩形式なしで、閉じた snapshot/CSS から独立した矩形を計算する。条件・対応外の理由は [layout-contract-ir.md](layout-contract-ir.md#自動部分幾何-independent-rectangle-projection) に記載。 `tools/eval-ui-build.mjs` と `tools/ui-build-examples/` の JSON は、他のビルドでも手計算無しで再実行できる。実際の対象・状態・契約は呼び出し側の要求として指定する。
+
+統合版 70176a6 の WebKit 4点/状態 (幅320–1920、高さ320–1080、DPR 1、overlay・safe area 0、ローカルビルド、外部通信無し) の結果:
+
+| 入力 | 条件付き verified / Unknown | 自動矩形と実測の比較 | 操作実測 |
+| --- | --- | --- | --- |
+| 墨ノ太刀 title/play/paused | 6 / 7 | 24/24 | 8/8 |
+| 潮界防衛 home/prepare | 2 / 7 | 8/8 | 4/4 |
+| また村人から。 planning | 1 / 2 | 4/4 | — |
+| portfolio HOME | 0 / 3 | — | — |
+
+墨ノ太刀: game と inkImpact、潮界防衛: app、また村人から。: app が自動証明対象。点測定は計36/36一致、操作は12/12到達、捕捉エラー0。Portfolio は正常な縦スクロールを許す横方向の3契約を設定し、実測11件成功・1件非表示で未観測、静的3件 Unknown。潮界防衛の844x390で field/scene高さ400・準備開始ボタンの下端394を再検出し、5観測が画面収容契約違反（実際の操作は成功）。開始操作の形式証明は対象外。
+
+未対応は明示基準位置の無い絶対配置、native control、aspect-ratio、内容依存または flex/grid 兄弟、min() と auto margin の組合せ、View Transition selector 等。全 CSS の自動分割・全状態のモデル化・実ゲームの配信変更は行っていない。ビルド毎に取得する入力が変わるため契約が verified でない場合も再現可能な結果として保持する。
