@@ -231,8 +231,20 @@ export function createCssMistakes({ report, facts, tools }) {
       ...(src ? { css: [{ property: 'text-indent', file: src.file, line: src.line, selector: src.selector }] } : {}),
       message: `${box.label}: text-indent: ${value}${from ? ` (inherited from ${from.box.label})` : ''} indents the selected option twice in Firefox and once in Chrome and Safari, so the text sits in a different place. Use padding-inline-start on the select${from ? `, and text-indent: 0 on it` : ' instead'}` });
   }
+  // F126: overflow-x: hidden with overflow-y: visible (or the other way round, or clip beside auto) does not keep that
+  // axis visible: it computes to auto (clip to hidden), so the box scrolls or clips on both axes (measured in Chromium,
+  // Firefox and WebKit). overflow: clip on the axis to cut keeps the other visible.
+  function overflowPromoted(box, style) {
+    for (const p of style.$overflowPromoted ?? []) {
+      if (layoutWarnings.some(w => w.code === 'W_CSS_OVERFLOW_PROMOTED' && w.path === box.path && w.property === p.property)) continue;
+      const axis = p.property.slice(-1), otherAxis = axis === 'x' ? 'y' : 'x', becomes = p.written === 'visible' ? 'auto' : 'hidden';
+      layoutWarnings.push({ code: 'W_CSS_OVERFLOW_PROMOTED', severity: 'warning', box: box.label, path: box.path, property: p.property, css: [{ property: p.property, file: p.source.file, line: p.source.line, selector: p.source.selector }],
+        message: `${box.label}: overflow-${axis}: ${p.written} computes to ${becomes} because overflow-${otherAxis} is ${p.other}: a box cannot scroll or clip on one axis and stay ${p.written} on the other, so it ${becomes === 'auto' ? `scrolls (or clips) its overflow on the ${axis} axis too` : `clips on the ${axis} axis too`}. To cut only the ${otherAxis} axis, write overflow-${otherAxis}: clip` });
+    }
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    overflowPromoted(box, style);
     selectIndent(box, style, ancestors);
     optionInert(box, style, ancestors);
     brStyled(box, style);
@@ -699,5 +711,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, overflowPromoted, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

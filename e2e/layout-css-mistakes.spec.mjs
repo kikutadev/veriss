@@ -1468,3 +1468,23 @@ test('F124: Firefox indents the shown option of a select twice; the select size 
   const r = analyzeHTML('<html lang="en"><body><select class="s" aria-label="x"><option>x</option></select></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.s{text-indent:10px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_SELECT_INDENT')).toBe(true);
 });
+
+test('F125: a 50rem media query is 800px whatever the root font-size', async ({page}) => {
+  await page.setViewportSize({ width: 600, height: 400 });
+  for (const root of ['', 'html{font-size:10px}', 'html{font-size:62.5%}']) for (const unit of ['em', 'rem']) {
+    await page.setContent(`<!doctype html><style>${root}.a{height:10px}@media (min-width:50${unit}){.a{height:40px}}@media (min-width:500px){.b{height:40px}}</style><div class="a"></div><div class="b"></div>`);
+    expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height), `${root} ${unit}`).toBe(10);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${root}.a{height:10px}@media (min-width:50${unit}){.a{height:40px}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_EM_ROOT'), `${root} ${unit}`).toBe(Boolean(root));
+  }
+});
+
+test('F126: overflow-y: visible beside overflow-x: hidden computes to auto, clip beside auto to hidden; clip keeps visible', async ({page}) => {
+  for (const [css, y, reported] of [['overflow-x:hidden;overflow-y:visible', 'auto', true], ['overflow:hidden visible', 'auto', true], ['overflow-x:auto;overflow-y:clip', 'hidden', true],
+    ['overflow-x:clip;overflow-y:visible', 'visible', false], ['overflow-x:hidden', 'auto', false]]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.a{height:50px;${css}}.c{height:100px}</style><div class="a"><div class="c"></div></div>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).overflowY), css).toBe(y);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;${css}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_OVERFLOW_PROMOTED'), css).toBe(reported);
+  }
+});

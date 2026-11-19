@@ -1357,3 +1357,19 @@ test('F124: text-indent on a select is indented twice by Firefox; it no longer m
   assert.match(w.message, /padding-inline-start/);
   for (const css of ['.s{text-indent:0}', '.s{color:red}', '']) assert.equal(hit(css).length, 0, css);
 });
+
+test('F125: em / rem in a media query ignore the root font-size the page sets', () => {
+  const hit = css => codes(run(css), 'W_CSS_MEDIA_EM_ROOT');
+  assert.match(hit('html{font-size:62.5%}@media (min-width:50rem){.a{width:10px}}')[0]?.message ?? '', /50rem is 800px/);
+  assert.equal(hit('@media (max-width:40em){.a{width:10px}}:root{font-size:10px}').length, 1);
+  for (const css of ['@media (min-width:50rem){.a{width:10px}}', 'html{font-size:100%}@media (min-width:50rem){.a{width:10px}}', 'html{font-size:10px}@media (min-width:500px){.a{width:10px}}', '.x{font-size:10px}@media (min-width:50em){.a{width:10px}}'])
+    assert.equal(hit(css).length, 0, css);
+});
+
+test('F126: an axis written visible (or clip) beside a scrolling one computes to auto (hidden)', () => {
+  const hit = css => codes(run(css), 'W_CSS_OVERFLOW_PROMOTED');
+  assert.match(hit('.a{overflow-x:hidden;overflow-y:visible}')[0]?.message ?? '', /overflow-y: visible computes to auto.*write overflow-x: clip/);
+  assert.equal(hit('.a{overflow:hidden visible}').length, 1);
+  assert.match(hit('.a{overflow-x:auto;overflow-y:clip}')[0]?.message ?? '', /computes to hidden/);
+  for (const css of ['.a{overflow-x:hidden}', '.a{overflow-x:clip;overflow-y:visible}', '.a{overflow:hidden}', '.a{overflow:auto}']) assert.equal(hit(css).length, 0, css);
+});

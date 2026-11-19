@@ -680,6 +680,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
   const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
+  const reportedMediaEm = new Set();
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
     const problem = (code, message, line) => diagnostic(code, message, line, filename);
     if (depth > 32) { problem('U_LAYOUT_LIMIT', 'Conditional nesting limit exceeded'); return; }
@@ -829,6 +830,10 @@ export function parseLayoutCSS(sheets, diagnostic) {
             .concat([...node.params.matchAll(/\(\s*([^()<>=]+?)\s*(?:<=|>=|<|>|=)\s*(?:width|height)\s*\)/gi)].map(m => m[1]));
           const bad = values.find(v => /^\s*(?:\d*\.)?\d+\s*$/.test(v) && Number(v) !== 0 || /^\s*(?:\d*\.)?\d+\s+[a-z%]+\s*$/i.test(v));
           if (bad) { note('W_CSS_MEDIA_INVALID_LENGTH', { params: node.params.trim(), value: bad.trim(), file: filename, line: node.source.start.line }); continue; }
+        }
+        if (rootFont && node.name.toLowerCase() === 'media' && /\d\s*r?em\b/i.test(node.params) && !reportedMediaEm.has(`${filename}:${node.source.start.line}`)) {
+          reportedMediaEm.add(`${filename}:${node.source.start.line}`);
+          note('W_CSS_MEDIA_EM_ROOT', { params: node.params.trim(), root: rootFont, file: filename, line: node.source.start.line });
         }
         // F87: "and(", "or(" or "not(" (no space) is a function token, not the keyword: the query is invalid and never matches (measured
         // in Chromium, Firefox and WebKit). In a list only that query fails, so only a single query is handled.
@@ -1061,6 +1066,17 @@ export function parseLayoutCSS(sheets, diagnostic) {
       rules.push({ selectors, contexts, declarations, layer, file: filename, line: node.source.start.line, ...(preferences.length ? { preferences } : {}), ...(stateGeometry ? { stateGeometry: true } : {}), ...(stateLayout && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase())) ? { stateLayout: true, ...(hoverLayout ? { hoverLayout: true } : {}) } : {}) });
     }
   };
+  // F125: em and rem in a media query are the browser's default font size (16px unless the user changed it), not the
+  // root font-size the page sets (measured in Chromium, Firefox and WebKit: html { font-size: 10px } leaves
+  // (min-width: 50rem) at 800px). The root rules are found first, so a query before them is judged too.
+  let rootFont = null;
+  for (const sheet of sheets) {
+    let root; try { root = postcss.parse(sheet.css, { from: sheet.file }); } catch { continue; }
+    root.walkRules(rule => { if (rule.parent?.type === 'root' && postcss.list.comma(rule.selector).some(sel => /^(?:html|:root)$/i.test(sel.trim()))) rule.walkDecls(/^(?:font-size|font)$/i, d => {
+      const v = d.prop.toLowerCase() === 'font' ? (/(?:^|\s)(\d*\.?\d+(?:px|%|em|rem|pt))(?:\/|\s)/i.exec(d.value)?.[1] ?? '') : d.value.trim().toLowerCase();
+      if (v && !/^(?:16px|100%|1em|1rem|medium|12pt|inherit|initial|unset|revert|revert-layer|var\(.*)$/i.test(v)) rootFont = { value: v, selector: rule.selector, file: sheet.file, line: d.source.start.line };
+    }); });
+  }
   for (const sheet of sheets) {
     try { const root = flattenNesting(postcss.parse(sheet.css, { from: sheet.file })); visit(root.nodes, [], null, sheet.file); }
     catch (error) { diagnostic('U_LAYOUT_CSS', error.reason ?? error.message, error.line, sheet.file); }
@@ -1464,6 +1480,10 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   }
   const nonscroll = value => ['visible', 'clip'].includes(value);
   const x = values['overflow-x'], y = values['overflow-y'];
+  // F126: an axis the author wrote visible (or clip) next to a scrolling one on the other axis computes to auto (hidden):
+  // the box becomes a scroll container on both axes (measured in Chromium, Firefox and WebKit). Kept for the warning.
+  for (const [key, own, other] of [['overflow-x', x, y], ['overflow-y', y, x]]) if (!nonscroll(other) && nonscroll(own) && sources[key] && !box.pseudo)
+    (values.$overflowPromoted ??= []).push({ property: key, written: own, other, source: sources[key] });
   if (!nonscroll(y)) values['overflow-x'] = x === 'visible' ? 'auto' : x === 'clip' ? 'hidden' : x;
   if (!nonscroll(x)) values['overflow-y'] = y === 'visible' ? 'auto' : y === 'clip' ? 'hidden' : y;
   // F68: input[type=hidden] { display: none !important } (UA): no author display shows it (measured in Chromium, Firefox

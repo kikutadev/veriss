@@ -399,6 +399,8 @@
 - [x] **F122. 一部のブラウザーしか受け付けない大きさのキーワード**(`W_CSS_SIZE_BROWSER_DEPENDENT`、解析はこれらのキーワードで Unknown のまま): `stretch` は Chromium と WebKit だけ、`-moz-available` と `-moz-fit-content` は Firefox だけ、`-webkit-fit-content` は Chromium と WebKit だけ、`intrinsic` は WebKit だけ(Firefox 157 ほかで実測)。同じ規則の中で、各ブラウザーが最後に受け付ける値の種類が違うと報告する(`-webkit-fill-available; stretch` のように前置きを並べたものは報告しない)
 - [x] **F123. `mix-blend-mode` と同じ要素の `isolation: isolate`**(`W_CSS_ISOLATION_SELF`、解析は normal 以外の `mix-blend-mode` で Unknown のまま): `isolation` は子孫の混合を閉じ込めるもので、その要素自身は後ろのページと混ざり続ける。親に付ければ親の中だけで混ざる(親の `opacity`・`transform`・`z-index` で重なりの文脈を作っても同じ。Chromium・Firefox・WebKit で画素を読んで実測)。同じ規則の中の組み合わせだけを判定する
 - [x] **F124. `select` の `text-indent`**(`W_LAYOUT_SELECT_INDENT`、以前は select ごと Unknown): Firefox だけが表示中の選択肢を 2 倍字下げする(10px で 22、Chromium 16、WebKit 17。`appearance: none` でも同じ)。select の大きさは変わらないので、解析は select では `text-indent` を外して進める。`input` は 3 ブラウザーで揃う。`text-align` と `padding` は select でも揃った(実測)
+- [x] **F125. メディアクエリの `em` / `rem` とページのルートの `font-size`**(`W_CSS_MEDIA_EM_ROOT`、解析はこのクエリで Unknown のまま): メディアクエリの em と rem はブラウザーの既定の文字サイズ(利用者が変えなければ 16px)で、`html { font-size: 62.5% }` などを見ない(Chromium・Firefox・WebKit で実測: 50rem は 800px のまま)。ルートに 16px 以外の `font-size`(または `font`)があるときだけ報告する
+- [x] **F126. 片方の軸だけの `overflow: hidden`**(`W_CSS_OVERFLOW_PROMOTED`): もう片方の軸に書いた `visible` は `auto` に、`clip` は `hidden` になり、両方の軸でスクロール(切り取り)する(Chromium・Firefox・WebKit で実測)。片方だけ切るなら `clip`。著者が書いた軸だけ報告する(`overflow-x: hidden` だけのときは報告しない)
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
