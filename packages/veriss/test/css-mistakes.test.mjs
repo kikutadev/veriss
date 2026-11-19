@@ -1098,3 +1098,24 @@ test('F102: a CSS counter that no counter() / counters() reads changes nothing',
   // list-item is the counter list markers read; none resets nothing
   assert.deepEqual(unused('.i{counter-increment:list-item 2}.l{counter-reset:none}'), []);
 });
+
+test('F103: margin auto on an inline-level box in a block container does not centre it', () => {
+  const hit = (css, html = '<div class="a"><span class="s"></span></div>') => codes(run(`.a{height:auto}${css}`, html), 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.some(p => /^margin-(?:left|right)$/.test(p))).map(w => w.box);
+  assert.deepEqual(hit('.s{display:inline-block;width:100px;margin:0 auto}'), ['.s']);
+  assert.deepEqual(hit('.s{display:inline-flex;width:100px;margin-left:auto}'), ['.s']);
+  assert.deepEqual(hit('.s{margin:0 auto}'), ['.s']);
+  // a flex or grid parent makes it a block-level item, where auto margins do work
+  assert.deepEqual(hit('.a{display:flex}.s{display:inline-block;width:100px;margin:0 auto}'), []);
+  assert.deepEqual(hit('.s{display:inline-block;width:100px;margin:0 10px}'), []);
+  // inline in a line of text
+  assert.deepEqual(hit('.s{display:inline-block;width:10px;margin:0 auto}', '<p class="a" data-text-one-line>ab <span class="s"></span> cd</p>'), ['.s']);
+});
+
+test('F105: justify-self / justify-items in block layout: Chromium and WebKit align, Firefox does not', () => {
+  const hit = (css, html = '<main class="p"><div class="a"></div></main>') => { const r = run(`.p{display:block}.a{width:100px}${css}`, html); return [r.status, codes(r, 'W_LAYOUT_ALIGN_BROWSER_DEPENDENT').map(w => `${w.box} ${w.property}`)]; };
+  assert.deepEqual(hit('.a{justify-self:center}'), ['unknown', ['.a justify-self']]);
+  assert.deepEqual(hit('.p{justify-items:end}'), ['unknown', ['.p justify-items']]);
+  assert.deepEqual(hit('.a{justify-self:stretch}'), ['verified', []]);
+  // in a grid it aligns in every browser: not reported
+  assert.deepEqual(hit('.p{display:grid;grid-template-columns:300px}.a{justify-self:center}')[1], []);
+});

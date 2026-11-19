@@ -505,6 +505,26 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   // F45: text-align / text-indent / text-align-last on an inline element (no child elements) do nothing: they align and
   // indent the lines of a block container (measured in Chromium, Firefox and WebKit).
+  // F103: in a line (an inline formatting context) a margin-left / -right of auto is 0 (CSS 2.2 §10.3.1, §10.3.9): an
+  // inline, inline-block, inline-flex, inline-grid or inline-table box is not centred by margin: 0 auto (measured in
+  // Chromium, Firefox and WebKit). A flex or grid parent makes it a block-level item, where auto margins do work.
+  function inlineAutoMargin(box, style, parentStyle) {
+    const display = String(style.$inlineDisplay ?? style.display);
+    if (box.pseudo || !/^inline(?:-block|-flex|-grid|-table)?$/.test(display)) return;
+    if (parentStyle && ['flex', 'inline-flex', 'grid', 'inline-grid'].includes(String(parentStyle.display)) && !parentStyle.$blockFlow) return;
+    const keys = ['margin-left', 'margin-right'].filter(key => style.$sources?.[key] && String(style[key]) === 'auto');
+    if (!keys.length || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(keys[0]))) return;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, css: keys.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+      message: `${box.label}: ${keys.join(' and ')}: auto ${keys.length === 1 ? 'is' : 'are'} 0 on a display: ${display} box in a line of text, so it is not centred or pushed aside. Centre it with text-align: center on its parent, or make it display: block (or the parent a flex container)` });
+  }
+  // F105: justify-self on a block-level box in block layout, and justify-items on a block container, align (and shrink an
+  // auto width) in Chromium and WebKit but do nothing in Firefox (measured, every value but normal, stretch and auto): the
+  // page differs by browser. The layout stays Unknown there; this says why it matters.
+  function alignBrowserDependent(box, property, value) {
+    if (layoutWarnings.some(w => w.code === 'W_LAYOUT_ALIGN_BROWSER_DEPENDENT' && w.path === box.path && w.property === property)) return;
+    layoutWarnings.push({ code: 'W_LAYOUT_ALIGN_BROWSER_DEPENDENT', severity: 'warning', box: box.label, path: box.path, property, browsers: { aligns: ['chromium', 'webkit'], ignores: ['firefox'] },
+      message: `${box.label}: ${property}: ${value} in block layout aligns ${property === 'justify-items' ? 'the children' : 'the box'} (and shrinks an auto width to fit) in Chromium and Safari, but Firefox ignores it, so the page differs by browser. Use margin-inline: auto (with a width) to centre, or make the parent display: grid` });
+  }
   function inlineTextAlignment(box, style) {
     if (box.pseudo || style.display !== 'inline' || (box.children ?? []).some(c => !c.anonymous) || (box.inline ?? []).length) return;
     const found = [...(style.$inlineTextInert ?? [])];
@@ -568,6 +588,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    inlineAutoMargin(box, style, ancestors?.at(-1)?.style);
     if (style.$floatInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['float'], ...(style.$sources?.float ? { css: [{ property: 'float', file: style.$sources.float.file, line: style.$sources.float.line, selector: style.$sources.float.selector }] } : {}),
         message: `${box.label}: float: ${style.$floatInert} has no effect on an absolutely positioned box (its float computes to none). Place it with left / right instead` });
@@ -1044,7 +1065,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         const seen = textFonts.get(box.path);
         textFonts.set(box.path, seen && seen !== 'varied' && JSON.stringify(seen) !== JSON.stringify(facts) ? 'varied' : seen === 'varied' ? 'varied' : facts);
       }
-      if (gridItem && inherited && ['inline', 'inline-block'].includes(style.display)) style = { ...style, display: 'block', $inlineLevel: true };
+      if (gridItem && inherited && ['inline', 'inline-block'].includes(style.display)) style = { ...style, display: 'block', $inlineLevel: true, $inlineDisplay: style.display };
       // content-visibility: auto: on screen the box lays out as usual; offscreen it is size-contained. Admitted where
       // its width does not come from its content (block flow, or grid columns that are not content-sized), so that
       // only its height changes offscreen (W_LAYOUT_CONTENT_VISIBILITY_SIZE).
@@ -2059,6 +2080,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       // transforms (CSS Transforms 1 §1: only block-level and atomic inline boxes are transformable; measured too).
       inlineStateTransforms(child, style);
       inlineTextAlignment(child, style);
+      inlineAutoMargin(child, style);
       inlineOverflow(child, style);
       decorationNone(child, style, parents);
       firstPseudoInert(child, style);
@@ -3638,7 +3660,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
               // align-content applies to block containers (measured): center and end move the content; the rest is start.
               // justify-items on a block container aligns its block-level children and shrinks an auto width to fit
               // (measured: justify-items: end puts an empty child at the right edge, 0px wide); that is not modeled.
-              if (style.display === 'block' && !box.text && !['normal', 'stretch', 'legacy', 'auto'].includes(String(style['justify-items'] ?? 'normal'))) throw Object.assign(new Error(`${box.label}: justify-items: ${style['justify-items']} on a block container aligns its children and shrinks them to fit, which is not modeled`), { code: 'U_LAYOUT_CSS', box });
+              if (style.display === 'block' && !box.text && !['normal', 'stretch', 'legacy', 'auto'].includes(String(style['justify-items'] ?? 'normal'))) { alignBrowserDependent(box, 'justify-items', style['justify-items']); throw Object.assign(new Error(`${box.label}: justify-items: ${style['justify-items']} on a block container aligns its children and shrinks them to fit, which is not modeled`), { code: 'U_LAYOUT_CSS', box }); }
               if (style.display === 'block' && !box.text) style = { ...style, display: 'grid', 'grid-template-columns': 'minmax(0,1fr)', 'grid-template-rows': 'none', 'grid-auto-rows': 'auto', 'grid-auto-flow': 'row', 'grid-template-areas': 'none', 'align-content': ['center', 'safe center'].includes(String(style['align-content'])) ? 'center' : ['end', 'flex-end'].includes(String(style['align-content'])) ? 'end' : 'start', 'justify-content': 'normal', 'align-items': 'normal', 'justify-items': 'normal', 'row-gap': 'normal', 'column-gap': 'normal', $blockFlow: true };
               if (!['grid', 'flex'].includes(style.display)) { issue('E_LAYOUT_CONTAINER', 'Layout containers must use grid or the flex subset', box, bs.region); continue; }
               const isFlex = style.display === 'flex';
@@ -3802,7 +3824,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     for (const child of flow) if (child.style.$inlineLevel) throw Object.assign(new Error(`${child.box.label} is inline-level inside the block container ${box.label}: its line layout is not modeled (give it display: block, or make ${box.label} a grid or flex container)`), { code: 'U_LAYOUT_INLINE', box: child.box, region: children.region });
                     // Grid placement and self-alignment do nothing in block flow: laid out as auto, reported as inert.
                     // (justify-self is not inert: Chromium aligns block-level boxes by it — measured — which is not modeled.)
-                    for (const child of flow) if (!['auto', 'normal', 'stretch', 'legacy'].includes(String(child.style['justify-self'] ?? 'auto'))) throw Object.assign(new Error(`${child.box.label}: justify-self: ${child.style['justify-self']} aligns a block-level box (CSS Box Alignment), which is not modeled`), { code: 'U_LAYOUT_CSS', box: child.box, region: children.region });
+                    for (const child of flow) if (!['auto', 'normal', 'stretch', 'legacy'].includes(String(child.style['justify-self'] ?? 'auto'))) { alignBrowserDependent(child.box, 'justify-self', child.style['justify-self']); throw Object.assign(new Error(`${child.box.label}: justify-self: ${child.style['justify-self']} aligns a block-level box (CSS Box Alignment), which is not modeled`), { code: 'U_LAYOUT_CSS', box: child.box, region: children.region }); }
                     const inertDefaults = { 'grid-column': 'auto', 'grid-row': 'auto', 'align-self': 'auto' };
                     flow.forEach((child, k) => {
                       const written = Object.keys(inertDefaults).filter(key => child.style.$sources?.[key] && !['auto', 'normal', 'stretch'].includes(String(child.style[key])));
@@ -4179,6 +4201,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         if (!c || c.style.display === 'none') return;
         try { inlineStateTransforms(child, c.style); } catch { /* the rest still runs */ }
         try { inlineTextAlignment(child, c.style); } catch { /* the rest still runs */ }
+        try { inlineAutoMargin(child, c.style); } catch { /* the rest still runs */ }
         try { inlineOverflow(child, c.style); } catch { /* the rest still runs */ }
         try { decorationNone(child, c.style, chain); } catch { /* the rest still runs */ }
         try { firstPseudoInert(child, c.style); } catch { /* the rest still runs */ }

@@ -13,8 +13,6 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 
 「現状」は今の解析器の結果。
 
-- [ ] **F103. inline-block の左右の `margin: auto`**: 0 になり中央に寄らない(3 ブラウザで実測)。現状: inline の行は Unknown。`text-align: center` を親に、と案内する
-- [ ] **F105. block の子の `justify-self`**: Chromium と WebKit は寄せるが Firefox は寄せない(実測)。現状: Unknown(健全)。ブラウザごとの違いとして警告する
 
 
 ## 保留
@@ -56,3 +54,5 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 - F104. list-item でない要素の `list-style-image`
 - F101. grid の不正なトラック
 - F102. どこからも読まれない CSS カウンター
+- F103. inline 系の箱の左右の `margin: auto`
+- F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)

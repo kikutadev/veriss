@@ -1177,3 +1177,29 @@ test('F102: a CSS counter that nothing reads changes nothing', async ({page}) =>
   const r = analyzeHTML('<html lang="en"><body><ol class="l"><li class="i"></li></ol></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.i{height:20px;counter-increment:step}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
   expect((r.layoutWarnings ?? []).filter(w => w.code === 'W_CSS_COUNTER_UNUSED').map(w => w.counter)).toEqual(['step']);
 });
+
+test('F103: margin auto does not centre an inline-level box in a block container; in a flex container it does', async ({page}) => {
+  for (const display of ['inline-block', 'inline-flex', 'inline-grid', 'inline-table', 'inline'])
+    for (const html of ['<div class="p"><span class="a">x</span></div>', '<div class="p">t <span class="a">x</span> u</div>']) {
+      const base = `.p{width:400px}.a{display:${display};${display === 'inline' ? '' : 'width:100px'}}`;
+      expect(await pixelsAndBoxes(page, `${base}.a{margin:0 auto}`, html), `${display} ${html}`).toEqual(await pixelsAndBoxes(page, base, html));
+    }
+  const flex = '.p{width:400px;display:flex}.a{display:inline-block;width:100px}', one = '<div class="p"><span class="a">x</span></div>';
+  expect(await pixelsAndBoxes(page, `${flex}.a{margin:0 auto}`, one)).not.toEqual(await pixelsAndBoxes(page, flex, one));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"><span class="s"></span></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.s{display:inline-block;width:100px;margin:0 auto}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.s' && w.properties.includes('margin-left'))).toBe(true);
+  const f = analyzeHTML('<html lang="en"><body><div class="a"><span class="s"></span></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{display:flex}.s{display:inline-block;width:100px;height:20px;margin:0 auto}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((f.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.s' && w.properties.includes('margin-left'))).toBe(false);
+});
+
+test('F105: justify-self / justify-items in block layout align in Chromium and WebKit, not in Firefox', async ({page}, info) => {
+  const left = async css => { await page.setContent(`<!doctype html><html lang="en"><head><style>*{margin:0}.p{width:400px}${css}</style></head><body><div class="p"><div class="a">x</div></div></body></html>`); return page.evaluate(() => document.querySelector('.a').getBoundingClientRect().x); };
+  const aligns = info.project.name !== 'firefox';
+  expect(await left('.a{width:100px;justify-self:center}')).toBe(aligns ? 150 : 0);
+  expect(await left('.p{justify-items:end}.a{width:100px}')).toBe(aligns ? 300 : 0);
+  // stretch and normal are the same everywhere
+  expect(await left('.a{width:100px;justify-self:stretch}')).toBe(0);
+  const r = analyzeHTML('<html lang="en"><body><main class="p"><div class="a"></div></main></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{display:block}.a{height:20px;width:100px;justify-self:center}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('unknown');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_ALIGN_BROWSER_DEPENDENT' && w.property === 'justify-self')).toBe(true);
+});

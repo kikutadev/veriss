@@ -378,6 +378,8 @@
 - [x] **F104. list-item でない要素の `list-style-image`**(`W_LAYOUT_DECLARATION_INERT`): F88 と同じく、マーカーがなく中に継承先もなければ効かない
 - [x] **F101. grid の不正なトラック**(`W_CSS_GRID_TRACKS_INVALID`、以前は Unknown): `repeat(auto-fill / auto-fit)` に固定でない大きさ(`1fr`、`auto`、`min-content`、`fit-content()`)がある、その外に固定でないトラックがある、auto の repeat が 2 つ、`minmax()` の最小が fr、repeat の回数が正の整数でない、負の値、`fit-content()` に長さ以外。どれも宣言ごと捨てられる(3 ブラウザで 23 通り実測)。`var()` と `subgrid` は判定しない
 - [x] **F102. どこからも読まれない CSS カウンター**(`W_CSS_COUNTER_UNUSED`): `counter-reset` / `-increment` / `-set` の名前を、解析した CSS のどの `content` の `counter()` / `counters()` も読まなければ見た目は変わらない。`list-item`(リストのマーカーが読む)は除く。別のスタイルシートで読む場合は誤検知になるので、メッセージに「解析した CSS の中で」と書く
+- [x] **F103. inline 系の箱の左右の `margin: auto`**(`W_LAYOUT_DECLARATION_INERT`): 親が block のとき、inline / inline-block / inline-flex / inline-grid / inline-table の左右の auto は 0 で、中央に寄らない(3 ブラウザで実測)。親が flex / grid なら block 化されて効くので警告しない
+- [x] **F105. block レイアウトの `justify-self` / `justify-items`**(`W_LAYOUT_ALIGN_BROWSER_DEPENDENT`、解析は Unknown のまま): Chromium と WebKit は寄せる(幅が auto なら中身まで縮める)が、Firefox は無視する(実測、normal / stretch / auto 以外のすべての値)。ブラウザで見た目が違うことを知らせる
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
