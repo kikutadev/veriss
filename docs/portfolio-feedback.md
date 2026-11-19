@@ -181,3 +181,5 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 墨ノ太刀: game と inkImpact、潮界防衛: app、また村人から。: app が自動証明対象。点測定は計36/36一致、操作は12/12到達、捕捉エラー0。Portfolio は正常な縦スクロールを許す横方向の3契約を設定し、実測11件成功・1件非表示で未観測、静的3件 Unknown。潮界防衛の844x390で field/scene高さ400・準備開始ボタンの下端394を再検出し、5観測が画面収容契約違反（実際の操作は成功）。開始操作の形式証明は対象外。
 
 未対応は明示基準位置の無い絶対配置、native control、aspect-ratio、内容依存または flex/grid 兄弟、min() と auto margin の組合せ、View Transition selector 等。全 CSS の自動分割・全状態のモデル化・実ゲームの配信変更は行っていない。ビルド毎に取得する入力が変わるため契約が verified でない場合も再現可能な結果として保持する。
+
+最終統合ゲート: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 351 E2E passed、supervisor exit=0、639 PID追跡・残留0。自動部分幾何単独の3 E2Eも成功。実入力 manifest による ui-check/lint の Unknown exit=2、証明済み6契約の exit=0、意図的な不成立契約の exit=1 と有理数 witness (1120,700) を確認。gate 起動後の差分は文書のみ。
