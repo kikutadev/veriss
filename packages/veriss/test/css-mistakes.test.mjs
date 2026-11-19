@@ -1119,3 +1119,20 @@ test('F105: justify-self / justify-items in block layout: Chromium and WebKit al
   // in a grid it aligns in every browser: not reported
   assert.deepEqual(hit('.p{display:grid;grid-template-columns:300px}.a{justify-self:center}')[1], []);
 });
+
+test('F106: line-breaking properties do nothing where white-space keeps the text on one line', () => {
+  const inert = (css, prop, html) => { const r = run(css, html); return [r.status, codes(r, 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes(prop))]; };
+  for (const [decl, prop] of [['word-break:break-all', 'word-break'], ['word-break:keep-all', 'word-break'], ['line-break:anywhere', 'line-break'], ['hyphens:auto', 'hyphens'], ['text-wrap-style:pretty', 'text-wrap-style']]) {
+    assert.deepEqual(inert(`.a{white-space:nowrap;${decl}}`, prop), ['verified', true], decl);
+    assert.deepEqual(inert(`.a{white-space:pre;${decl}}`, prop), ['verified', true], `pre ${decl}`);
+  }
+  // where lines wrap they change the breaks: word-break and line-break stay Unknown, hyphens is not reported
+  assert.equal(run('.a{word-break:break-all}').status, 'unknown');
+  assert.equal(run('.a{line-break:anywhere}').status, 'unknown');
+  assert.deepEqual(inert('.a{hyphens:auto}', 'hyphens'), ['verified', false]);
+  // a text-wrap shorthand after white-space turns wrapping back on: not inert
+  assert.equal(inert('.a{white-space:nowrap;text-wrap:balance}', 'text-wrap-style')[1], false);
+  // inherited by an element inside, which may wrap again: still Unknown / not reported
+  assert.equal(run('.p{white-space:nowrap;word-break:break-all}', '<div class="p"><div class="a"></div></div>').status, 'unknown');
+  assert.deepEqual(inert('.p{white-space:nowrap;hyphens:auto}', 'hyphens', '<div class="p"><div class="a"></div></div>')[1], false);
+});

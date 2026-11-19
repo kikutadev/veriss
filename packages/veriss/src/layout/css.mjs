@@ -490,7 +490,7 @@ function expand(property, value) {
   // Accepted only at values that leave line breaking, shaping, containing blocks and painting as modeled; any other
   // value changes what is checked, so it stays Unknown.
   const neutral = {
-    'word-break': ['normal'], 'text-wrap-mode': ['wrap'],
+    'text-wrap-mode': ['wrap'],
     'font-variant-numeric': ['normal'], 'font-variant-ligatures': ['normal'], 'font-feature-settings': ['normal'], 'font-variation-settings': ['normal'], 'text-rendering': ['auto'],
     'box-decoration-break': ['slice'], '-webkit-box-decoration-break': ['slice'], 'field-sizing': ['fixed'],
     'text-size-adjust': ['none', '100%'], '-webkit-text-size-adjust': ['none', '100%'],
@@ -547,6 +547,9 @@ function expand(property, value) {
   }
   // resize: kept so the engine can tell an inert one (overflow visible) from one the user can drag (Unknown there).
   if (property === 'resize') { const v = value.trim().toLowerCase(); if (!wide.has(v) && !['none', 'both', 'horizontal', 'vertical', 'block', 'inline'].includes(v)) throw new Error(`Unsupported resize: ${value}`); return [['resize', v]]; }
+  // F106: word-break and line-break are kept so computeStyle can tell an inert one (no wrapping) from one that moves breaks.
+  if (property === 'word-break' || property === 'line-break') { const v = value.trim().toLowerCase(), allowed = property === 'word-break' ? ['normal', 'break-all', 'keep-all', 'break-word', 'auto-phrase'] : ['auto', 'loose', 'normal', 'strict', 'anywhere'];
+    if (!wide.has(v) && !allowed.includes(v)) throw new Error(`Unsupported ${property}: ${value}`); return [[property, v]]; }
   // F84: tab-size is kept so computeStyle can tell an inert one (white-space collapses tabs) from one that moves text.
   if (property === 'tab-size') { const v = value.trim().toLowerCase(); if (!wide.has(v) && !/^(?:\d+(?:\.\d+)?|\d+(?:\.\d+)?px)$/.test(v)) throw new Error(`Unsupported tab-size: ${value}`); return [['tab-size', v]]; }
   if (Object.hasOwn(neutral, property)) {
@@ -1375,6 +1378,15 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   if ((box.pseudo === 'before' || box.pseudo === 'after') && (values.content ?? 'none') !== 'none' && noPseudoHost(box)) { values.$pseudoNotRendered = values.content; values.content = 'none'; }
   // F45: text-indent and text-align-last apply to block containers. On an inline element with no child elements they do
   // nothing (measured in Chromium, Firefox and WebKit); elsewhere they move the lines, which is not modeled.
+  // F106: with white-space nowrap or pre the text has no soft wrap opportunity, so word-break and line-break (which add or
+  // remove some) do nothing (measured in Chromium, Firefox and WebKit on Latin, Japanese and hyphenated text). They are
+  // inherited, so only a box with no element inside is judged; where lines wrap they move the breaks (not modeled).
+  for (const [key, idle] of [['word-break', 'normal'], ['line-break', 'auto']]) {
+    if (values[key] === undefined) continue;
+    if ([idle, 'initial', 'unset', 'revert', 'revert-layer'].includes(String(values[key]))) { delete values[key]; continue; }
+    if (!box.pseudo && ['nowrap', 'pre'].includes(String(values['white-space'])) && String(values['text-wrap-mode'] ?? 'white-space') !== 'wrap' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { (values.$breakInert ??= []).push([key, values[key]]); delete values[key]; }
+    else throw new Error(key === 'line-break' ? `Unsupported layout property: line-break (${values[key]} changes line breaking, which is not modeled)` : `Unsupported word-break: ${values[key]} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
+  }
   // F84: white-space normal, nowrap and pre-line turn a tab into a space that collapses, so tab-size does nothing there
   // (measured in Chromium, Firefox and WebKit). It is inherited, so only a box with no element inside is judged.
   if (values['tab-size'] !== undefined) {

@@ -592,6 +592,16 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     if (style.$floatInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['float'], ...(style.$sources?.float ? { css: [{ property: 'float', file: style.$sources.float.file, line: style.$sources.float.line, selector: style.$sources.float.selector }] } : {}),
         message: `${box.label}: float: ${style.$floatInert} has no effect on an absolutely positioned box (its float computes to none). Place it with left / right instead` });
+    // F106: word-break / line-break (dropped in css.mjs), hyphens and text-wrap-style where white-space keeps one line.
+    {
+      const found = [...(style.$breakInert ?? [])];
+      const parentSources = ancestors?.at(-1)?.style?.$sources ?? {}, inheritedFrom = key => { const a = style.$sources?.[key], b = parentSources[key]; return a && b && a.file === b.file && a.line === b.line && a.selector === b.selector; };
+      const oneLine = ['nowrap', 'pre'].includes(String(style['white-space'])) && String(style['text-wrap-mode'] ?? 'white-space') !== 'wrap' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length;
+      if (oneLine) for (const [key, idle] of [['hyphens', 'manual'], ['text-wrap-style', 'auto']]) if (style.$sources?.[key] && !inheritedFrom(key) && ![idle, 'initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(style[key]))) found.push([key, style[key]]);
+      if (found.length && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(found[0][0])))
+        layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found.map(([key]) => key), css: found.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+          message: `${box.label}: ${found.map(([key, value]) => `${key}: ${value}`).join(', ')} ${found.length === 1 ? 'has' : 'have'} no effect with white-space: ${style['white-space']} (the text never wraps, so there are no line breaks to change). Use white-space: normal (or pre-wrap) if the text should wrap` });
+    }
     if (style.$tabSizeInert !== undefined && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('tab-size')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['tab-size'], ...(style.$sources?.['tab-size'] ? { css: [{ property: 'tab-size', file: style.$sources['tab-size'].file, line: style.$sources['tab-size'].line, selector: style.$sources['tab-size'].selector }] } : {}),
         message: `${box.label}: tab-size: ${style.$tabSizeInert} has no effect with white-space: ${style['white-space']} (a tab collapses into a space). Use white-space: pre or pre-wrap to keep tabs` });

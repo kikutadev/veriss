@@ -1,19 +1,153 @@
 # TODO
 
-CSS × DOM の静的検査パターンの候補。実装したものは [docs/static-check-checklist.md](docs/static-check-checklist.md) に F 番号で移す。
+CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。実装したものは [docs/static-check-checklist.md](docs/static-check-checklist.md) に F 番号で移す。
+モジュール分割の計画は [ADR-0016](docs/adr/0016-module-decomposition.md)(下の「構成の作業」)。
 
 各パターンの完了条件:
 
-- Chromium / Firefox / WebKit で挙動を実測する e2e(`e2e/layout-css-mistakes.spec.mjs`)
+- Chromium / Firefox / WebKit で挙動を実測する e2e(`e2e/layout-css-mistakes.spec.mjs`)。中身や条件を変えた複数の場合で測る(F97 の取り違えから)
 - 単体テスト(`packages/veriss/test/css-mistakes.test.mjs`)
 - 解析が Unknown を成功に変えないこと(判定できない値は Unknown のまま)
 - lint の説明(新しいコードのとき `packages/adapter-core/src/lint.mjs`)とチェックリストの行
 
-## 候補
+## 進み具合(カテゴリごと)
 
-「現状」は今の解析器の結果。
+「観点」はそのカテゴリで調べる切り口。済 = 実測して実装したか、効いていると確かめて外したもの。
 
+| カテゴリ | 済 / 観点 | 状態 |
+|---|---|---|
+| 1. 宣言ごと捨てられる値(構文) | 7 / 10 | 進行中 |
+| 2. at-rule(`@media` ほか) | 4 / 8 | 進行中 |
+| 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 9 / 10 | ほぼ済 |
+| 4. 表 | 8 / 9 | ほぼ済 |
+| 5. テキストと折り返し | 6 / 8 | 進行中 |
+| 6. リスト・マーカー・カウンター | 4 / 5 | ほぼ済(1 つ保留) |
+| 7. transform・重なり・描画 | 3 / 6 | 進行中 |
+| 8. フォーム部品・置換要素 | 4 / 8 | 進行中 |
+| 9. セレクタ × DOM(状態・構造) | 6 / 8 | 進行中 |
+| 10. ブラウザで結果が違うもの | 1 / 5 | 着手 |
+| 合計 | 52 / 77(68%) | |
 
+観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
+
+### 1. 宣言ごと捨てられる値(構文)
+
+- [x] calc の `+` / `-` の空白(F89)
+- [x] `!important` の綴り(F86)
+- [x] 単位のない長さ(F93)
+- [x] `font-family` の名前・`font` ショートハンド(F99、F100)
+- [x] grid のトラック(F101)
+- [x] grid-template-areas(F52)
+- [x] 未定義の custom property / `var()` の不正(既存 `W_CSS_VAR_INVALID`)
+- [ ] 色の関数(`rgb(0 0 0, .5)` のように区切りが混ざる、`#12345`)
+- [ ] `transition` / `animation` ショートハンドの順序と不正な値
+- [ ] `url()` の引用符のない空白、`background` ショートハンドの `/` の位置
+
+### 2. at-rule
+
+- [x] `@media` の `var()`、単位のない長さ、`and(`(F78、F79、F87)
+- [x] `@import` の位置(既存 `W_CSS_IMPORT_IGNORED`)
+- [x] `@keyframes` の `!important`、存在しない名前(既存)
+- [x] `@container` の当たらない query(既存)
+- [ ] `@supports` の不正な条件(括弧の不足など)
+- [ ] `@layer` の順序の宣言と、後から書いた層
+- [ ] `@font-face` の `src` / `font-display` のない宣言
+- [ ] `@property` の不正な `syntax` / `initial-value`
+
+### 3. 親の表示形式で効かない宣言
+
+- [x] flex / grid の子の項目プロパティを block の子に(既存)
+- [x] block コンテナの `gap`(F92)
+- [x] inline の箱の幅・高さ・縦の margin・transform(既存、F36)
+- [x] inline 系の箱の `margin: auto`(F103)
+- [x] `display: contents` の箱のプロパティ(F30 ほか)
+- [x] position: static の inset、z-index(既存)
+- [x] absolute の `float`、`margin: auto`(F77、F38)
+- [x] `columns` を flex / grid に、段組の外の `column-span`(F34、F81)
+- [x] `aspect-ratio` を表と inline に(F98)
+- [ ] absolute / fixed の子の flex 項目プロパティ(`order`、`flex-grow`)。現状は解析が Unknown
+
+### 4. 表
+
+- [x] `overflow`、`padding`(collapse)、`gap`、`border-spacing`(F31、F60、F25)
+- [x] セルの min/max-height、固定表の min/max-width(F43)
+- [x] collapse の `border-radius`、行・行グループの `border-radius`(F59、F94)
+- [x] collapse の `empty-cells`(F82)
+- [x] 固定表の 1 行目以外の `width`(F96)
+- [x] `table > tr`(tbody の挿入、F26)
+- [x] 行・行グループの padding・margin・border・overflow(既存)
+- [x] セルの `max-width`(自動表では効くと確かめて見送り)
+- [ ] `<col>` / `<colgroup>` に効かないプロパティ(`padding`、`height`、`color` など)
+
+### 5. テキストと折り返し
+
+- [x] nowrap / pre の `overflow-wrap`(F80)
+- [x] タブを潰す `white-space` の `tab-size`(F84)
+- [x] 1 行のままの `word-break` / `line-break` / `hyphens` / `text-wrap-style`(F106)
+- [x] inline の `text-align` / `text-indent`(F45)
+- [x] `text-overflow` の条件(既存)
+- [x] `text-decoration: none` で祖先の線は消えない(F58)
+- [ ] `letter-spacing` / `word-spacing` の不正(`%`、単位のない数)
+- [ ] `text-wrap: balance` が `white-space: nowrap` を打ち消す(折り返しが戻る)ことの知らせ
+
+### 6. リスト・マーカー・カウンター
+
+- [x] list-item でない要素の `list-style-type` / `-position` / `-image`(既存、F88、F104)
+- [x] 読まれないカウンター(F102)
+- [x] `::marker` に効かないプロパティ(既存)
+- [x] summary のマーカー(既存 `W_A11Y_SUMMARY_INDICATOR`)
+- [ ] `li` の display を変えてマーカーが消える(F95、保留)
+
+### 7. transform・重なり・描画
+
+- [x] transform のない `transform-origin`(F83)
+- [x] 祖先の後ろに回る負の z-index(F72)
+- [x] `perspective`(重なり順が変わると確かめて見送り)
+- [ ] `backface-visibility` / `transform-style: preserve-3d` を 3D の transform なしで
+- [ ] `isolation` / `mix-blend-mode` の組み合わせ
+- [ ] `will-change` の値が効かないプロパティ名
+
+### 8. フォーム部品・置換要素
+
+- [x] appearance auto の checkbox / select の背景・枠・行の高さ(F42、F75)
+- [x] `input type=hidden`、`datalist`、置換要素の擬似要素(F68、F69、F32)
+- [x] `object-fit` / `object-position`(既存、F39)
+- [x] canvas の引き伸ばし(F71)
+- [ ] `select` / `input` の `padding`・`text-align` のブラウザ差(実測では 3 ブラウザとも効いた。差の出る条件を探す)
+- [ ] `<option>` のスタイル(閉じた select では描かれない)
+- [ ] `<br>` の `margin`(Firefox だけ効く)
+- [ ] `<img>` / `<video>` の `width` / `height` 属性と CSS の優先
+
+### 9. セレクタ × DOM
+
+- [x] 状態の擬似クラス(`:placeholder-shown`、`:required`、`:read-write`、`:link`、`:focus-within` など、F35〜F63)
+- [x] 構造の擬似クラス(`:empty`、`:last-child`、`:nth-child(of S)`、F29、F33、F70)
+- [x] 当たらないセレクタ、親子関係の破綻(既存)
+- [x] DOM のプロパティを属性で書いた、効かない属性(F64〜F67)
+- [x] `hidden` 属性の上書き(既存 `W_A11Y_HIDDEN_OVERRIDDEN`)
+- [x] `:visited` で効かないプロパティ(既存)
+- [ ] 重複した `id` と `#id` セレクタ
+- [ ] `:has()` の中の状態(解析の扱いを確かめる)
+
+### 10. ブラウザで結果が違うもの
+
+- [x] block レイアウトの `justify-self` / `justify-items`(F105)
+- [ ] `<br>` の `margin`(カテゴリ 8 と同じ)
+- [ ] `::-webkit-scrollbar` と `scrollbar-width` / `scrollbar-color`(重ねて描くスクロールバーのヘッドレスでは測れない。測り方を決める)
+- [ ] `-webkit-` だけの書き方(`-webkit-line-clamp` 以外)
+- [ ] フォーム部品の既定の大きさ(UA プロファイルと突き合わせる)
+
+## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
+
+- [ ] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
+- [ ] M2. import の向きを調べる境界テスト
+- [ ] M3. 構文の検査の結果を `notes[]` にまとめる(28 の配列)
+- [ ] M4. 捨てた宣言を `dropped[]` にまとめる(11 の `$…Inert`)
+- [ ] M5. `rules/css-mistakes` を engine から出す
+- [ ] M6. `solve` の中の「効かない宣言」の判定を規則に移す
+- [ ] M7. `rules/contrast`(レイアウトなしでも判定する)
+- [ ] M8. a11y を DOM の規則と幾何の規則に分ける
+- [ ] M9. `packages/` に出す
 
 ## 保留
 
@@ -56,3 +190,4 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F106. 1 行のままの `white-space` の下の `word-break` / `line-break` / `hyphens` / `text-wrap-style`

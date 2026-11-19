@@ -1203,3 +1203,20 @@ test('F105: justify-self / justify-items in block layout align in Chromium and W
   expect(r.status).toBe('unknown');
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_ALIGN_BROWSER_DEPENDENT' && w.property === 'justify-self')).toBe(true);
 });
+
+test('F106: word-break, line-break, hyphens and text-wrap-style do nothing under white-space nowrap or pre', async ({page}) => {
+  const texts = ['supercalifragilistic expialidocious words here', '日本語の文章を折り返すかどうかの確認です。', 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p'];
+  const props = ['word-break:break-all', 'word-break:keep-all', 'line-break:anywhere', 'hyphens:auto', 'text-wrap-style:pretty'];
+  for (const ws of ['nowrap', 'pre']) for (const decl of props) for (const t of texts) {
+    const base = `.a{width:120px;font:16px sans-serif;white-space:${ws}}`, html = `<div class="a">${t}</div>`;
+    expect(await pixelsAndBoxes(page, `${base}.a{${decl}}`, html), `${ws} ${decl} ${t}`).toEqual(await pixelsAndBoxes(page, base, html));
+  }
+  // where the text wraps, word-break moves the breaks (so the checks above are not vacuous)
+  const wrap = '.a{width:120px;font:16px sans-serif}', one = `<div class="a">${texts[0]}</div>`;
+  expect(await pixelsAndBoxes(page, `${wrap}.a{word-break:break-all}`, one)).not.toEqual(await pixelsAndBoxes(page, wrap, one));
+  for (const decl of props) {
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;white-space:nowrap;${decl}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, decl).toBe('verified');
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes(decl.split(':')[0])), decl).toBe(true);
+  }
+});
