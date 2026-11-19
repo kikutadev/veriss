@@ -45,8 +45,8 @@ const pageCSS = opt.pageCss ? readFileSync(opt.pageCss, 'utf8') : opt.snapshots 
 const options = {...(opt.defaultFontSize !== 'none' ? {defaultFontSize: Number(opt.defaultFontSize)} : {}), ...(opt.defaultColors !== 'none' ? {defaultColors: true} : {}), scrollIntent: 'css', ...(opt.ua ? (String(opt.ua).includes(',') ? {uas: String(opt.ua).split(',')} : {ua: opt.ua}) : {}), ...(!opt.snapshots ? {sourceLines: true, eachCounts: (opt.eachCounts ?? '0,2').split(',').map(Number)} : {}), pageCSS, viewport: {...range(opt.viewport), height: range(opt.height)}, accessibility: true, integrity: true, selectors: true, scrollbars: [{name: 'overlay', inlineSize: 0, blockSize: 0}], ...(opt.assumeText && !opt.snapshots ? {assumeText: true} : {})};
 
 // --font Family=file.ttf: the component's texts in that family are measured from the font file (widths, line breaks).
-if (opt.snapshots && (!opt.css || opt.fonts)) { console.error('--snapshots requires --css and does not support --font (use explicit API box contracts)'); process.exit(2); }
-if (opt.fonts) { const {loadTextMetrics} = await import('../packages/veriss/src/text-node.mjs'); options.textMetrics = await loadTextMetrics({fonts: opt.fonts}); options.fonts = opt.fonts; if (opt.textResize !== 'off') options.textResize = true; }
+if (opt.snapshots && !opt.css) { console.error('--snapshots requires --css'); process.exit(2); }
+if (opt.fonts) { const {loadTextMetrics} = await import('../packages/veriss/src/text-node.mjs'); options.textMetrics = await loadTextMetrics({fonts: opt.fonts}); options.fonts = opt.fonts; if (!opt.snapshots && opt.textResize !== 'off') options.textResize = true; }
 
 const adapters = {
   '.svelte': async () => (await import('../packages/svelte-adapter/src/index.mjs')).analyzeSvelte,
@@ -66,7 +66,9 @@ for (const file of files) {
       if (typeof snapshot !== 'string' || !snapshot) throw new TypeError('Snapshot state requires a file');
       return {html:readFileSync(resolve(dirname(file),snapshot),'utf8'),choices};
     });
-    const result = analyzeSnapshots({states,css:readFileSync(opt.css,'utf8')},options);
+    const {textMetrics, fonts, ...snapshotOptions}=options;
+    const boxes=textMetrics ? textMetrics.resolveBoxes(manifest.boxes??{}) : manifest.boxes;
+    const result = analyzeSnapshots({states,css:readFileSync(opt.css,'utf8'),contracts:manifest.contracts}, {...snapshotOptions,...(boxes ? {boxes} : {}),...(fonts ? {knownFonts:Object.keys(fonts)} : {}),...(manifest.safeArea ? {safeArea:manifest.safeArea} : {})});
     unchecked ||= result.status !== 'verified' || result.states.some(s=>s.report.status==='unknown');
     all.push(...lint(result,{file,profile:opt.profile,page:true}));
     continue;

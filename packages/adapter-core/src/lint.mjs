@@ -18,6 +18,7 @@ export const recommended = {
   E_CSS_SHORTHAND_CONFLICT: ['error', 'put the shorthand and the longhand in separate rules (the later rule wins), or write only longhands (font: inherit, then font-size in another rule)'],
   E_SCOPE_CONTRACT: ['error', 'declare data-noshift inside the child component, or wrap it in an element of this component and mark that'],
   // Layout shift: an element the component marks data-noshift moves or resizes between its states.
+  E_SNAPSHOT_CONTRACT: ['error', 'adjust the layout to satisfy the declared rectangle geometry contract'],
   E_LAYOUT_NOSHIFT: ['error', 'reserve the space the changing content needs (a fixed track or min-height), overlay it (position: absolute), or limit the contract to the states it should hold in (data-noshift-on)'],
   E_SCOPE_ESCAPE: ['error', 'drop :global/:deep/:slotted: style each element in the component that renders it'],
   E_A11Y_FIXED_HIDES: ['error', 'offset the content by the fixed bar\'s size (padding or margin), as the rest of the page is'],

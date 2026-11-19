@@ -316,6 +316,29 @@ test('snapshot CLI verifies explicit DOM states and reports violations and incom
     const unknown=run(['normal']);
     assert.equal(unknown.status,2);
     assert.ok(unknown.rows.some(r=>r.code==='U_SNAPSHOT_CONTRACT'));
-    assert.equal(run(['normal','paused'],'480-900').status,2);
+    assert.equal(run(['normal','paused'],'480-900').status,0);
   } finally {rmSync(dir,{recursive:true,force:true})}
+});
+
+test('snapshot geometry: height-dependent shifts and explicit game region contracts', async () => {
+  const {analyzeSnapshots} = await import('../src/index.mjs');
+  const html=mode=>'<!doctype html><html data-mode="'+mode+'"><head><title>Game</title></head><body><main id="field"><div id="left" data-noshift="left"></div><div id="right"></div></main></body></html>';
+  const states=['normal','paused'].map(mode=>({html:html(mode),choices:{mode}}));
+  const css='*{box-sizing:border-box;margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}main{display:grid;grid-template-columns:100px 100px;gap:10px;height:100px}#left,#right{height:48px}';
+  const options={viewport:{min:320,max:800,height:{min:400,max:900}}};
+  const contracts=[{kind:'disjoint',target:'left',other:'right'},{kind:'contains',target:'field',other:'left'},{kind:'within-viewport',target:'right'}];
+  const stable=analyzeSnapshots({states,css,contracts},options);
+  assert.equal(stable.status,'verified',JSON.stringify(stable.unknowns));
+  const changed=analyzeSnapshots({states,css:css+'@media (max-height:550px){html[data-mode=paused] #left{margin-top:8px}}',contracts},options);
+  assert.equal(changed.status,'violated');
+  assert.ok(changed.findings.some(f=>f.code==='E_LAYOUT_NOSHIFT' && /viewport/.test(f.message)));
+  const failed=analyzeSnapshots({states,css,contracts:[{kind:'contains',target:'left',other:'right'},{kind:'disjoint',target:'field',other:'right'}]},options);
+  assert.equal(failed.status,'violated');
+  assert.equal(failed.findings.filter(f=>f.code==='E_SNAPSHOT_CONTRACT').length,2);
+  const absent=analyzeSnapshots({states,css,contracts:[{kind:'within-viewport',target:'missing'}]},options);
+  assert.equal(absent.status,'unknown');
+  assert.ok(absent.unknowns.some(f=>f.message.includes('missing')));
+  const safe=analyzeSnapshots({states,css,contracts:[{kind:'within-viewport',target:'left'}]},{...options,safeArea:{top:20}});
+  assert.equal(safe.status,'violated');
+  assert.ok(safe.findings.some(f=>f.code==='E_SNAPSHOT_CONTRACT'));
 });

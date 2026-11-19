@@ -184,17 +184,34 @@ CSS の cascade 順序を保持する。検査器は JS を実行せず、CSS �
 ```
 
 ```bash
-node tools/css-lint.mjs --snapshots --css game.css --viewport 320-1920 --height 844-844 --fail-on-unknown states.json
+node tools/css-lint.mjs --snapshots --css game.css --viewport 320-1920 --height 320-1080 --fail-on-unknown states.json
 ```
 
 - manifest の HTML パスは manifest からの相対パス。1〜64 状態と一意の choices を指定する。
 - スナップショットは変形せず解析し、コンポーネント用 reset や仮の文字幅を自動で追加しない。
-  CLI の --font はこのモードでは未対応。API の明示的な boxes に文字寸法の契約を渡せる。
+  manifest の boxes に明示的な寸法契約を指定できる。--font Family=file.ttf を付けると、boxes 内の text 契約は既存のフォント計測器で解決される。自動推定・200% 再検査はしない。
 - 既存の data-noshift と data-noshift-on を利用できる。スナップショットでは一意の非空の名前と比較可能な状態の組が必要。
-  現時点では固定 viewport 高さ・単一 scrollbar/DPR profile のみ。この条件を満たさない契約は Unknown。
+  幅・高さの両軸を exact rational の領域演算で検査する。単一 scrollbar/DPR profile、host inset 0 が必要。モデルの被覆不足、対象が非表示・未対応、予算超過は Unknown。
 - 状態列挙の完全性、viewport 依存 JS、CSS の完全性は呼び出し元の責任である。Canvas 内部は対象外。
   この結果は与えた DOM に対するもので、実行時の全状態の証明ではない。
 - --fail-on-unknown は通常のコンポーネント lint でも使える。エラーなら 1、未検査があれば 2、
   それ以外は 0。既定は従来通り error のみ終了コード 1。明示的な環境仮定そのものは Unknown ではない。
 
-API: `analyzeSnapshots({states: [{html, choices}], css}, options)` (adapter-core)。
+manifest の任意項目 contracts:
+```json
+{"contracts":[{"kind":"disjoint","target":"attack","other":"move"},
+              {"kind":"contains","target":"hud","other":"score"},
+              {"kind":"within-viewport","target":"attack","when":{"paused":false}}],
+ "safeArea":{"top":47,"bottom":34,"left":0,"right":0}}
+```
+target/other は HTML id (一意)。各状態で border rectangle が重ならない、包含する、または
+指定 safeArea 内の viewport に収まることを要求する。接触は重なりに含まない。
+省略した inset は 0。when に合う状態がない場合は Unknown。見た目の occlusion や hit testing
+ではなく、未スクロールの root 相対矩形の契約である。
+
+Playwright による状態取得は tools/capture-snapshots.mjs の captureSnapshot(page, choices) を
+使える。各操作と待機は呼び出し元で指定する。headLayoutIndependent: true は head の
+script/style/link が配置に影響しないという明示的な前提の下で除く。それ以外は DOM を保存し、
+CSS の取得・順序・動的な DOM プロパティは呼び出し元で確認する。
+
+API: `analyzeSnapshots({states: [{html, choices}], css, contracts}, options)` (adapter-core)。
