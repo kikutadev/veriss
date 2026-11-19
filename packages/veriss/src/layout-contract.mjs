@@ -7,6 +7,9 @@ import {layoutInstances,directInstances,localLayout,exposedRoots,scopeLayout,par
 import {obligationModel as makeModel} from './layout/model.mjs';
 import {validateTargetMetadata} from './layout/target-metadata.mjs';
 
+import {createRelationalContractIR,createRelationalObligationIR,verifyRelationalObligation} from './relational-contract.mjs';
+export {createStateIR,createEnvironmentIR,createEvidenceIR,layoutGeometry,verifyUI,verifyRelationalObligation} from './relational-contract.mjs';
+
 const freeze=value=>{if(value && typeof value==='object') {Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const snapshot=value=>freeze(structuredClone(value));
 export const SafeGrid=freeze({id:'safe-grid/1',containers:'grid',positioning:'in-flow',boxSizing:'border-box',geometry:'piecewise-affine',overflowPolicies:['fit']});
@@ -21,6 +24,7 @@ function range(input) {
   return serializeRange({min:q(input.min),max:q(input.max),minInclusive:true,maxInclusive:true});
 }
 export function createContractIR(input) {
+  if(input?.profile==='relational/1')return createRelationalContractIR(input);
   if(!object(input,['component','profile','requires','ensures','spaces','overlays']) || typeof input.component!=='string' || !/^[A-Z][A-Za-z0-9_]{0,127}$/.test(input.component) ||
     input.profile!==undefined && ![SafeGrid.id,PositionedGrid.id].includes(input.profile) || !object(input.requires,['inlineSize','blockSize']) ||
     input.ensures!==undefined && (!object(input.ensures,['inline','block']) || input.ensures.inline!=='fit' || input.ensures.block!=='fit')) throw new TypeError('Invalid closed layout contract grammar');
@@ -38,6 +42,7 @@ export function createLayoutIR(report) {
   if(!Array.isArray(report.sizes) || !Array.isArray(report.policies) || report.elements!==undefined && !Array.isArray(report.elements) || report.sizes.length+report.checks.length+report.policies.length+(report.elements?.length ?? 0)>32768) throw new TypeError('Invalid layout fact count');
   for(const element of report.elements ?? []) validateTargetMetadata(element);
   const diagnostics=report.diagnostics.filter(d=>d.severity==='unknown');
+  const geometryComplete=report.status==='verified' && report.structure?.complete!==false && report.scope.axis==='both' && report.scope.blockSizing && !diagnostics.length;
   if(report.scope.axis!=='both' || !report.scope.blockSizing) diagnostics.push(unknown('U_LAYOUT_AXES','SafeGrid contracts require both dimensions'));
   if(report.policies.some(row=>row.overflow!=='fit') || report.checks.some(row=>!row.enforced)) diagnostics.push(unknown('U_LAYOUT_PROFILE','safe-grid/1 cannot import weakened overflow policies'));
   const variants=report.structure?.variants.map(({id})=>({variant:id})) ?? [{}];
@@ -58,7 +63,7 @@ export function createLayoutIR(report) {
     checks:cases.length ? report.checks : [],errors:cases.length ? report.diagnostics.filter(d=>d.severity==='error' && !d.witness) : [],
     elements:cases.length ? report.elements ?? [] : [],
     bindings:cases.length ? report.layoutBindings ?? [] : [],
-    complete:report.status!=='unknown' && report.structure?.complete!==false && !diagnostics.length,diagnostics,assumptions:report.assumptions});
+    geometryComplete,complete:report.status!=='unknown' && report.structure?.complete!==false && !diagnostics.length,diagnostics,assumptions:report.assumptions});
 }
 
 function validateContract(contract) {
@@ -78,6 +83,7 @@ function requires(contract,inputs) {
 }
 const fullBox=box=>box.border.inline && box.border.block && box.content.inline && box.content.block && box.allocated.inline && ['static','relative','absolute'].includes(box.position);
 export function createObligationIR(contract,implementation,options={}) {
+  if(contract?.profile?.id==='relational/1'){if(Object.keys(options).length)throw new TypeError('Relational options belong to IR');return createRelationalObligationIR(contract,implementation);}
   if(!object(options,['children'])) throw new TypeError('Invalid conformance options');
   return conformance(contract,implementation,{children:options.children,requested:true});
 }
@@ -194,6 +200,7 @@ export function createRefinementObligationIR(previous,next) {
 }
 
 export async function verifyObligationIR(obligation,api,options) {
+  if(obligation?.operation==='relational')return verifyRelationalObligation(obligation,options);
   if(obligation?.kind!=='obligation' || obligation.version!==1 || !['conformance','refinement'].includes(obligation.operation)) throw new TypeError('Invalid ObligationIR');
   let coverage;
   if(obligation.coverage) {

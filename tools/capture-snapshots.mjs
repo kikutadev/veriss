@@ -15,7 +15,7 @@ export async function captureSnapshot(page, choices, {headLayoutIndependent=fals
 
 // Record a point observation independently of proof. No automatic scrolling;
 // the caller drives state transitions and checks their expected outcome.
-export async function captureGameObservation(page,{state,profile,targets}) {
+export async function captureUIObservation(page,{state,profile,targets}) {
   const data=await page.evaluate(targets=>{
     const rects=Object.create(null);
     for(const id of targets){

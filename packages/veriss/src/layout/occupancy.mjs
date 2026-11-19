@@ -1,7 +1,7 @@
 // Exact union of axis-aligned rectangles clipped to the playfield. Split by
 // affine edge ordering, then maximize a rational quadratic in each cell.
-import {q,add,sub,mul,div,cmp} from '@mizchi/veriss/src/layout/linear.mjs';
-import {diff,sum,partition,sample,evaluate} from '@mizchi/veriss/src/layout/region.mjs';
+import {q,add,sub,mul,div,cmp} from './linear.mjs';
+import {diff,sum,partition,sample,evaluate} from './region.mjs';
 const z=q(0),two=q(2), neg=x=>sub(z,x);
 const plus=(a,b)=>a.map((v,i)=>add(v,b[i]));
 const product=(a,b)=>[mul(a.x,b.x),add(mul(a.x,b.y),mul(a.y,b.x)),mul(a.y,b.y),add(mul(a.x,b.b),mul(a.b,b.x)),add(mul(a.y,b.b),mul(a.b,b.y)),mul(a.b,b.b)];

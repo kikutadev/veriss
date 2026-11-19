@@ -146,3 +146,5 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 結果は証拠ディレクトリの island-proof.json と coverage-final.json に保存。本番サイト変更なし。連続領域の縦方向・内側の配置・アニメーション途中・全状態・全ページ CSS の証明は未達。
 
 最終 gate (a09df13): 6単体テスト群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 339 E2E passed、監督ランナー exit=0、619 PID追跡・残留0。ゲート対象のソースが同一であることを確認して並行作業の main へ統合する。
+
+後続: 汎用 UI の relational/1 に移行した。ゲームは利用例の一つであり契約本体の仕様は [layout-contract-ir.md](layout-contract-ir.md#relational1-汎用-ui-関係述語)。旧 game-ui API の実装経緯と評価は上記の履歴として残す。

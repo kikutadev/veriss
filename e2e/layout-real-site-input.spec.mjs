@@ -85,8 +85,8 @@ test('snapshot game contracts match browser rectangles in both axes',async({page
 });
 
 test('game model separates DOM/canvas geometry, HUD union and live action observations',async({page})=>{
-  const {verifyGameUI,domGeometry}=await import('../packages/adapter-core/src/game-ui.mjs');
-  const {captureGameObservation}=await import('../tools/capture-snapshots.mjs');
+  const {verifyUI,domGeometry}=await import('../packages/adapter-core/src/ui-contracts.mjs');
+  const {captureUIObservation}=await import('../tools/capture-snapshots.mjs');
   const profile={id:'desktop',viewport:{min:320,max:800,height:{min:400,max:900}}};
   const css='*{box-sizing:border-box;margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}main{position:relative;display:grid;grid-template-columns:minmax(0,1fr);height:100px}#hud{position:absolute;left:0;top:0;width:100px;height:50px}#extra{position:absolute;left:50px;top:0;width:100px;height:50px}';
   const html='<!doctype html><html lang="en"><head><title>Game</title></head><body><main id="field"><div id="hud"></div><div id="extra"></div></main></body></html>';
@@ -101,24 +101,24 @@ test('game model separates DOM/canvas geometry, HUD union and live action observ
   // CSS-pixel projection is compared below against the browser's field box.
   const a=(constant,coefficient='0')=>({constant,coefficient});
   evidence.push({state:'play',profile:'desktop',target:'field',source:'scene',assumptions:['scene uses full viewport width and 100 CSS px height at origin'],rows:[{rect:{inlineStart:a('0'),blockStart:a('0'),inlineSize:a('0','1'),blockSize:a('100')}}]});
-  const check=verifyGameUI({model,evidence});
+  const check=verifyUI({model,evidence});
   expect(check.contracts.map(c=>c.status)).toEqual(['verified','violated','verified','unknown']);
   const observations=[];
   for(const width of [320,600,800]){
     await page.setViewportSize({width,height:600});
     await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
     const targets=['field','hud','extra'];
-    const one=await captureGameObservation(page,{state:'play',profile:'desktop',targets});
+    const one=await captureUIObservation(page,{state:'play',profile:'desktop',targets});
     observations.push(one);
     const {field,hud,extra}=one.rects;
     expect((hud.width*50+extra.width*50-50*50)/(field.width*field.height)).toBeCloseTo(75/width);
     await page.evaluate(()=>document.querySelector('#hud').addEventListener('click',()=>document.body.dataset.mode='pause'));
     await page.locator('#hud').click({position:{x:10,y:10}});
     expect(await page.locator('body').getAttribute('data-mode')).toBe('pause');
-    observations.push(await captureGameObservation(page,{state:'pause',profile:'desktop',targets}),
+    observations.push(await captureUIObservation(page,{state:'pause',profile:'desktop',targets}),
       {state:'play',profile:'desktop',width,height:600,event:'pause',to:'pause',passed:true});
   }
-  const report=verifyGameUI({model,evidence,observations});
+  const report=verifyUI({model,evidence,observations});
   expect(report.contracts.find(c=>c.id==='space').observations.map(o=>o.status)).toEqual(['passed','passed','passed']);
   expect(report.contracts.find(c=>c.id==='tight').observations.map(o=>o.status)).toEqual(['failed','passed','passed']);
   expect(report.contracts.find(c=>c.id==='stable').observations.map(o=>o.status)).toEqual(['passed','passed','passed']);
@@ -163,4 +163,45 @@ test('minified rotation and dynamic viewport flex lengths match in a fixed viewp
     expect(actual.width).toBeCloseTo(Number(a.heightCoefficient.split('/')[0])/Number(a.heightCoefficient.split('/')[1])*height,1);
     expect(actual.transform).toBe('matrix(1, 0, 0, 1, 0, 0)');
   }
+});
+
+test('relational profile proves ordinary account settings responsiveness and state stability',async({page,browserName})=>{
+  const {createContractIR,createStateIR,createEnvironmentIR,createEvidenceIR,createObligationIR,verifyObligationIR}=await import('../packages/veriss/src/layout-contract.mjs');
+  const {domGeometry}=await import('../packages/adapter-core/src/ui-contracts.mjs');
+  const {captureUIObservation}=await import('../tools/capture-snapshots.mjs');
+  const html='<html lang="en"><head><title>Account settings</title></head><body><main id="panel"><section id="details"><div id="email" role="textbox" aria-label="Email address"></div></section><section id="actions"><div id="save" role="button" aria-label="Save"></div></section></main></body></html>';
+  const css='*{box-sizing:border-box;margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}#panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}#details,#actions{display:grid;grid-template-columns:minmax(0,1fr);height:100px;align-content:start}#email,#save{width:100%;height:48px}@media(max-width:600px){#panel{grid-template-columns:minmax(0,1fr)}}';
+  const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:400,max:900}}};
+  const state=createStateIR({initial:'editing',states:['editing','saving'],transitions:[{from:'editing',event:'save',to:'saving'}]});
+  const environment=createEnvironmentIR([profile]);
+  const cmp=(relation,left,right)=>({op:'compare',relation,left,right});
+  const ref=(target,field,endpoint)=>({target,field,...(endpoint?{endpoint}:{})});
+  const separation={op:'any',items:[
+    cmp('le',{op:'add',items:[ref('details','inlineEnd'),'16']},ref('actions','inlineStart')),
+    cmp('le',{op:'add',items:[ref('details','blockEnd'),'16']},ref('actions','blockStart'))
+  ]};
+  const spec=createContractIR({component:'AccountSettings',profile:'relational/1',definitions:{control:{op:'all',items:[cmp('ge',ref('item','inlineSize'),'44'),cmp('ge',ref('item','blockSize'),'44')]}},contracts:[
+    {id:'responsive-gap',kind:'predicate',predicate:separation},
+    {id:'control-size',kind:'predicate',predicate:{op:'use',name:'control',bind:{item:'save'}}},
+    {id:'stable-save',kind:'stable',target:'save',event:'save'}
+  ]});
+  const targets=['details','actions','save'];
+  const saving=html.replace('aria-label="Save"','aria-label="Saving"');
+  const facts=(changed=false)=>createEvidenceIR(['editing','saving'].flatMap(s=>domGeometry({state:s,profile,html:s==='editing'?html:saving,css:changed&&s==='saving'?css+'#save{height:40px}':css,targets})));
+  const observations=[];
+  for(const width of [320,600,601,1000])for(const height of [400,900]){
+    await page.setViewportSize({width,height});
+    const doc=s=>'<!doctype html>'+s.replace('</head>','<style>'+css+'</style></head>');
+    await page.setContent(doc(html));
+    observations.push(await captureUIObservation(page,{state:'editing',profile:'web',targets}));
+    await page.setContent(doc(saving));
+    observations.push(await captureUIObservation(page,{state:'saving',profile:'web',targets}));
+  }
+  const proof=await verifyObligationIR(createObligationIR(spec,{state,environment,evidence:facts()}),undefined,{observations});
+  expect(proof.status,JSON.stringify(proof.contracts)).toBe('verified');
+  expect(proof.observationStatus).toBe('sampled');
+  expect(proof.contracts[0].observations.length).toBe(16);
+  const broken=await verifyObligationIR(createObligationIR(spec,{state,environment,evidence:facts(true)}));
+  expect(broken.contracts[1].status).toBe('violated');
+  expect(broken.contracts[2].status).toBe('violated');
 });

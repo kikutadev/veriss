@@ -1,0 +1,74 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createContractIR,createObligationIR,verifyObligationIR,createStateIR,createEnvironmentIR,createEvidenceIR,createLayoutIR} from '../src/layout-contract.mjs';
+import {analyzeHTML} from '../src/html.mjs';
+const profile={id:'web',viewport:{min:320,max:1000,height:{min:400,max:900}}};
+const state=createStateIR({initial:'empty',states:['empty','loaded','dead'],transitions:[{from:'empty',event:'load',to:'loaded'}]});
+const environment=createEnvironmentIR([profile]);
+const a=(constant,coefficient='0')=>({constant,coefficient});
+const row=(width)=>({rect:{inlineStart:a('0'),blockStart:a('0'),inlineSize:a(String(width)),blockSize:a('48')}});
+const fact=(state,target,width)=>({state,profile:'web',target,source:'scene',assumptions:['explicit layout model'],rows:[row(width)]});
+const ref=(target,field,endpoint)=>({target,field,...(endpoint?{endpoint}:{})});
+const cmp=(relation,left,right)=>({op:'compare',relation,left,right});
+const evidence=createEvidenceIR([fact('empty','submit',100),fact('loaded','submit',100)]);
+const make=contracts=>createContractIR({component:'Checkout',profile:'relational/1',contracts});
+const prove=async(contract,ev=evidence)=>verifyObligationIR(createObligationIR(contract,{state,environment,evidence:ev}));
+test('relational ContractIR uses explicit state, environment and evidence with composable predicates',async()=>{
+ const contract=createContractIR({component:'Checkout',profile:'relational/1',definitions:{usable:{op:'all',items:[cmp('ge',ref('control','inlineSize'),'44'),cmp('le',ref('control','inlineEnd'),{environment:'width'})]}},contracts:[
+  {id:'usable',kind:'predicate',predicate:{op:'use',name:'usable',bind:{control:'submit'}}},
+  {id:'stable',kind:'predicate',event:'load',predicate:cmp('eq',ref('submit','inlineSize','before'),ref('submit','inlineSize','after'))}
+ ]});
+ const obligation=createObligationIR(contract,{state,environment,evidence});
+ assert.equal(obligation.kind,'obligation');assert.equal(obligation.operation,'relational');
+ assert.ok(Object.isFrozen(obligation));assert.deepEqual(JSON.parse(JSON.stringify(obligation)),obligation);
+ const p=await verifyObligationIR(obligation);
+ assert.equal(p.status,'verified');assert.equal(p.contracts[0].cases.length,2);assert.deepEqual(p.unreachable,['dead']);
+ const broken=await prove(contract,createEvidenceIR([fact('empty','submit',100),fact('loaded','submit',30)]));
+ assert.equal(broken.status,'violated');assert.equal(broken.contracts[1].cases[0].coverage.status,'verified');
+ const missing=await prove(contract,createEvidenceIR([fact('empty','submit',100)]));
+ assert.equal(missing.status,'unknown');assert.equal(missing.contracts[1].cases[0].coverage.status,'unknown');
+});
+test('boolean relations have exact boundaries, no vacuous pass for missing evidence',async()=>{
+ const c=make([{id:'either',kind:'predicate',predicate:{op:'any',items:[cmp('lt',ref('submit','inlineSize'),'100'),{op:'not',item:cmp('gt',ref('submit','inlineSize'),'100')}]}}]);
+ assert.equal((await prove(c)).status,'verified');
+ const empty=await prove(c,createEvidenceIR([]));assert.equal(empty.status,'unknown');
+ assert.throws(()=>createContractIR({component:'X',profile:'relational/1',definitions:{x:{op:'use',name:'x',bind:{}}},contracts:[{id:'x',kind:'predicate',predicate:{op:'use',name:'x',bind:{}}}]}),/cycle/i);
+});
+
+test('serialized obligations do not permit omitted cases and unknown grammar is rejected',async()=>{
+ const c=make([{id:'size',kind:'min-size',target:'submit',width:101,height:44}]);
+ const o=JSON.parse(JSON.stringify(createObligationIR(c,{state,environment,evidence})));
+ o.cases=[];
+ assert.equal((await verifyObligationIR(o)).status,'violated');
+ assert.throws(()=>make([{id:'x',kind:'min-size',target:'submit',width:44,height:44,other:'ignored'}]),/Unknown contract field/);
+ assert.throws(()=>make([{id:'x',kind:'predicate',predicate:cmp('eq',ref('submit','inlineSize','after'),'100')}]),/Endpoint requires event/);
+ assert.throws(()=>createEnvironmentIR([{...profile,pointer:'fine'}]),/Unknown environment field/);
+});
+
+test('profile-specific graph and contract applicability are not silently omitted',async()=>{
+ const env=createEnvironmentIR([profile,{...profile,id:'desktop'}]);
+ const graph=createStateIR({initial:'empty',states:['empty','loaded'],transitions:[{from:'empty',event:'load',to:'loaded',profiles:['web']}]});
+ const c=make([{id:'size',kind:'min-size',target:'submit',width:44,height:44,states:['loaded'],profiles:['web']}]);
+ const ok=await verifyObligationIR(createObligationIR(c,{state:graph,environment:env,evidence}));
+ assert.equal(ok.status,'verified');
+ assert.deepEqual(ok.reachability,[{profile:'web',states:['empty','loaded']},{profile:'desktop',states:['empty']}]);
+ const both=make([{id:'size',kind:'min-size',target:'submit',width:44,height:44,states:['loaded']}]);
+ assert.equal((await verifyObligationIR(createObligationIR(both,{state:graph,environment:env,evidence}))).status,'unknown');
+ assert.throws(()=>createObligationIR(make([{id:'size',kind:'min-size',target:'submit',width:44,height:44,profiles:['typo']}]),{state:graph,environment:env,evidence}),/Unknown contract state\/profile/);
+});
+
+test('state graph with 64 states has no dummy validation case',()=>{
+ const states=Array.from({length:64},(_,i)=>'s'+i);
+ assert.equal(createStateIR({initial:states[0],states,transitions:[]}).states.length,64);
+ assert.equal(make([{id:'size',kind:'min-size',target:'x',width:44,height:44,states}]).contracts[0].states.length,64);
+});
+
+test('observed states outside a profile graph fail the combined outcome',async()=>{
+ const env=createEnvironmentIR([profile,{...profile,id:'desktop'}]);
+ const graph=createStateIR({initial:'empty',states:['empty','loaded'],transitions:[{from:'empty',event:'load',to:'loaded',profiles:['web']}]});
+ const c=make([{id:'size',kind:'min-size',target:'submit',width:44,height:44,profiles:['web']}]);
+ const report=await verifyObligationIR(createObligationIR(c,{state:graph,environment:env,evidence}),undefined,{observations:[{state:'loaded',profile:'desktop',width:390,height:600,rects:{}}]});
+ assert.equal(report.status,'verified');
+ assert.equal(report.outcome,'failed');
+ assert.equal(report.observationDiagnostics[0].code,'E_UI_OBSERVED_STATE');
+});

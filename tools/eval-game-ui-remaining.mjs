@@ -4,7 +4,7 @@ import {webkit} from 'playwright';
 import {readFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
-import {verifyGameUI} from '../packages/adapter-core/src/game-ui.mjs';
+import {verifyUI} from '../packages/adapter-core/src/ui-contracts.mjs';
 
 const games={
   'sumi-no-tachi':{
@@ -38,7 +38,7 @@ function add(target,state,rows,assumptions,source='local-dom'){
   evidence.push({target,state,profile:profile.id,source,rows,assumptions});
 }
 const contracts=[];
-function contract(id,kind,target,more={}){contracts.push({id,kind,target,...more})}
+function contract(id,kind,target,more={}){contracts.push({id,kind,...(target!==undefined?{target}:{}),...more})}
 const viewportRect=rect(aff(),aff(),aff(0,1),aff(0,0,1));
 if(game==='sumi-no-tachi'){
   const assumption=['Reviewed CSS build: game is a margin-free viewport-width relative box, height 100dvh equals profile height; view is its first applicable static-position absolute canvas and has width/height 100%; inkImpact is inset:0. No external CSS, scrolling, review mode, or size-altering inline overrides; CSS pixels only.'];
@@ -156,6 +156,6 @@ for(const o of observations.filter(o=>o.rects)){
     if(Object.keys(expected).some(k=>Math.abs(actual[k]-expected[k])>0.05))mismatches.push({state:o.state,width:o.width,height:o.height,target:e.target,expected,actual});
   }
 }
-const report=verifyGameUI({model,evidence,observations});
+const report=verifyUI({model,evidence,observations});
 console.log(JSON.stringify({game,hashes:cfg.sheets,compared,mismatches,issues,report},null,2));
 if(mismatches.length||issues.length)process.exitCode=2;

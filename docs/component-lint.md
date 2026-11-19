@@ -226,3 +226,16 @@ API: `analyzeSnapshots({states: [{html, choices}], css, contracts}, options)` (a
 
 `--font Roboto=Roboto.ttf` を指定する。Roboto fixture で幅180pxの領域は通過し、
 20pxの領域では必要幅89.94pxの E_LAYOUT_CONTENT を検出することを CLI で確認済み。
+
+## 汎用の関係述語契約
+
+明示した UI の状態、環境、レイアウト証拠に対して利用する
+[relational/1 profile](layout-contract-ir.md#relational1-汎用-ui-関係述語) は、
+既存の component lint / snapshot lint と共通の矩形検証コアを利用する。
+
+```sh
+node tools/css-lint.mjs --contracts --fail-on-unknown ui.json
+```
+
+manifest の documents に HTML/CSS を指定するか、独立した条件付き幾何証拠を渡す。
+React/Vue/Svelte の自動状態列挙にこの新 profile の DSL を直接組み込む機能はまだない。

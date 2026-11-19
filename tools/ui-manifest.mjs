@@ -1,13 +1,9 @@
-// Usage: node tools/game-ui-check.mjs game-ui.json
-// Manifest contains model, optional evidence/observations, and DOM documents.
-// A geometry proof, runtime failure and Unknown have separate result fields.
 import {readFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
-import {verifyGameUI,domGeometry} from '../packages/adapter-core/src/game-ui.mjs';
+import {verifyUI,domGeometry} from '../packages/adapter-core/src/ui-contracts.mjs';
 import {loadTextMetrics} from '../packages/veriss/src/text-node.mjs';
-try{
-  const file=process.argv[2];
-  if(!file||process.argv.length!==3)throw Error('usage: game-ui-check.mjs manifest.json');
+
+export async function checkUIManifest(file) {
   const path=rel=>resolve(dirname(file),rel),read=rel=>readFileSync(path(rel),'utf8');
   const manifest=JSON.parse(readFileSync(file,'utf8'));
   const {model,evidence=[],observations=[],documents=[]}=manifest;
@@ -24,7 +20,5 @@ try{
     }
     derived.push(...domGeometry({...d,profile,html:read(d.html),css:read(d.css),boxes,knownFonts}));
   }
-  const report=verifyGameUI({model,evidence:[...evidence,...derived],observations});
-  console.log(JSON.stringify(report,null,2));
-  process.exitCode=report.outcome==='failed'?1:report.outcome==='unknown'?2:0;
-}catch(e){console.error(e.message);process.exitCode=2}
+  return verifyUI({model,evidence:[...evidence,...derived],observations});
+}
