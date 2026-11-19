@@ -1438,3 +1438,15 @@ test('F122: stretch, -moz-available, -webkit-fit-content and intrinsic are taken
   await page.setContent(`<!doctype html><style>*{margin:0}.p{width:300px}.a{display:inline-block;width:50px;width:-webkit-fill-available;width:stretch}</style><div class="p"><div class="a">x</div></div>`);
   expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().width)).toBe(300);
 });
+
+test('F123: isolation: isolate on the blended element itself does not stop the blend; on the parent it does', async ({page}) => {
+  const { PNG } = await import('pngjs');
+  await page.setViewportSize({ width: 200, height: 200 });
+  for (const [parent, self, blends] of [['', '', true], ['', 'isolation:isolate', true], ['isolation:isolate', '', false]]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}body{background:rgb(255,0,0)}.p{width:100px;height:100px;${parent}}.c{width:50px;height:50px;background:rgb(0,255,255);mix-blend-mode:difference;${self}}</style><div class="p"><div class="c"></div></div>`);
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: 10, y: 10, width: 1, height: 1 } }));
+    expect(png.data[0] > 200, `${parent}|${self}`).toBe(blends); // difference of cyan and red is white; unblended cyan has no red
+  }
+  const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="c"></div></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{height:20px;mix-blend-mode:difference;isolation:isolate}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_ISOLATION_SELF')).toBe(true);
+});

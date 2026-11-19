@@ -90,6 +90,7 @@ export const recommended = {
   W_CSS_WRAP_RESTORED: ['warning', 'write text-wrap-style: balance (or pretty) to change how wrapping text breaks: the text-wrap shorthand also sets text-wrap-mode: wrap and undoes white-space: nowrap'],
   W_CSS_BR_STYLED: ['warning', 'space the lines with margin or padding on the elements around the <br>: its margin works in Firefox only, its line-height in Safari only, the rest nowhere'],
   W_CSS_SIZE_BROWSER_DEPENDENT: ['warning', 'write fit-content, or -webkit-fill-available then stretch: some browsers drop stretch, -moz-available, -webkit-fit-content and intrinsic'],
+  W_CSS_ISOLATION_SELF: ['warning', 'put isolation: isolate on the parent: on the blended element itself it does not stop that element from blending with the page'],
   W_CSS_GRID_TRACKS_INVALID: ['warning', 'fix the grid track list: repeat(auto-fill) takes fixed sizes (minmax(200px, 1fr)), minmax() cannot start with fr, and a repeat count is a positive whole number'],
   W_CSS_COUNTER_UNUSED: ['warning', 'show the counter with content: counter(name), or remove the counter-reset / -increment / -set'],
   W_LAYOUT_ALIGN_BROWSER_DEPENDENT: ['warning', 'centre a block with margin-inline: auto (and a width), or make the parent a grid: justify-self / justify-items in block layout work in Chromium and Safari only'],

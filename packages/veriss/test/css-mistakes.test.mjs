@@ -1343,3 +1343,9 @@ test('F122: a size keyword some browsers drop, without a fallback they take, is 
   assert.match(hit('.a{max-width:-webkit-fit-content}')[0].message, /Write fit-content/);
   for (const css of ['.a{width:-webkit-fill-available;width:stretch}', '.a{width:fit-content}', '.a{width:-moz-fit-content;width:fit-content}']) assert.equal(hit(css).length, 0, css);
 });
+
+test('F123: isolation: isolate beside mix-blend-mode on the same element does not stop it blending', () => {
+  const hit = css => codes(run(css), 'W_CSS_ISOLATION_SELF');
+  assert.match(hit('.a{mix-blend-mode:difference;isolation:isolate}')[0]?.message ?? '', /Put isolation: isolate on the parent/);
+  for (const css of ['.a{mix-blend-mode:normal;isolation:isolate}', '.a{isolation:isolate}', '.a{mix-blend-mode:multiply}', '.a{mix-blend-mode:var(--m);isolation:isolate}', '.a{mix-blend-mode:multiply;isolation:auto}']) assert.equal(hit(css).length, 0, css);
+});

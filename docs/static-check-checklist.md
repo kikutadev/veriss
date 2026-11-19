@@ -397,6 +397,7 @@
 - [x] **F120. `<br>` に書いたスタイル**(`W_CSS_BR_STYLED`、解析は `<br>` で Unknown のまま): `<br>` は箱ではなく改行。`margin-top` / `margin-bottom` は Firefox だけ、`line-height` は WebKit だけで行の間隔を変え、`padding`・`width`・`height`・左右の `margin`・`display: block` はどのブラウザーでも何もしない(Chromium・Firefox・WebKit で実測)。`display: none` は改行を消すので報告しない
 - [x] **F121. ドロップダウンの `<option>` の大きさ・余白**(`W_LAYOUT_DECLARATION_INERT`、`select` 付き): `multiple` も `size` > 1 もない `select` では、`option` の `font-size`・`padding`・`margin`・`width`・`height`・`line-height` は select の大きさを変えない(Chromium・Firefox・WebKit で実測)。開いたメニューはブラウザーが描く(どれを使うかはブラウザーごとに違い、測っていない)。リストボックスと `appearance: base-select` は対象外。色は判定しない
 - [x] **F122. 一部のブラウザーしか受け付けない大きさのキーワード**(`W_CSS_SIZE_BROWSER_DEPENDENT`、解析はこれらのキーワードで Unknown のまま): `stretch` は Chromium と WebKit だけ、`-moz-available` と `-moz-fit-content` は Firefox だけ、`-webkit-fit-content` は Chromium と WebKit だけ、`intrinsic` は WebKit だけ(Firefox 157 ほかで実測)。同じ規則の中で、各ブラウザーが最後に受け付ける値の種類が違うと報告する(`-webkit-fill-available; stretch` のように前置きを並べたものは報告しない)
+- [x] **F123. `mix-blend-mode` と同じ要素の `isolation: isolate`**(`W_CSS_ISOLATION_SELF`、解析は normal 以外の `mix-blend-mode` で Unknown のまま): `isolation` は子孫の混合を閉じ込めるもので、その要素自身は後ろのページと混ざり続ける。親に付ければ親の中だけで混ざる(親の `opacity`・`transform`・`z-index` で重なりの文脈を作っても同じ。Chromium・Firefox・WebKit で画素を読んで実測)。同じ規則の中の組み合わせだけを判定する
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

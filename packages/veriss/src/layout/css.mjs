@@ -985,6 +985,12 @@ export function parseLayoutCSS(sheets, diagnostic) {
             related:[{css:location(conflict.earlier),message:`Earlier ${conflict.properties[0]} declaration`}]});
       }
       if(conflicts.length) continue;
+      // F123: isolation: isolate next to mix-blend-mode on the same element isolates its descendants, not the element: it
+      // still blends with what is behind it (measured in Chromium, Firefox and WebKit). The parent needs the isolation.
+      { const decls = node.nodes.filter(d => d.type === 'decl'), last = prop => decls.findLast(d => d.prop.toLowerCase() === prop);
+        const blend = last('mix-blend-mode'), iso = last('isolation');
+        if (blend && iso && iso.value.trim().toLowerCase() === 'isolate' && !/^(?:normal|initial|unset|inherit|revert|revert-layer)$/i.test(blend.value.trim()) && !/var\(/i.test(blend.value))
+          note('W_CSS_ISOLATION_SELF', { blend: blend.value.trim(), selector: node.selector, file: filename, line: iso.source.start.line }); }
       // F122: a size keyword some browsers drop (stretch, -moz-available, -webkit-fit-content, intrinsic) without a value
       // the others take: each browser ends on a different value (measured in Chromium, Firefox and WebKit). Reported;
       // the layout stays Unknown on these keywords.
