@@ -148,3 +148,7 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 最終 gate (a09df13): 6単体テスト群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 339 E2E passed、監督ランナー exit=0、619 PID追跡・残留0。ゲート対象のソースが同一であることを確認して並行作業の main へ統合する。
 
 後続: 汎用 UI の relational/1 に移行した。ゲームは利用例の一つであり契約本体の仕様は [layout-contract-ir.md](layout-contract-ir.md#relational1-汎用-ui-関係述語)。旧 game-ui API の実装経緯と評価は上記の履歴として残す。
+
+### 自動部分証拠の導入
+
+目標: 手書きの矩形式を要求せず、完全な HTML snapshot と author CSS の依存関係を検査し、独立した明示サイズの矩形だけを自動抽出して relational/1 の証拠へ接続する。元の全ページ判定は変更しない。セレクター・継承・含有ブロック・内容依存・外部 CSS・環境の不明な依存は拒否する。正常/反例/拒否の unit と3ブラウザー照合、実入力での評価、再実行 CLI、gate と fork main への統合を完了条件とする。無制限の CSS の自動分割は保証しない。
