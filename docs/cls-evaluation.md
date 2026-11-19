@@ -42,7 +42,7 @@ CLS は Layout Instability API の `layout-shift` エントリーの合計で決
 
 | 仕組み | CLS との関係 | 状態 |
 | --- | --- | --- |
-| `noshift/1`([layout-transitions.md](layout-transitions.md)) | 2つの状態で、対象の位置と大きさが viewport の全区間で一致することを証明する。CLS = 0 の部分的な十分条件 | 実装済み。transform とアニメーションは Unknown |
+| `noshift/1`([layout-transitions.md](https://github.com/mizchi/isle/blob/HEAD/docs/layout-transitions.md)) | 2つの状態で、対象の位置と大きさが viewport の全区間で一致することを証明する。CLS = 0 の部分的な十分条件 | 実装済み。transform とアニメーションは Unknown |
 | 動的な寸法の契約(ADR-0003) | 内容が変わっても箱が変わらない範囲を宣言して検査する | 実装済み |
 | 非同期の予約領域(ADR-0004) | 読み込み中と完了後の箱を一致させる。画像の予約と同じ考え方 | 実装済み |
 | key の世代と frame の遷移(ADR-0005) | 起こりうる隣接 frame を列挙する | 実装済み |

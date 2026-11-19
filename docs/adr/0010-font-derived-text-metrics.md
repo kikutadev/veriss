@@ -126,7 +126,7 @@ UAの見出し・強調のフォント(h1–h6のsizeとweight、strong/bのweig
 | --- | --- |
 | `packages/veriss/test/text-font.test.mjs` | 手書き契約でコアを単独検査。照合を外す変異で失敗することを確認 |
 | `tests/css-text-metrics.test.mjs` | 丸め、空白の畳み込み、wght、上界表、拒否する入力、CLIの例 |
-| `e2e/layout-text-fonts.spec.mjs` | Chromiumで同じフォントを描画。7文字列が`[advance, 上界]`、ランダム200文字列が上界以下、上界の余裕が2/64 px以下、例のcardが報告どおりの幅で溢れる。折り返し11構成(日本語・混在・Latin・括弧・小書き仮名・繰り返し記号、`anywhere`・`break-word`)と全クラスのランダム60文字列、ASCIIの語・記号とその日本語混在80文字列を`lang=en`/`ja`で描画し、行数がモデル以下、閾値直下の帯の外では一致(行数なしの幅は除く)。分割可能位置は全ての対と3000文字列を幅0で照合。[折り返しの例](../../examples/layout-contracts/text-wrap.json)のtitleの高さと、bodyが溢れる幅が一致 |
+| `e2e/layout-text-fonts.spec.mjs` | Chromiumで同じフォントを描画。7文字列が`[advance, 上界]`、ランダム200文字列が上界以下、上界の余裕が2/64 px以下、例のcardが報告どおりの幅で溢れる。折り返し11構成(日本語・混在・Latin・括弧・小書き仮名・繰り返し記号、`anywhere`・`break-word`)と全クラスのランダム60文字列、ASCIIの語・記号とその日本語混在80文字列を`lang=en`/`ja`で描画し、行数がモデル以下、閾値直下の帯の外では一致(行数なしの幅は除く)。分割可能位置は全ての対と3000文字列を幅0で照合。[折り返しの例](https://github.com/mizchi/isle/blob/HEAD/examples/layout-contracts/text-wrap.json)のtitleの高さと、bodyが溢れる幅が一致 |
 
 実行は`just css-text-check`。ブラウザーの実測は静的モデルの誤りを探す補助で、受理の判定には使わない。
 

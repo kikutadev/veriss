@@ -222,7 +222,7 @@ Missing coordinate coverage, scroll/clip or subgrid frames, unequal environments
 unsupported CSS and solver failures produce `unknown`. A fixed outer box only
 certifies that selected box. This endpoint relation does not prove intermediate
 frames, text/paint stability or a browser CLS value. See the
-[complete guide and runnable examples](../../docs/layout-transitions.md).
+[complete guide and runnable examples](https://github.com/mizchi/isle/blob/HEAD/docs/layout-transitions.md).
 
 The root and `/html` entry points do not initialize Z3. `/z3`, `/contracts` and `/transitions`
 accept an externally initialized Z3 API, including Wasm in a browser Worker.
@@ -234,4 +234,4 @@ Run `just veriss-check` from the repository root. The
 finds a one-pixel failure interval in an incorrect one without a browser.
 
 The adopted architecture and verification boundaries are described in
-[静的UI検証の方針](../../docs/static-ui-verification.md).
+[静的UI検証の方針](https://github.com/mizchi/isle/blob/HEAD/docs/static-ui-verification.md).

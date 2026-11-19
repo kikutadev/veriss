@@ -7,7 +7,7 @@
 
 ## 背景
 
-現在の[アクセシビリティ検査](../forms.md)はlabelや参照等を静的に検査し、デモでは
+現在の[アクセシビリティ検査](https://github.com/mizchi/isle/blob/HEAD/docs/forms.md)はlabelや参照等を静的に検査し、デモでは
 ブラウザーのcontrast gateも利用する。任意の利用アプリについて、CSSから色の組合せを
 静的に検査する契約はない。幾何のfitやnoshiftが成立しても文字の読みやすさは別に検査する必要がある。
 

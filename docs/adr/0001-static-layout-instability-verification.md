@@ -8,7 +8,7 @@
 ## 背景
 
 現在の[CSS検証コア](../../packages/veriss/README.md)は、閉じたCSS部分集合から
-有理数・区分線形の矩形を抽出する。[noshift/1](../layout-transitions.md)は明示した対象の
+有理数・区分線形の矩形を抽出する。[noshift/1](https://github.com/mizchi/isle/blob/HEAD/docs/layout-transitions.md)は明示した対象の
 存在・位置・寸法を二状態間で比較し、Isle adapterは有限な状態候補とkeyを対応付ける。
 可視領域、text fragment、frameの順序、入力時刻をモデル化する機能はまだない。
 
@@ -61,10 +61,10 @@ domain内のbrowser実行で、対象scopeのshiftが発生しない
 ## 依存関係
 
 - [0002](0002-layout-counterexample-explanations.md): source・矩形・原因を追跡する共通の説明データ。
-- [0003](0003-dynamic-dimension-contracts.md): 動的内容の範囲と相関。
-- [0004](0004-async-layout-reservations.md): 非同期表示と予約領域の有限case。
-- [0005](0005-key-generations-and-frame-transitions.md): identityの世代と描画され得る隣接状態。
-- [0006](0006-verification-result-cache.md)は性能改善であり、観測の正しさの前提にしない。
+- [0003](https://github.com/mizchi/isle/blob/HEAD/docs/adr/0003-dynamic-dimension-contracts.md): 動的内容の範囲と相関。
+- [0004](https://github.com/mizchi/isle/blob/HEAD/docs/adr/0004-async-layout-reservations.md): 非同期表示と予約領域の有限case。
+- [0005](https://github.com/mizchi/isle/blob/HEAD/docs/adr/0005-key-generations-and-frame-transitions.md): identityの世代と描画され得る隣接状態。
+- [0006](https://github.com/mizchi/isle/blob/HEAD/docs/adr/0006-verification-result-cache.md)は性能改善であり、観測の正しさの前提にしない。
 
 ## 実装計画
 

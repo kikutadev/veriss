@@ -9,7 +9,7 @@
 
 現在はviewport、違反field、正確な差分、source位置、key列、前後のpathを取得できる。
 一方、対象を動かした親Grid・track・gap・media/container条件までの説明は揃っていない。
-[反例のJSON](../layout-transitions.md)を読めても、どのCSSを見直せばよいかが分かりにくい。
+[反例のJSON](https://github.com/mizchi/isle/blob/HEAD/docs/layout-transitions.md)を読めても、どのCSSを見直せばよいかが分かりにくい。
 
 ## 判断
 

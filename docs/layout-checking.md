@@ -1,10 +1,10 @@
 # Grid とボックスモデルの静的検査
 
-テンプレートの [scoped CSS と Z3](inline-css.md) に対応した。Vite のチェック付きビルドは抽出した制約を Z3 Wasm でも検査し、結果を証明書の `proof` に記録する。playground は専用 Worker で同じモデルを検査する。以下の geometry/cascade 解析器自体の正しさを Z3 が証明する、という意味ではない。
+テンプレートの [scoped CSS と Z3](https://github.com/mizchi/isle/blob/HEAD/docs/inline-css.md) に対応した。Vite のチェック付きビルドは抽出した制約を Z3 Wasm でも検査し、結果を証明書の `proof` に記録する。playground は専用 Worker で同じモデルを検査する。以下の geometry/cascade 解析器自体の正しさを Z3 が証明する、という意味ではない。
 
 [CSS 変数の静的解決](css-variables.md)にも対応する。継承と条件ごとに `var()` を解決し、未解決値・不明な外部継承・fallback 経由の循環を使った geometry は成功扱いしない。
 
-[レイアウト契約の形式化](layout-contract-language.md)では、component の要求と保証を CSS 由来の配置から分離し、独立した API で被覆と適合を検査する。
+[レイアウト契約の形式化](https://github.com/mizchi/isle/blob/HEAD/docs/layout-contract-language.md)では、component の要求と保証を CSS 由来の配置から分離し、独立した API で被覆と適合を検査する。
 
 2026-11-06。Grid と親子のサイズ契約を検査する compiler adapter を実装した。横方向に加え、container size query と明示した高さ契約による縦方向を扱う。標準 CSS を PostCSS で解析し、MoonBit frontend が composition を展開した template IR から box tree を作る。component / handler を browser で実行せずに解析する。
 
@@ -23,11 +23,11 @@ just layout-dynamic-quality
 
 CLI の明示的な解析に加え、Vite の `layout` オプションで配信する HTML/CSS を検査する build gate を提供する。production runtime には解析器・依存ライブラリ・検査用 metadata を import しない。CSS chunk の一般的な最適化や CSS-ready runtime とは別の build-only pass である。
 
-[リジェクト例](layout-rejections.md)は `just layout-rejections` で、拒否されるコードと対応版を一組ずつ実行できる。
+[リジェクト例](https://github.com/mizchi/isle/blob/HEAD/docs/layout-rejections.md)は `just layout-rejections` で、拒否されるコードと対応版を一組ずつ実行できる。
 
 ## Vite build で保証範囲を閉じる
 
-アプリからは `@isle/prototype/vite` の `isle` に次のオプションを渡す。[実行例](../examples/responsive-checked/)と[設定全文](../examples/responsive-checked/vite.config.mjs)を参照。
+アプリからは `@isle/prototype/vite` の `isle` に次のオプションを渡す。[実行例](https://github.com/mizchi/isle/blob/HEAD/examples/responsive-checked)と[設定全文](https://github.com/mizchi/isle/blob/HEAD/examples/responsive-checked/vite.config.mjs)を参照。
 
 ```js
 isle({
@@ -58,11 +58,11 @@ isle({
 
 Vite/Rolldown の HTML transform 後、Isle manifest 注入後の `generateBundle` で検査する。後続 plugin・デプロイ時の HTML/CSS 書き換え、外部 CSS の後挿入等まで自動的に許可する証明ではない。配信 HTML を変えた場合は記録されたハッシュが無効になる。build toolchain と生成コードは信頼する実装に含まれる。[Vite hook の仕様](https://vite.dev/guide/api-plugin#transformindexhtml)と、HTML tree の解釈に使う [parse5](https://parse5.js.org/)を参照。
 
-`verified` は、宣言領域・CSS 部分集合・利用者の信頼する内容/font のサイズ上界に対して義務を満たしたという判定である。任意の入力や Web 全体に対する無条件の保証ではなく、browser のピクセル丸め、ink overflow、判定器の健全性の機械証明は含まない。これらの前提はレポートにも残す。[検証結果と今後の adapter](../evals/reports/layout-build.md)を参照。
+`verified` は、宣言領域・CSS 部分集合・利用者の信頼する内容/font のサイズ上界に対して義務を満たしたという判定である。任意の入力や Web 全体に対する無条件の保証ではなく、browser のピクセル丸め、ink overflow、判定器の健全性の機械証明は含まない。これらの前提はレポートにも残す。[検証結果と今後の adapter](https://github.com/mizchi/isle/blob/HEAD/evals/reports/layout-build.md)を参照。
 
 ## 動的構造の集合を検査する
 
-[実行例](../examples/responsive-dynamic/)は、リストの追加・全削除、class の切り替え、空状態を持つ。`Show`/`Switch` の候補と同期 `ErrorBoundary`/`fallback` を結合し、現在の SSR に現れない構造も調べる。同じ component の有限な scalar state は繰り返し内でも同じ値として扱う。class/id は有限な文字列集合へ解決できる式を許可し、任意入力からの class 等は unknown にする。
+[実行例](https://github.com/mizchi/isle/blob/HEAD/examples/responsive-dynamic)は、リストの追加・全削除、class の切り替え、空状態を持つ。`Show`/`Switch` の候補と同期 `ErrorBoundary`/`fallback` を結合し、現在の SSR に現れない構造も調べる。同じ component の有限な scalar state は繰り返し内でも同じ値として扱う。class/id は有限な文字列集合へ解決できる式を許可し、任意入力からの class 等は unknown にする。
 
 ```text
 state items = [0];
@@ -99,11 +99,11 @@ layout: {
 
 html の scrollbar は viewport へ一度だけ適用する。body の特別な overflow 伝播は現在 unknown とし、html に overflow を明示することを要求する。`html{overflow:auto}` で viewport を使うか、`html{overflow:hidden}` で body を local scroller にできる。正の gutter を持つ subgrid 自身の共有軸への inset は未対応で、親の通常 Grid を scroller にする。native button は appearance:none、display:block と box-sizing/min-size/padding/border の明示的 reset を要求し、未モデル化の UA 寸法を仮定しない。
 
-レポートの `scrollbars`、`scrollbarProfile`、content size と各構造の義務を確認できる。[240通りの実測と有限モデル](../evals/reports/layout-dynamic.md)を参照。
+レポートの `scrollbars`、`scrollbarProfile`、content size と各構造の義務を確認できる。[240通りの実測と有限モデル](https://github.com/mizchi/isle/blob/HEAD/evals/reports/layout-dynamic.md)を参照。
 
 ## 入力
 
-[実行できる fixture](../evals/scenarios/layout/fixture.isle) と [CSS](../evals/scenarios/layout/layout.css) に対して、次の sidecar を与える。CSS のパスは sidecar 自身からの相対パスである。
+[実行できる fixture](https://github.com/mizchi/isle/blob/HEAD/evals/scenarios/layout/fixture.isle) と [CSS](https://github.com/mizchi/isle/blob/HEAD/evals/scenarios/layout/layout.css) に対して、次の sidecar を与える。CSS のパスは sidecar 自身からの相対パスである。
 
 ```json
 {
@@ -118,13 +118,13 @@ html の scrollbar は viewport へ一度だけ適用する。body の特別な 
 }
 ```
 
-公開 API は [layout.d.mts](../lib/layout.d.mts)、入出力の型は [layout-contracts.d.ts](../lib/layout-contracts.d.ts)。`analyzeLayout(ir, options)` では `css` にファイルパスではなくソース本文を渡す。`hostInset` は、選択した root の外側で host が消費する横幅の合計で、既定は0。root の包含領域は `viewport - hostInset` とする。
+公開 API は [layout.d.mts](https://github.com/mizchi/isle/blob/HEAD/lib/layout.d.mts)、入出力の型は [layout-contracts.d.ts](https://github.com/mizchi/isle/blob/HEAD/lib/layout-contracts.d.ts)。`analyzeLayout(ir, options)` では `css` にファイルパスではなくソース本文を渡す。`hostInset` は、選択した root の外側で host が消費する横幅の合計で、既定は0。root の包含領域は `viewport - hostInset` とする。
 
 `minInlineSize` は、許可する全入力・font・折り返し条件で内容を収めるための必要幅の上界を、呼出し側が宣言する契約である。compiler が文字列や font metrics から導いた証明ではない。割当幅がこれを下回る診断は契約違反を意味し、任意の具体的な文字列が必ずあふれることまでは意味しない。fixture には320pxの子を実際に置き、反例の overflow を browser でも再現する。
 
 text leaf の fit 検査にはこの幅契約が必要。契約の selector は、型名・class・id の複合 selector に限定する。同じ box へ複数契約が一致した場合や、一つも一致しない契約は入力エラーにする。
 
-[略記と上書きの対応範囲](css-shorthands.md)も参照してください。最終カスケードを検査する機能と、意図しない上書きを警告するlintは区別しています。
+[略記と上書きの対応範囲](https://github.com/mizchi/isle/blob/HEAD/docs/css-shorthands.md)も参照してください。最終カスケードを検査する機能と、意図しない上書きを警告するlintは区別しています。
 
 ## CSS reset と継承
 
@@ -169,7 +169,7 @@ ancestor 入力は継承用であり、host の寸法を再計算する入力で
 
 `styleSources` に入力順と file、`sizes` に有効な `boxSizing` と `boxSizingSource` の file / line / selector / layer / specified value を記録する。reset 内の構文・未対応宣言の診断も、app CSS と区別して元ファイルを指す。
 
-[実行可能な reset fixture](../evals/scenarios/layout-reset/layout.json)は `just layout-reset` で検査できる。[評価記録](../evals/reports/layout-reset.md)には content-box へ戻してあふれる故障版と browser の computed style を保存する。
+[実行可能な reset fixture](https://github.com/mizchi/isle/blob/HEAD/evals/scenarios/layout-reset/layout.json)は `just layout-reset` で検査できる。[評価記録](https://github.com/mizchi/isle/blob/HEAD/evals/reports/layout-reset.md)には content-box へ戻してあふれる故障版と browser の computed style を保存する。
 
 ## 縦方向の入力
 
@@ -194,7 +194,7 @@ ancestor 入力は継承用であり、host の寸法を再計算する入力で
 }
 ```
 
-これは形を示す断片であり、selector と契約は実際の tree に合わせる。[実行可能な両軸 fixture](../evals/scenarios/layout-axes/layout.json)は `just layout-axes` で検査できる。
+これは形を示す断片であり、selector と契約は実際の tree に合わせる。[実行可能な両軸 fixture](https://github.com/mizchi/isle/blob/HEAD/evals/scenarios/layout-axes/layout.json)は `just layout-axes` で検査できる。
 
 `minBlockSize` は内容を収める必要高さの上界を宣言する。自動高さの計算には、実際の content 高さを表す **trusted な exact 値** `intrinsicBlockSize` を使う。単一数値、または inline content 幅ごとの profile を宣言できる。profile は閾値の昇順で、最後に成立する値を選ぶ。定義域を覆わない幅は unknown。font の変更や入力の変化で exact 契約が崩れないことは caller の責任であり、font metrics の自動証明ではない。
 
@@ -385,7 +385,7 @@ Chromium の照合は 2 つある。`e2e/layout-flex.spec.mjs` は、本数が�
 
 `LayoutSummary.subgrids` に共有元の box/path、軸、親での開始 line、span、使用 gap、端の inset とトラック幅の有理数 affine 式を記録する。検査は build-only で、browser runtime と配布 JS は増えない。
 
-[ソース](../examples/layout-contracts/subgrid.isle)・[CSS](../examples/layout-contracts/subgrid.css)・[sidecar](../examples/layout-contracts/subgrid.json)を `just layout-subgrid` で実行できる。`just layout-subgrid-check` は MoonBit/veri の有限モデルと JS kernel を照合し、ブラウザーで共有 line の中央と各 box の両軸サイズを比較する。[範囲と結果](../evals/reports/layout-subgrid.md)を参照。
+[ソース](https://github.com/mizchi/isle/blob/HEAD/examples/layout-contracts/subgrid.isle)・[CSS](https://github.com/mizchi/isle/blob/HEAD/examples/layout-contracts/subgrid.css)・[sidecar](https://github.com/mizchi/isle/blob/HEAD/examples/layout-contracts/subgrid.json)を `just layout-subgrid` で実行できる。`just layout-subgrid-check` は MoonBit/veri の有限モデルと JS kernel を照合し、ブラウザーで共有 line の中央と各 box の両軸サイズを比較する。[範囲と結果](https://github.com/mizchi/isle/blob/HEAD/evals/reports/layout-subgrid.md)を参照。
 
 ## Overflow の契約
 
@@ -506,7 +506,7 @@ E_LAYOUT_ITEM_SIZE: .cell requires 40px but receives 53/2px on inline axis at vi
 ASCII の記号は Chromium の対の表に従う(`well-known` は `-` の後、`ABCD-1234` も分けるが `-1` は分けない、括弧・句読点は語に付く)。
 `$ % + \` と日本語の隣接、Latin-1 の文字と ASCII 記号の隣接は入力エラー。`lang` で字形が変わる文字(Noto Sans JP の `'` など)は各言語で測り、行数が言語で変わる幅は Unknown。
 `text` に `"lang": "ja"` を書くとその言語だけで測る。要素の `lang` 属性(継承、CLI では `ancestors` の `lang`、Vite では配信する `<html lang>`)と一致しなければ Unknown。分割位置は en・ja・ko で照合済みで、中国語は対象外。
-[例](../examples/layout-contracts/text-wrap.json)では 48px の行に本文が3行必要になる幅を報告する。
+[例](https://github.com/mizchi/isle/blob/HEAD/examples/layout-contracts/text-wrap.json)では 48px の行に本文が3行必要になる幅を報告する。
 
 ```text
 E_LAYOUT_CONTENT: .body requires 72px but receives 48px on block axis at viewport 24487/128px × 400px
@@ -527,7 +527,7 @@ isle({entry: './app.isle', mounts: [{component: 'Card'}], wrapMounts: false,
 
 溢れる幅があれば build が失敗し、成功時は `isle.layout.json` の `contracts.fonts` にフォントの SHA-256 が残る。`fonts` なしの `text` 契約は設定エラー。
 
-反例には収まる文字数が付く。[例](../examples/layout-contracts/text-fonts.json)では、名前欄の割当が`V − 88`、12文字の上界が`192 + 1/64`pxなので、
+反例には収まる文字数が付く。[例](https://github.com/mizchi/isle/blob/HEAD/examples/layout-contracts/text-fonts.json)では、名前欄の割当が`V − 88`、12文字の上界が`192 + 1/64`pxなので、
 viewport `[240, 17921/64)`で溢れ得ると報告する。
 
 ```text
@@ -586,7 +586,7 @@ veriss側の`!important`無視、詳細度無視、順序反転、media無視、
 
 media と container 条件は、到達可能な領域の共通部分で評価する。4列への切替を159pxにすると `[159,160)` が違反し、160pxで切り替える版は通る。高さ条件と幅条件の組み合わせにも同様に制約をかけ、同時に成立しない条件は除外する。未対応 CSS、解析上限、未知の内容を含む場合は unknown。Vite では layout オプションでこの pass を明示的に有効にする。未指定の build に保証を付与するものではない。
 
-192構成の独立した下限和の oracle、96件のブラウザー計測を[回帰テスト](../tests/layout-minimum.test.mjs)・[ブラウザー照合](../e2e/layout-minimum.spec.mjs)に置く。[要約と実測](../evals/results/layout-minimum/latest.json)・[完全な symbolic checks](../evals/results/layout-minimum/full.json.gz)は固定境界、box-sizing と条件の組み合わせを含む。これは下記の数理モデルの検査であり、判定器の実装自体の健全性証明や任意の UI の無条件保証ではない。
+192構成の独立した下限和の oracle、96件のブラウザー計測を[回帰テスト](https://github.com/mizchi/isle/blob/HEAD/tests/layout-minimum.test.mjs)・[ブラウザー照合](https://github.com/mizchi/isle/blob/HEAD/e2e/layout-minimum.spec.mjs)に置く。[要約と実測](https://github.com/mizchi/isle/blob/HEAD/evals/results/layout-minimum/latest.json)・[完全な symbolic checks](https://github.com/mizchi/isle/blob/HEAD/evals/results/layout-minimum/full.json.gz)は固定境界、box-sizing と条件の組み合わせを含む。これは下記の数理モデルの検査であり、判定器の実装自体の健全性証明や任意の UI の無条件保証ではない。
 
 ### 結果の意味
 
@@ -600,7 +600,7 @@ CLI は verified のときだけ exit 0。入力エラー、コンパイルエ�
 
 今回は静的な純粋制約の判定であり、既存 veri の時相モデルを増やして寸法を離散化する方法は採らない。有理数の領域判定、独立した1次元・2次元の bounded arithmetic oracle、browser での反例再現を組み合わせる。判定器そのものの形式的な健全性証明は未着手。既存の MoonBit / veri 92ケースは別の検査として維持する。
 
-検証方法と結果は [両軸の評価記録](../evals/reports/layout-axes.md)、[初段の横幅検査](../evals/reports/layout.md)、記述・読解は [両軸の課題](../evals/scenarios/layout-axes/brief.md)。参考: [Grid](https://www.w3.org/TR/css-grid-2/)、[Box sizing](https://www.w3.org/TR/css-sizing-3/)、[Overflow](https://www.w3.org/TR/css-overflow-3/)、[Media Queries](https://www.w3.org/TR/mediaqueries-4/)、[Container queries](https://www.w3.org/TR/css-conditional-5/#container-queries)、[Size containment](https://www.w3.org/TR/css-contain-2/#containment-size)。
+検証方法と結果は [両軸の評価記録](https://github.com/mizchi/isle/blob/HEAD/evals/reports/layout-axes.md)、[初段の横幅検査](https://github.com/mizchi/isle/blob/HEAD/evals/reports/layout.md)、記述・読解は [両軸の課題](https://github.com/mizchi/isle/blob/HEAD/evals/scenarios/layout-axes/brief.md)。参考: [Grid](https://www.w3.org/TR/css-grid-2/)、[Box sizing](https://www.w3.org/TR/css-sizing-3/)、[Overflow](https://www.w3.org/TR/css-overflow-3/)、[Media Queries](https://www.w3.org/TR/mediaqueries-4/)、[Container queries](https://www.w3.org/TR/css-conditional-5/#container-queries)、[Size containment](https://www.w3.org/TR/css-contain-2/#containment-size)。
 
 ## 宣言ごとの差分照合(`e2e/layout-differential.spec.mjs`)
 

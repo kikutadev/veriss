@@ -20,7 +20,7 @@ component Variables() {
 }
 ```
 
-[全体の実行例](../examples/inline-css/variables.isle)には高さ・reset も含めています。[playground](https://mizchi.github.io/isle/playground/) の **CSS variables · responsive proof** で、幅80–640px・高さ80–640pxを Z3 Wasm で検査できます。`--cell` を41pxへ変えると反例が出ます。
+[全体の実行例](https://github.com/mizchi/isle/blob/HEAD/examples/inline-css/variables.isle)には高さ・reset も含めています。[playground](https://mizchi.github.io/isle/playground/) の **CSS variables · responsive proof** で、幅80–640px・高さ80–640pxを Z3 Wasm で検査できます。`--cell` を41pxへ変えると反例が出ます。
 
 ## 解決の順序
 
@@ -80,7 +80,7 @@ analyzeLayout(ir, {
 - 1値4096 token / 65536 UTF-16単位、関数・括弧の入れ子32、1 element の自前 binding 256件に上限を置き、解決の仕事量も全体の work budget に課金します。超過は `U_LAYOUT_LIMIT` であり、fallback では隠せません。
 - CSS のファイル・宣言行を診断へ残します。未対応値・未知の継承・fallback を経由する循環・上限超過は、検査付きビルドを失敗させます。確定した guaranteed-invalid 参照は `unset` として検査し、`invalidSubstitutions` に記録します。
 
-Node の境界値テスト、Chromium の computed geometry、独立した [SMT 参照仕様](../models/css_layout/README.md)との XOR 検査を組み合わせます。40pxの仕様と生成制約は UNSAT で一致し、変数を41pxへ壊すと SAT で差を検出します。CSS parser・モデル抽出器・全ブラウザーの正しさを証明したものではありません。
+Node の境界値テスト、Chromium の computed geometry、独立した [SMT 参照仕様](https://github.com/mizchi/isle/blob/HEAD/models/css_layout/README.md)との XOR 検査を組み合わせます。40pxの仕様と生成制約は UNSAT で一致し、変数を41pxへ壊すと SAT で差を検出します。CSS parser・モデル抽出器・全ブラウザーの正しさを証明したものではありません。
 
 ```sh
 node --test tests/layout-variables.test.mjs tests/layout-z3.test.mjs
