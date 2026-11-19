@@ -148,3 +148,6 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 最終 gate (a09df13): 6単体テスト群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 339 E2E passed、監督ランナー exit=0、619 PID追跡・残留0。ゲート対象のソースが同一であることを確認して並行作業の main へ統合する。
 
 後続: 汎用 UI の relational/1 に移行した。ゲームは利用例の一つであり契約本体の仕様は [layout-contract-ir.md](layout-contract-ir.md#relational1-汎用-ui-関係述語)。旧 game-ui API の実装経緯と評価は上記の履歴として残す。
+
+### Responsive gap model (継続)
+目標は実CSSの幅依存の余白・グリッドの連続範囲解析を前進させること。まず gap の区分アフィン化を grid/flex の既存解法へ接続し、幅と高さの分岐及び overflow 反例を3ブラウザーで照合する。次に同一HTML/CSSを再測定する。全ページの Unknown は未対応を無視せず残す。既存ゲートと fork main 統合を完了条件とする。
