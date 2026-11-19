@@ -86,19 +86,145 @@ Worker では `verifyObligationIR(obligations, z3API)` を使います。Node ad
 
 これらは定義した例の照合です。抽出器全体について必要な健全性、すなわち「許可した実ブラウザーの観測が M にすべて含まれる」の一般的証明は未実装です。到達状態・CSS parser・box model 抽出器を信頼し、text/font の bound・native scrollbar・host・ブラウザー丸め等の仮定も証明結果へ残します。
 
-次は一般の profile/述語 AST、子 summary のインポート、部分集合の抽出の健全性と合成定理です。契約文法を増やす際も ContractIR と LayoutIR の独立性を維持します。
+relational/1 に一般の関係述語 AST を導入しました。次は子 summary のインポート、部分集合の抽出の健全性と合成定理です。契約文法を増やす際も ContractIR と LayoutIR の独立性を維持します。
 
 ```sh
 just layout-contract-check
 ```
 
 
-## relational/1 の設計・実装計画 (fork)
+## relational/1 汎用 UI 関係述語
 
-ゴール: UI の種類に依存しない関係述語の契約を既存の ContractIR / LayoutIR /
-ObligationIR の体系に統合する。StateIR、EnvironmentIR、EvidenceIR の境界を明示する。
-既存 profile の保証を維持し、ゲーム専用実装を共通コアの呼び出しに置き換える。
-完了条件: 公開 API と型、合成可能な述語 AST、coverage と counterexample の分離、
-HTML adapter / CLI / lint 統合、通常の Web UI での正常・違反・Unknown の検証、
-3ブラウザー照合、全ゲート、fork main 統合。
-設計判断は [ADR-0019](adr/0019-relational-ui-contracts.md)。
+設計判断は [ADR-0019](adr/0019-relational-ui-contracts.md)。コンポーネントへの割当と収容を保証する
+SafeGrid/PositionedGrid は維持し、任意の UI の要素間の幾何関係・状態端点の関係を同じ /contracts API
+の relational/1 profile に追加した。検証コアは HTML parser やブラウザーを呼ばず、
+adapter が既存の LayoutIR から EvidenceIR を生成する。以前の用途別検証器と
+snapshot の矩形比較もこの profile に統合した。
+
+### IR と保証の境界
+
+| IR | 正本 |
+| --- | --- |
+| ContractIR | 独立した意図。関係述語、適用状態・profile、定義と対象束縛。実装データから述語を逆算しない |
+| LayoutIR | 既存 CSS の抽出結果。先に独立して構築する |
+| StateIR | 一意の状態 ID、初期状態、from/event/to の有限遷移。環境ごとの遷移制約は任意 |
+| EnvironmentIR | 証明要求の閉じた幅・高さの範囲、ブラウザー、DPR、scrollbar、safe-area、入力/フォントの仮定 |
+| EvidenceIR | state/profile/target ごとの区分的 affine 矩形と出所。DOM, local-dom, scene, external |
+| ObligationIR | 契約×適用 profile×到達する状態/遷移、必要な対象と端点の有限集合 |
+| Proof/report | 被覆・整合性の判定、反例、証明の環境・状態グラフ、根拠・仮定、観測の別判定 |
+
+すべての新 IR は有限の JSON データをコピーして freeze する。実行可能コードを含めない。
+既存の Grid profile 用型名は維持し、TypeScript の全 profile は UIContractIR /
+UIObligationIR / UIContractProof。createContractIR, createObligationIR, verifyObligationIR の overload が
+profile を選ぶ。
+
+StateIR の初期状態から profile ごとに到達グラフを列挙する。
+transition の profiles は有効な profile の ID、未指定なら全 profile。
+contract の states/profiles は適用範囲で、event がある場合は対象遷移の from で
+states を評価する。ある要求 profile で該当状態/遷移がないときは Unknown。
+このグラフと環境は独立した要求・抽象化であり、JS 実装から全到達性を自動抽出したと主張しない。
+
+EvidenceIR の各 rows の rect は viewport 原点を基準とする未スクロール CSS px の
+軸平行矩形、各座標は exact rational affine の coefficient × width + heightCoefficient × height + constant。
+rows の constraints は affine >= 0、strict=true の場合 > 0。省略は全 profile。
+対象の存在・一意性、有限領域の完全被覆、重複領域での値の一致、非負寸法を先に検査する。
+証明対象でない別契約の Unknown を成功に変えない一方、独立した証拠による別契約の証明を妨げない。
+契約は実装の外部仮定に混入させない。被覆後に「存在する環境 e で NOT predicate(e)」を検査し、
+非空なら exact rational の witness を返す。予算超過・未対応は Unknown。
+この証明はモデルを条件とするもので、ブラウザーそのものの意味論の証明ではない。
+
+LayoutIR の geometryComplete は元の解析が verified・両軸・完全な構造であること。
+SafeGrid 専用の complete（弱めた overflow policy を拒否する等）と別の記録とし、従来の判定を緩めない。
+layoutGeometry は一構造/プラットフォーム case の LayoutIR しか受け入れず、
+target は一意の要素 id、明示 target または paths による native path 対応。証拠の領域は元の report の
+range と region を保存する。host inset 0、同一 origin が必要。
+局所文書は独立 containing size、継承、閉じた cascade を生産者が確立し、
+local.assumptions と必要なら origin（inlineStart,blockStart の affine 平行移動）を明記する。
+外部モデルも生成元の根拠は信頼仮定。任意の DOM の自動切り出し、手書き矩形と実装の同値性、
+Canvas 内部の投影などを自動証明しない。LayoutIR 由来証拠は profile の署名を照合する。
+受け取った LayoutIR から分からない UA/フォント等は生産者が環境を証明範囲に束縛する信頼仮定。
+input / fontProfile は環境識別子で、未対応の pointer/hover media 分岐を勝手に成立させない。
+
+### 述語 AST と合成
+
+`kind: "predicate"` は次の JSON grammar。
+- compare: relation lt/le/eq/ge/gt/ne と left/right の線形 operand
+- all/any: items の論理積/論理和、not: item の否定
+- use: name と bind（定義側 target 名 → 利用側 target 名）。
+  definitions に定義を置き、展開時に未束縛・循環・予算超過を拒否する。
+
+operand は rational string（"44", "1/2" 等）、{target,field,endpoint?}、
+{environment}、{op:"add",items}、{op:"scale",factor,item}。
+field は inlineStart/blockStart/inlineSize/blockSize/inlineEnd/blockEnd、
+endpoint は before が既定、after を使う場合は event が必須。
+environment は width/height/safeLeft/safeTop/safeRight/safeBottom（safeRight/Bottom は座標）。
+比較式は半平面の分割へコンパイルし、all/any/not は領域交差・和集合・補集合として厳密に扱う。
+複数の子の述語を同じ target と親の座標に束縛して再利用できるが、
+別環境で得た子の証明結果をそのまま流用する仕組みではない。
+
+within-viewport, contains, disjoint, min-size, stable はこの AST への糖衣構文。
+接触は non-overlap とし、stable は遷移端点の矩形を比較する。
+max-occupancy は target の矩形内の overlays の和集合面積 / target 面積の上限。
+辺の順序で領域を分割し、各セルの二次式を exact rational の頂点・辺・内部停留点で最大化する。
+開境界の反例は領域内の点を探索し、空 target や精度予算超過は Unknown。
+この非線形述語は単独契約とし、v1 で任意の Boolean AST 内へは入れない。
+action は実測で期待遷移へ進んだかを評価し、形式証明の status は Unknown のまま。
+
+### API と CLI
+
+実行できる通常のアカウント設定画面例: [packages/veriss/examples/relational.mjs](../packages/veriss/examples/relational.mjs)。
+
+```js
+import {createContractIR,createStateIR,createEnvironmentIR,createEvidenceIR,
+  createObligationIR,verifyObligationIR} from '@mizchi/veriss/contracts';
+
+const contract = createContractIR({
+  component: 'Settings', profile: 'relational/1',
+  definitions: {control: {op:'compare',relation:'ge',
+    left:{target:'item',field:'blockSize'},right:'44'}},
+  contracts: [
+    {id:'save-size',kind:'predicate',predicate:{op:'use',name:'control',bind:{item:'save'}}},
+    {id:'stable-save',kind:'stable',target:'save',event:'submit'}
+  ]
+});
+const state = createStateIR({initial:'editing',states:['editing','saving'],
+  transitions:[{from:'editing',event:'submit',to:'saving'}]});
+const environment = createEnvironmentIR([{id:'web',
+  viewport:{min:320,max:1280,height:{min:400,max:1000}}}]);
+// facts: layoutGeometry({state,profile,layout:createLayoutIR(report),targets}) の結果を集める
+const evidence = createEvidenceIR(facts);
+const proof = await verifyObligationIR(createObligationIR(contract,{state,environment,evidence}));
+```
+
+verifyUI({model,evidence,observations}) は同じ IR 構築手順の簡易 API。
+model={version:1,component?,initial,states,transitions,profiles,definitions?,contracts}。
+manifest={model,evidence?,observations?,documents?}、documents の各項目:
+{state,profile,html,css,targets,local?,boxes?,fonts?,defaultFontSize?}。
+ファイルパスは manifest 相対。CSS は順序を維持した完全な閉じた author cascade。
+fonts: {"Family":"font.ttf"} で boxes の既存テキスト契約を解決する。
+
+```sh
+node tools/ui-check.mjs manifest.json
+node tools/css-lint.mjs --contracts --fail-on-unknown manifest.json
+```
+
+前者は詳細 JSON、後者は既存 lint 形式 (E_UI_CONTRACT, U_UI_CONTRACT, E_UI_OBSERVATION,
+U_UI_OBSERVATION 等)。ui-check は verified=0, failed=1, unknown/不正入力=2。
+lint は従来と同様 --fail-on-unknown で未検証を終了コード2にする。
+
+観測は {state,profile,width,height,rects?}、rects は target ごとに {x,y,width,height}。
+action は {state,profile,width,height,event,to?,passed}。観測側は
+tools/capture-snapshots.mjs の captureUIObservation(page,{state,profile,targets}) で測定できる。
+同一 viewport の端点の組が一意でなければ不明、self-transition の観測は別途対応が必要。
+実測の状態や成功遷移が宣言グラフに存在しなければ E_UI_OBSERVED_STATE。
+status は数理証明、observationStatus は sampled/failed/incomplete/not-run、
+outcome は両者の結果（モデルが verified でも観測違反なら failed）。
+observationCoverage は各到達 state/profile のサンプル数で、0も表示する。
+実測の成功は未被覆を埋めない。
+
+### 上限
+
+state 64、遷移256、profile16、契約128、ObligationIR case 32768、evidence/observation 4096。
+各証拠 rows 128、半平面64、処理内の領域256、AST 展開256ノード・深さ32。
+契約×profile の処理予算30000、occupancy overlay 4。上限超過は Unknown または不正入力として拒否。
+全 CSS、全 JS、描画・clip/hit testing・アニメーション中間状態まで一般に保証するものではない。

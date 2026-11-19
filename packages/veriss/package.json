@@ -51,6 +51,7 @@
   "files": [
     "src/",
     "README.md",
+    "examples/relational.mjs",
     "text-metrics/_build/js/release/build/font_ffi/font_ffi.js",
     "text-metrics/fixtures/"
   ],

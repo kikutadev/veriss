@@ -2,6 +2,7 @@ import {verifyObligationIR,createLayoutIR,createDeclaredObligations} from './lay
 
 /** Build-only convenience; browser Workers supply their own Z3 API instead. */
 export async function verifyContractObligation(obligation,options) {
+  if(obligation?.operation==='relational')return verifyObligationIR(obligation,undefined,options);
   const {init,killThreads}=await import('z3-solver');
   const api=await init();
   try {return await verifyObligationIR(obligation,api,options);}

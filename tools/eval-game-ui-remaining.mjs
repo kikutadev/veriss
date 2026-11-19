@@ -4,7 +4,7 @@ import {webkit} from 'playwright';
 import {readFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
-import {verifyGameUI} from '../packages/adapter-core/src/game-ui.mjs';
+import {verifyUI} from '../packages/adapter-core/src/ui-contracts.mjs';
 
 const games={
   'sumi-no-tachi':{
@@ -156,6 +156,6 @@ for(const o of observations.filter(o=>o.rects)){
     if(Object.keys(expected).some(k=>Math.abs(actual[k]-expected[k])>0.05))mismatches.push({state:o.state,width:o.width,height:o.height,target:e.target,expected,actual});
   }
 }
-const report=verifyGameUI({model,evidence,observations});
+const report=verifyUI({model,evidence,observations});
 console.log(JSON.stringify({game,hashes:cfg.sheets,compared,mismatches,issues,report},null,2));
 if(mismatches.length||issues.length)process.exitCode=2;

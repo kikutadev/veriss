@@ -240,3 +240,13 @@ finds a one-pixel failure interval in an incorrect one without a browser.
 
 The adopted architecture and verification boundaries are described in
 [静的UI検証の方針](https://github.com/mizchi/isle/blob/HEAD/docs/static-ui-verification.md).
+
+### Relational UI contracts
+
+`@mizchi/veriss/contracts` also supports the `relational/1` profile.
+It verifies finite state/environment cases against independently extracted LayoutIR or
+explicit model geometry: containment, separation, minimum size, endpoint stability,
+and composable Boolean comparisons of affine rectangle coordinates.
+The proof distinguishes coverage failures from counterexamples and runtime observations.
+See [the executable example](examples/relational.mjs) and the repository's
+[contract IR specification](../../docs/layout-contract-ir.md#relational1-汎用-ui-関係述語).

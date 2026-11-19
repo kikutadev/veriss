@@ -72,3 +72,7 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 - isle は veriss を `github:mizchi/veriss#<commit>&path:packages/veriss` で使う。veriss を変えたら、isle の pin を上げて isle の照合テスト(`just css-verifier-check`、`just css-text-check`)を回す
 - isle に残るのは isle の利用者側だけ: テンプレート → 箱の木(`lib/layout*`)、vite のビルド、`.isle` の例と eval、isle の構文(`layout SafeGrid { ... }`、`@noshift`)の文書
+
+## fork: relational/1 (2026-11-20)
+
+汎用 UI の関係述語 profile を既存 contracts API に統合した。現行仕様は [layout-contract-ir.md](layout-contract-ir.md#relational1-汎用-ui-関係述語)。以前の game-ui 専用 API と snapshot 別実装は共通コアへ移行。

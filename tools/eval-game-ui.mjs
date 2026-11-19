@@ -1,12 +1,12 @@
 // Reproducible application-level evaluation; no game source modifications.
 // Run under the project-owned browser QA supervisor:
-// node tools/eval-game-ui.mjs ../game/voxel-tide-defense/dist
+// node tools/eval-ui-contracts.mjs ../game/voxel-tide-defense/dist
 import {webkit} from 'playwright';
 import {readFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
-import {verifyGameUI,domGeometry} from '../packages/adapter-core/src/game-ui.mjs';
-import {captureSnapshot,captureGameObservation} from './capture-snapshots.mjs';
+import {verifyUI,domGeometry} from '../packages/adapter-core/src/ui-contracts.mjs';
+import {captureSnapshot,captureUIObservation} from './capture-snapshots.mjs';
 
 const dir=resolve(process.argv[2]??'');
 if(!process.argv[2]||!existsSync(resolve(dir,'index.html')))throw Error('Provide the built 潮界防衛 directory');
@@ -65,7 +65,7 @@ try{
       await page.locator('#home-play').waitFor({state:'visible',timeout:10000});
       await page.waitForTimeout(200);
       async function capture(state){
-        const observation=await captureGameObservation(page,{state,profile:profile.id,targets:targets[state]});
+        const observation=await captureUIObservation(page,{state,profile:profile.id,targets:targets[state]});
         if(['prepare','combat'].includes(state)){
           if(observation.rects.field)observation.rects['field-model']=observation.rects.field;
           const canvas=page.locator('#scene canvas');
@@ -102,5 +102,5 @@ try{
     }catch(e){console.error(width,height,e.message)}finally{await context.close()}
   }
 }finally{await browser.close()}
-const report=verifyGameUI({model,evidence,observations});
+const report=verifyUI({model,evidence,observations});
 console.log(JSON.stringify({hashes,report},null,2));

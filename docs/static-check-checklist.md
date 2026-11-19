@@ -422,4 +422,6 @@
 - [x] **H2. game UI model**: 宣言した到達状態・profile 別に独立証拠を検査。HUD の重複を二重計上しない
   occupancy、遷移端点、操作観測を分離する。e2e/layout-real-site-input.spec.mjs の game model separates
   で幅320/600/800pxの矩形・面積率・クリック遷移を3ブラウザーで照合。
-  二次式の内部極大・厳密な開閉境界・矛盾した証拠・観測不一致は adapter-core/test/game-ui.test.mjs。
+  二次式の内部極大・厳密な開閉境界・矛盾した証拠・観測不一致は adapter-core/test/ui-contracts.test.mjs。
+
+- [x] **H3. relational/1 汎用述語**: 同じ ContractIR / LayoutIR / ObligationIR API と snapshot/lint 間で矩形証明器を共有。レスポンシブな設定画面の16px間隔、44px操作寸法、保存時の安定性を通常のWeb UI で検査。境界600/601px、幅320/1000px、高さ400/900pxを3ブラウザーで比較。単体は relational-contract.test.mjs, ui-contracts.test.mjs。

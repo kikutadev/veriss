@@ -218,6 +218,21 @@ const pageRules = new Set(['W_A11Y_PAGE_H1', 'W_A11Y_NO_MAIN', 'W_A11Y_MULTIPLE_
 // Messages as an author reads them: the adapter's internal text markers removed, exact fractions as px decimals.
 const readable = message => message.replace(/\.__(?:text|ph)\d+/g, '').replace(/(\d+)\/(\d+)(?=px)/g, (m, a, b) => String(Math.round(Number(a) / Number(b) * 100) / 100));
 export function lint(result, { file = '<component>', source = '', profile = 'recommended', page = false } = {}) {
+  if(result.operation==='relational'){
+    const out=[];
+    for(const c of result.contracts){
+      const at=v=>(v.state?v.state+' / ':'')+v.profile+(v.event?' / '+v.event:'');
+      if(!c.cases.length)out.push({file,severity:'info',code:'U_UI_CONTRACT',message:c.id+': '+c.reason});
+      for(const v of c.cases)if(v.status!=='verified'){
+        if(v.status==='violated')out.push({file,severity:'error',code:'E_UI_CONTRACT',message:c.id+' violates its contract at '+v.witness.width+'px × '+v.witness.height+'px',states:at(v)});
+        else out.push({file,severity:'info',code:'U_UI_CONTRACT',message:c.id+': '+v.reason,states:at(v)});
+      }
+      for(const v of c.observations)if(v.status!=='passed')out.push({file,severity:v.status==='failed'?'error':'info',code:v.status==='failed'?'E_UI_OBSERVATION':'U_UI_OBSERVATION',message:c.id+': observation '+v.status+' at '+v.sample.width+'px × '+v.sample.height+'px'+(v.reason?' — '+v.reason:''),states:at(v.sample)});
+    }
+    for(const d of result.observationDiagnostics??[])out.push({file,severity:'error',code:d.code,message:d.message,states:d.sample.state+' / '+d.sample.profile});
+    for(const a of result.assumptions)out.push({file,severity:'info',code:'ASSUMPTION',message:a});
+    return out.sort((a,b)=>Number(b.severity==='error')-Number(a.severity==='error'));
+  }
   const total = result.states.length, out = [];
   // Checked with several UA profiles: a finding that holds in some browsers only says which.
   const inBrowsers = f => result.browsers && f.browsers && f.browsers.length < result.browsers.length ? ` (in ${f.browsers.join(', ')}; not in ${result.browsers.filter(b => !f.browsers.includes(b)).join(', ')})` : '';
