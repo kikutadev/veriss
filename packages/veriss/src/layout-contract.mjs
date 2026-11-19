@@ -42,7 +42,11 @@ export function createLayoutIR(report) {
   if(!Array.isArray(report.sizes) || !Array.isArray(report.policies) || report.elements!==undefined && !Array.isArray(report.elements) || report.sizes.length+report.checks.length+report.policies.length+(report.elements?.length ?? 0)>32768) throw new TypeError('Invalid layout fact count');
   for(const element of report.elements ?? []) validateTargetMetadata(element);
   const diagnostics=report.diagnostics.filter(d=>d.severity==='unknown');
-  const geometryComplete=report.status==='verified' && report.structure?.complete!==false && report.scope.axis==='both' && report.scope.blockSizing && !diagnostics.length;
+  // A counterexample to a fit obligation is not a failure to compute geometry.
+  // Restrict this to witnessed geometric violations, never syntax/model errors.
+  const geometricViolation=report.status==='violated' && report.diagnostics.length>0 && report.diagnostics.every(d=>
+    d.severity==='error' && d.witness && ['E_LAYOUT_ITEM_SIZE','E_LAYOUT_TRACKS','E_LAYOUT_ABSOLUTE_START','E_LAYOUT_ABSOLUTE_END','E_LAYOUT_ABSOLUTE_CLIPPED','E_LAYOUT_PAGE_OVERFLOW','E_LAYOUT_PROTRUSION'].includes(d.code));
+  const geometryComplete=(report.status==='verified'||geometricViolation) && report.structure?.complete!==false && report.scope.axis==='both' && report.scope.blockSizing && !diagnostics.length;
   if(report.scope.axis!=='both' || !report.scope.blockSizing) diagnostics.push(unknown('U_LAYOUT_AXES','SafeGrid contracts require both dimensions'));
   if(report.policies.some(row=>row.overflow!=='fit') || report.checks.some(row=>!row.enforced)) diagnostics.push(unknown('U_LAYOUT_PROFILE','safe-grid/1 cannot import weakened overflow policies'));
   const variants=report.structure?.variants.map(({id})=>({variant:id})) ?? [{}];

@@ -56,3 +56,53 @@ test('selector-list disjunction excludes unrelated subjects but not a possible d
  assert.equal(verify(check(html,style)).status,'verified');
  assert.equal(verify(check(html,style+':is(#shell:has(kbd),.other){height:8px}')).status,'unknown');
 });
+
+test('complete geometry remains evidence when an overflow obligation has a counterexample',()=>{
+ const e=check(html,css+'#scene{width:120%}')[0];
+ assert.ok(e.rows?.length,JSON.stringify(e));
+ const r=verify([e]);
+ assert.equal(r.status,'violated');
+ assert.ok(r.contracts[0].cases[0].witness);
+ // Unsupported geometry and a statically invalid cascade remain Unknown.
+ assert.equal(verify(check(html,css+'#scene{width:120%;transform:rotate(30deg)}')).status,'unknown');
+});
+test('responsive centered block geometry is independently derived from a complete cascade',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><main id="shell"><kbd>native</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0}#shell{width:min(100%,520px);height:100dvh;margin:0 auto;overflow:hidden;border-inline:2px solid #123456}';
+ const e=check(source,style,['shell'])[0];
+ assert.ok(e.rows?.length,JSON.stringify(e));
+ assert.equal(verify([e],'shell').status,'verified');
+});
+
+test('unscrolled rectangles remain available inside nested hidden overflow ancestors',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><main id="app"><section id="field"><kbd>native</kbd><div id="surface"></div></section></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}html,body,#app{width:100%;height:100dvh;overflow:hidden}#field{position:relative;width:100%;height:100%;min-height:400px;overflow:hidden}#surface{position:absolute;inset:0}';
+ const evidence=check(source,style,['field','surface']);
+ assert.ok(evidence.every(e=>e.rows?.length),JSON.stringify(evidence));
+ const model={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[
+ {id:'fits',kind:'within-viewport',target:'surface'},
+ {id:'contains',kind:'contains',target:'field',other:'surface'}
+ ]};
+ const r=verifyUI({model,evidence});
+ assert.deepEqual(r.contracts.map(c=>c.status),['violated','verified']);
+ // A changing transform of an ancestor or a non-overlay environment is not covered.
+ assert.ok(!check(source,style+'#app{transform:scale(2)}',['surface'])[0].rows?.length);
+ const p={...profile,scrollbar:{name:'classic',inlineSize:15,blockSize:15}};
+ assert.ok(!domGeometry({state:'screen',profile:p,html:source,css:style,targets:['surface']})[0].rows?.length);
+});
+
+test('a resolved overflow is not confused with parser or coverage failure',async()=>{
+ const {analyzeHTML}=await import('@mizchi/veriss/html');
+ const {createLayoutIR}=await import('@mizchi/veriss/contracts');
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><main id="wide"></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}#wide{width:120%;height:40px}';
+ const opts={viewport:profile.viewport,scrollbars:[{name:'overlay',inlineSize:0,blockSize:0}]};
+ const full=analyzeHTML(source,{...opts,css:style});
+ assert.equal(full.status,'violated');
+ assert.equal(createLayoutIR(full).geometryComplete,true);
+ assert.equal(full.ok,false);
+ assert.equal(verify(check(source,style,['wide']),'wide').status,'violated');
+ const unresolved=analyzeHTML(source,{...opts,css:style+'#wide{width:attr(data-width px)}'});
+ assert.equal(unresolved.status,'unknown');
+ assert.equal(createLayoutIR(unresolved).geometryComplete,false);
+});

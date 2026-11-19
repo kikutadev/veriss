@@ -270,5 +270,5 @@ export function projectIndependentGeometry(html,css,target,profile,binding){
 // coordinate is promoted to a proof for arbitrary scroll positions.
 export function analyzeProjectedGeometry(projection,options){
   const {tree,diagnostics}=htmlBoxTree(projection.html);
-  return analyzeInput(tree,{...options,css:projection.css,integrity:true},diagnostics,['scroll-zero']);
+  return analyzeInput(tree,{...options,css:projection.css,integrity:true},diagnostics,['scroll-zero','independent-rectangle']);
 }

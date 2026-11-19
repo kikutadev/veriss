@@ -183,3 +183,13 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 未対応は明示基準位置の無い絶対配置、native control、aspect-ratio、内容依存または flex/grid 兄弟、min() と auto margin の組合せ、View Transition selector 等。全 CSS の自動分割・全状態のモデル化・実ゲームの配信変更は行っていない。ビルド毎に取得する入力が変わるため契約が verified でない場合も再現可能な結果として保持する。
 
 最終統合ゲート: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 351 E2E passed、supervisor exit=0、639 PID追跡・残留0。自動部分幾何単独の3 E2Eも成功。実入力 manifest による ui-check/lint の Unknown exit=2、証明済み6契約の exit=0、意図的な不成立契約の exit=1 と有理数 witness (1120,700) を確認。gate 起動後の差分は文書のみ。
+
+### 次の自動証明改善
+実入力の残りから、(1) overflow の数理反例があっても解決済み矩形を独立契約に渡せること、(2) block flow の明示的な min()/max()/clamp() 幅と auto margin を既存の厳密長さモデルで評価することを目標とする。検査の未完了を成功にせず、全体判定は維持する。反例・正常例・3ブラウザの境界比較・実ビルド再評価・gate を完了条件とする。
+
+### 自動証明改善の検証完了 (2026-11-20)
+c2ce669: 対応済み幾何違反の数理反例がある場合も完全な矩形を relational/1 に渡す。元 report の violated を維持。通常 block flow の明示 min/max/clamp 幅と auto margin を実際の幅計算と共有し、入れ子の hidden overflow の直接の絶対配置を独立矩形の初期スクロール位置に限定して扱う。
+同一の28契約: verified 9→10、violated 0→4、Unknown 19→14。WebKit実ビルド矩形照合56/56、操作12/12、捕捉エラー0。
+追加: 潮界防衛 home/prepare を3ブラウザー・幅1120・高さ360/399/400/401/568で照合。矩形90/90、開始操作15/15、捕捉エラー0。4契約各3環境で同じ反例1120×360を生成し、高さ400未満のfield/sceneの実高さ400と一致。400以上の対照も一致。操作不能や描画全体の違反を意味しない。各監督ランナー残留0。
+Portfolio 5ページの同一捕捉入力に対する全体検査: Unknown 43/33/33/33/33、checks 0、エラー4/3/3/3/8、すべて前回と同じ。軸独立証拠、複雑な構造・動的選択子、暗黙配置は引き続き未対応。ゲーム・サイトの配信変更なし。
+gate: 6単体群 fail=0、component-lint 4評価不変、357 E2E passed (Chromium/Firefox/WebKit)、supervisor exit=0、670 PID追跡・残留0。

@@ -133,7 +133,7 @@ rows の constraints は affine >= 0、strict=true の場合 > 0。省略は全 
 非空なら exact rational の witness を返す。予算超過・未対応は Unknown。
 この証明はモデルを条件とするもので、ブラウザーそのものの意味論の証明ではない。
 
-LayoutIR の geometryComplete は元の解析が verified・両軸・完全な構造であること。
+LayoutIR の geometryComplete は両軸・完全な構造であり、元の解析が verified、または数理的な反例付きの対応済み幾何違反のみを持つこと。構文エラーや Unknown からは幾何証拠を作らない。違反のある report 自体の status は変えない。
 SafeGrid 専用の complete（弱めた overflow policy を拒否する等）と別の記録とし、従来の判定を緩めない。
 layoutGeometry は一構造/プラットフォーム case の LayoutIR しか受け入れず、
 target は一意の要素 id、明示 target または paths による native path 対応。証拠の領域は元の report の
@@ -160,7 +160,9 @@ input / fontProfile は環境識別子で、未対応の pointer/hover media 分
   疑似要素は生成しないか、全適用候補で通常フローから独立すると確認できる場合だけ除く。
 - 完全な standards-mode snapshot、閉じた author CSS、overlay scrollbar、初期スクロール位置、
   horizontal-tb/ltr、明示した環境の両軸を前提とする。自動抽出は最大32対象。
-  残った縮約文書を既存の解析器で計算し、完全な LayoutIR の矩形と領域のみ relational/1 の証拠にする。
+  残った縮約文書を既存の解析器で計算し、完全な幾何を持つ LayoutIR の矩形と領域のみ relational/1 の証拠にする。
+  入れ子の hidden overflow 内の直接の絶対配置は独立矩形の初期スクロール位置に限定し、可視性の保証とはしない。
+  明示的な min/max/clamp 幅と auto margin の組合せは固定 px の辺を持つ通常ブロックに対応する。
   元の全ページ report、他の契約、見た目・hit-test・アクセシビリティの検査結果は変更しない。
 - 証拠は source=local-dom、仮定、被覆付き区分アフィン行または理由付き Unknown。
   この方式は万能な CSS 依存解析でなく、対応外の入力で証明を拒否するための限定プロファイルである。

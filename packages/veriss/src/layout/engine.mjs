@@ -2855,6 +2855,17 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const empty = !(box.children ?? []).length && !box.text && !box.inline?.length;
     return style[`min-${size}`] !== 'auto' || scroller || empty ? size : null;
   }
+  // Shared by actual sizing and block-flow auto-margin placement. CSS uses
+  // the final border-box width (after min/max and edge floors), not the
+  // specified preferred width, to distribute remaining inline space.
+  function preferredInlinePieces(style, parent, region, cssInlineEdges, autoValue) {
+    const preferred = (style['inline-size'] === 'auto' ? [{region, value:autoValue}] : lengthPieces(style['inline-size'], parent, region, style))
+      .map(piece => ({...piece, value:style['inline-size'] !== 'auto' && style['box-sizing'] === 'content-box' ? sum(piece.value,cssInlineEdges) : piece.value}));
+    const minimum = style['min-inline-size'] === 'auto' ? zero : px(style['min-inline-size']);
+    const edge = style['box-sizing'] === 'content-box' ? cssInlineEdges : scalar(0);
+    const capped = style['max-inline-size'] !== 'none' ? preferred.flatMap(piece => lengthPieces(style['max-inline-size'],parent,piece.region,style).flatMap(cap => minimumOf(cap.region,piece.value,sum(cap.value,edge)))) : preferred;
+    return capped.flatMap(c => cmp(minimum,zero)>0 ? maximum(c.region,c.value,sum(scalar(minimum),edge)) : [c]);
+  }
   function solve(box, available, region, parents = [], inherited, emit = true) {
     let results = [];
     if (emit) box.$starts = { geometry: geometry.length, sizes: sizes.length };
@@ -3020,12 +3031,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           // ratio = height / width, on the box named by box-sizing.
           return style['box-sizing'] === 'content-box' ? sum(times(h, div(one, r)), cssInlineEdges) : times(h, div(one, r));
         };
-        const preferredPieces = (style['inline-size'] === 'auto' ? [{ region: state.region, value: ratioWidth ? ratioInline() : available.inline }] : lengthPieces(style['inline-size'], available.percentInline ?? available.inline, state.region, style))
-          .map(piece => ({ ...piece, value: style['inline-size'] !== 'auto' && style['box-sizing'] === 'content-box' ? sum(piece.value, cssInlineEdges) : piece.value }));
-        const minimum = style['min-inline-size'] === 'auto' ? zero : px(style['min-inline-size']);
-        const minimumBorderBox = sum(scalar(minimum), style['box-sizing'] === 'content-box' ? cssInlineEdges : scalar(0));
-        const capped = style['max-inline-size'] !== 'none' ? preferredPieces.flatMap(piece => lengthPieces(style['max-inline-size'], available.percentInline ?? available.inline, piece.region, style).flatMap(cap => minimumOf(cap.region, piece.value, sum(cap.value, style['box-sizing'] === 'content-box' ? cssInlineEdges : scalar(0))))) : preferredPieces;
-        const preferredStates = capped.flatMap(c => cmp(minimum, zero) > 0 ? maximum(c.region, c.value, minimumBorderBox) : [c]);
+        const preferredStates = preferredInlinePieces(style,available.percentInline ?? available.inline,state.region,cssInlineEdges,
+          style['inline-size']==='auto' ? ratioWidth ? ratioInline() : available.inline : null);
         const edgeExplanation = axis => () => explanation(sizeChain([...parents, { box, style }], axis, { hostInset: options.hostInset }), sizeProperties(axis).filter(property => /^(?:padding|border)-/.test(property)).map(property => fact(box, style, property)));
         for (const proposal of preferredStates) if (emit) obligation(proposal.value, inlineEdges, box, proposal.region, 'E_LAYOUT_BOX_EDGES', 'inline', true, edgeExplanation('inline'));
         const contentStates = preferredStates.flatMap(proposal => clamp(proposal.region, diff(proposal.value, inlineEdges)));
@@ -3443,7 +3450,16 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                   const autoMargins = item => ['margin-left', 'margin-right'].some(key => item.style[key] === 'auto');
                   // In block flow an auto width fills the area, max-inline-size caps it, and the auto margins center it.
                   const blockFill = item => style.$blockFlow && String(item.style['inline-size']) === 'auto' && /^(?:none|\d+(?:\.\d+)?px)$/.test(String(item.style['max-inline-size']));
-                  for (const item of placed) if (autoMargins(item) && !blockFill(item)) {
+                  // Only ordinary block-flow children with explicit width
+                  // and fixed px edges: grid/flex intrinsic contributions,
+                  // replaced elements and variable padding need other proofs.
+                  const responsiveBlock = item => style.$blockFlow && style.direction==='ltr' &&
+                    ['html','body','main','div','section','article','aside','header','footer','nav'].includes(item.box.tag) &&
+                    /^(?:min|max|clamp|calc)\(/.test(String(item.style['inline-size'])) &&
+                    !ratioOf(item.style) && ['left','right'].every(side =>
+                      /^(?:0|\d+(?:\.\d+)?px)$/.test(String(item.style['padding-'+side])) &&
+                      /^(?:0|\d+(?:\.\d+)?px)$/.test(String(item.style['border-'+side])));
+                  for (const item of placed) if (autoMargins(item) && !blockFill(item) && !responsiveBlock(item)) {
                     const w = String(item.style['inline-size']);
                     if (!/^\d+(?:\.\d+)?(?:px|%)$/.test(w) || (item.style['box-sizing'] === 'content-box' && ['left', 'right'].some(side => !/^(?:0|\d+(?:\.\d+)?px)$/.test(String(item.style[`padding-${side}`])) || !/^(?:0|ua|\d+(?:\.\d+)?px)$/.test(String(item.style[`border-${side}`])))) || style.direction === 'rtl')
                       throw Object.assign(new Error(`${item.box.label}: auto margins on a grid item are modeled only with a px or % width (ltr); with an auto width it shrinks to fit its content`), { code: 'U_LAYOUT_CSS', box: item.box });
@@ -3488,6 +3504,16 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     const aligned = justified(item, region);
                     if (aligned) return aligned.map(a => ({ ...a, justified: true }));
                     if (!autoMargins(item)) return [{ region, offset: scalar(0) }];
+                    if (responsiveBlock(item)) {
+                      const st=item.style, edges=['left','right'].map(side=>edgeValue(st,side)).reduce(sum,scalar(zero));
+                      const share=st['margin-left']==='auto'?(st['margin-right']==='auto'?div(one,q(2)):one):zero;
+                      return bounded(preferredInlinePieces(st,areaInline(item),region,edges,itemInline(item))
+                        .flatMap(p=>maximum(p.region,p.value,edges))
+                        .flatMap(p=>{
+                          const free=diff(itemInline(item),p.value),split=partition(p.region,free,'>=');
+                          return [...split.yes.map(r=>({region:r,offset:times(free,share)})),...split.no.map(r=>({region:r,offset:scalar(0)}))];
+                        }));
+                    }
                     if (blockFill(item)) {
                       const max = String(item.style['max-inline-size']);
                       if (max === 'none') return [{ region, offset: scalar(0) }];
@@ -3621,14 +3647,24 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                         // padding box: the box is laid out as usual, and what reaches past that edge is cut off
                         // (E_LAYOUT_ABSOLUTE_CLIPPED). Any other clipping ancestor stays Unknown.
                         const clipping = finalAncestors.filter(ancestor => ancestor.clipped);
-                        const ownClip = clipping.length === 1 && clipping[0] === finalAncestors.at(-1) && ['hidden', 'visible'].includes(clipping[0].style?.['overflow-x']) && ['hidden', 'visible'].includes(clipping[0].style?.['overflow-y']);
+                        const immediate = finalAncestors.at(-1);
+                        const hiddenClip = ancestor => ['hidden','visible'].includes(ancestor.style?.['overflow-x']) && ['hidden','visible'].includes(ancestor.style?.['overflow-y']);
+                        // A projected independent rectangle is explicitly at scroll offset zero.
+                        // Nested hidden overflow does not change a direct containing block's
+                        // border/padding geometry. Do not relax the ordinary full-page
+                        // clipping/integrity model or claim the rectangle is visible.
+                        const projectedClip = preferences.includes('independent-rectangle') &&
+                          preferences.includes('scroll-zero') && containing===immediate &&
+                          clipping.includes(immediate) && clipping.every(hiddenClip) &&
+                          !finalAncestors.some(a=>a.clipScope||a.subgrid||containsFixed(a.style??{}));
+                        const ownClip = (clipping.length === 1 && clipping[0] === immediate && hiddenClip(immediate)) || projectedClip;
                         // A scroll container that is the containing block: the box is placed against its padding box at
                         // scroll offset 0 and scrolls with the content (what reaches past the end extends the scrollable
                         // area instead of being cut off). Its size is known; its position, like the content's, only at
                         // offset 0 (scroll-zero), so it has none otherwise.
                         const ownScroll = clipping.length === 1 && clipping[0] === finalAncestors.at(-1) && containing === clipping[0] && [clipping[0].style?.['overflow-x'], clipping[0].style?.['overflow-y']].every(v => ['auto', 'scroll', 'hidden', 'visible'].includes(String(v))) && !ownClip;
                         if (!containing?.paddingBlock || containing.subgrid || (clipping.length && !ownClip && !ownScroll)) throw new Error('Absolute boxes require an owned non-scrolling, unclipped containing block without subgrid placement');
-                        if (ownClip) containing.clips = { box: clipping[0].box.label, x: clipping[0].style['overflow-x'] === 'hidden', y: clipping[0].style['overflow-y'] === 'hidden' };
+                        if (ownClip) containing.clips = { box: immediate.box.label, x: immediate.style['overflow-x'] === 'hidden', y: immediate.style['overflow-y'] === 'hidden' };
                         return solve(item.box,{inline:containing.paddingInline,block:containing.paddingBlock,
                           containingBlock:{path:containing.box.path,inline:containing.paddingInline,block:containing.paddingBlock,origin:containing.paddingOrigin,...(containing.clips ? { clips: containing.clips } : {})}},r,finalAncestors,item.inherited ?? style,emit).map(result=>result.region);
                       }));
