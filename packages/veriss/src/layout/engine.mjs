@@ -256,7 +256,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     anonymous.forEach((child, k) => { if (runs[k]) { child.contract = runs[k]; child.contractSelector = `${box.contractSelector} text ${k}`; } });
   }
   const styleSources = [...(options.reset ?? []).map((sheet, index) => ({ ...sheet, kind: 'reset', file: sheet.file ?? `<reset:${index}>` })), { css: options.css, kind: 'app', file: options.cssFile ?? '<css>' },...inlineSheets];
-  const { rules, layers, keyframes: keyframeNames = new Set(), missingKeyframes = [], duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
+  const { rules, layers, keyframes: keyframeNames = new Set(), missingKeyframes = [], duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], userSelectNone = [], keyframeFrames, fontFaces, transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
   });
@@ -351,6 +351,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       layoutWarnings.push({ code: 'W_CSS_LANG_CODE', severity: 'warning', selector: sel.source, css: [{ property: ':lang', file: rule.file, line: rule.line, selector: sel.source }],
         message: `${sel.source}: ${code} is a country code, not a language code, so :lang(${part.value}) matches lang="${code}" only — the language is ${country[code]}. Write :lang(${country[code].split(' ')[0]})` });
     } }
+  for (const note of mediaVar) layoutWarnings.push({ code: 'W_CSS_MEDIA_VAR', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],
+    message: `@media ${note.params}: var() is not allowed in a media query (custom properties are not substituted there), so the query is invalid and its rules never apply. Write the length itself, or use @custom-media in a build step` });
   for (const note of gridAreasInvalid) layoutWarnings.push({ code: 'W_CSS_GRID_AREAS_INVALID', severity: 'warning', selector: note.selector, property: 'grid-template-areas', css: [{ property: 'grid-template-areas', file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector}: grid-template-areas is invalid (${note.why}), so the browser drops the whole declaration and every grid-area name in it is unknown (items are auto-placed). Make each name one rectangle and give every row the same number of cells` });
   for (const note of placeholderIgnored) layoutWarnings.push({ code: 'W_CSS_PLACEHOLDER_IGNORED', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],

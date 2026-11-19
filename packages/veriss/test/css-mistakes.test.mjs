@@ -852,3 +852,13 @@ test('F77: float on an absolutely positioned box computes to none (not a float e
   const [hit] = codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.includes('float'));
   assert.ok(hit && /absolutely positioned/.test(hit.message));
 });
+
+test('F78: var() in a media query is invalid: the rule never applies', () => {
+  const r = run(':root{--bp:600px}.a{height:20px}@media (min-width: var(--bp)){.a{height:40px}}');
+  assert.equal(r.status, 'verified');
+  const [hit] = codes(r, 'W_CSS_MEDIA_VAR');
+  assert.ok(hit && /never/.test(hit.message));
+  assert.equal(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), 20);
+  // A query list keeps its other queries: not judged.
+  assert.equal(codes(run('.a{height:20px}@media print, (min-width: var(--bp)){.a{height:40px}}'), 'W_CSS_MEDIA_VAR').length, 0);
+});

@@ -886,3 +886,14 @@ test('F77: float on an absolutely positioned box computes to none', async ({page
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('float')), pos).toBe(true);
   }
 });
+
+test('F78: a media query with var() never matches', async ({page}) => {
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}:root{--bp:600px}.a{height:20px}@media (min-width: var(--bp)){.a{height:40px}}';
+  await page.setViewportSize({width: 800, height: 300});
+  await page.setContent(`<!doctype html><html lang="en"><head><style>${css}</style></head><body><div class="a"></div></body></html>`);
+  expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height)).toBe(20);
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant)).toBe(20);
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_VAR')).toBe(true);
+});
