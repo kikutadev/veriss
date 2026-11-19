@@ -179,8 +179,30 @@ export function createCssMistakes({ report, facts, tools }) {
       css: [{ property: 'white-space', file: w.from.file, line: w.from.line, selector: w.from.selector }, { property: 'text-wrap', file: w.by.file, line: w.by.line, selector: w.by.selector }],
       message: `${box.label}: text-wrap: ${by} (${w.by.selector}) also sets text-wrap-mode: wrap, so it undoes white-space: ${w.whiteSpace} (${w.from.selector}) and the text wraps again.${pretty ? ' Firefox does not take text-wrap: pretty and drops it, so there the text stays on one line: the page differs by browser.' : ''} Write text-wrap-style: ${by} to change only how wrapping text breaks, or drop it to keep one line` });
   }
+  // F120: a <br> is a forced line break, not a box. margin-top / -bottom on it change the line spacing in Firefox only,
+  // line-height in Safari only; padding, width, height, the inline margins and display: block do nothing anywhere
+  // (measured in Chromium, Firefox and WebKit). display: none removes the break everywhere, so it is not reported.
+  function brStyled(box, style) {
+    if (box.tag !== 'br' || box.pseudo || layoutWarnings.some(w => w.code === 'W_CSS_BR_STYLED' && w.path === box.path)) return;
+    const own = key => { const src = style.$sources?.[key]; return src && !['initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(src.specified ?? '').trim().toLowerCase()) ? src : null; };
+    const zero = key => ['0', '0px', 'auto', 'normal', 'none'].includes(String(style[key]));
+    const firefox = ['margin-top', 'margin-bottom'].filter(key => own(key) && !zero(key));
+    const webkit = own('line-height') ? ['line-height'] : [];
+    const nowhere = ['padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'inline-size', 'block-size', 'margin-left', 'margin-right'].filter(key => own(key) && !zero(key));
+    const display = own('display') && style.display !== 'none' && style.display !== 'inline' ? ['display'] : [];
+    const found = [...firefox, ...webkit, ...nowhere, ...display];
+    if (!found.length) return;
+    const name = key => ({ 'inline-size': 'width', 'block-size': 'height' })[key] ?? key, shown = keys => keys.map(key => `${name(key)}: ${style.$sources[key].specified ?? style[key]}`).join(', ');
+    const parts = [firefox.length ? `${shown(firefox)} ${firefox.length === 1 ? 'changes' : 'change'} the line spacing in Firefox only` : null, webkit.length ? `${shown(webkit)} changes ${firefox.length ? 'it' : 'the line spacing'} in Safari only` : null,
+      nowhere.length + display.length ? `${shown([...nowhere, ...display])} ${nowhere.length + display.length === 1 ? 'does' : 'do'} nothing in any browser` : null].filter(Boolean);
+    layoutWarnings.push({ code: 'W_CSS_BR_STYLED', severity: 'warning', box: box.label, path: box.path, properties: found.map(name),
+      ...(firefox.length || webkit.length ? { browsers: { ...(firefox.length ? { firefox: firefox.map(name) } : {}), ...(webkit.length ? { webkit: webkit.map(name) } : {}) } } : {}),
+      css: found.map(key => ({ property: name(key), file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+      message: `${box.label}: a <br> is a line break, not a box: ${parts.join('; ')}. Space the lines with margin or padding on the elements around it (or split the text into blocks)` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    brStyled(box, style);
     wrapRestored(box, style);
     outOfFlowFlexInert(box, style);
     preserve3dInert(box, style, ancestors?.at(-1)?.style);
@@ -644,5 +666,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

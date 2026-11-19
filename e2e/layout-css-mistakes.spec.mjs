@@ -1404,3 +1404,13 @@ test('F119: text-wrap: balance after white-space: nowrap wraps again; text-wrap:
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_WRAP_RESTORED'), css).toBe(reported);
   }
 });
+
+test('F120: margin on a <br> spaces lines in Firefox only, line-height in WebKit only, the rest nowhere', async ({page, browserName}) => {
+  for (const [css, changes, reported] of [['margin-top:50px', browserName === 'firefox', true], ['margin-bottom:50px', browserName === 'firefox', true], ['line-height:80px', browserName === 'webkit', true],
+    ['padding-top:50px', false, true], ['display:block;height:50px', false, true], ['width:50px', false, true], ['display:none', true, false]]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}div{font:16px/20px monospace;width:300px}br{${css}}</style><div><span>a</span><br><span>b</span></div>`);
+    expect(await page.evaluate(() => document.querySelector('div').getBoundingClientRect().height) !== 40, css).toBe(changes);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"><span>a</span><br><span>b</span></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}br{${css}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BR_STYLED'), css).toBe(reported);
+  }
+});

@@ -1316,3 +1316,13 @@ test('F119: text-wrap: balance / pretty / stable after white-space: nowrap on th
   for (const css of ['.x{text-wrap:balance;white-space:nowrap}', '.x{white-space:nowrap;text-wrap-style:balance}', '.x{white-space:nowrap;text-wrap:wrap}', '.x{white-space:nowrap;text-wrap-mode:wrap}', '.p{white-space:nowrap}.x{text-wrap:balance}'])
     assert.equal(hit(css).length, 0, css);
 });
+
+test('F120: styles on a <br> work in one browser or none (display: none is not reported)', () => {
+  const hit = css => codes(run(css, '<div class="a"><span>a</span><br><span>b</span></div>'), 'W_CSS_BR_STYLED');
+  assert.deepEqual(hit('br{margin-top:50px}')[0].browsers, { firefox: ['margin-top'] });
+  assert.deepEqual(hit('br{line-height:80px}')[0].browsers, { webkit: ['line-height'] });
+  assert.match(hit('br{line-height:80px}')[0].message, /line spacing in Safari only/);
+  assert.match(hit('br{padding:10px;width:5px;display:block}')[0].message, /do nothing in any browser/);
+  assert.equal(hit('br{padding:10px}')[0].browsers, undefined);
+  for (const css of ['br{display:none}', 'br{margin:0}', '.a{line-height:30px}', '']) assert.equal(hit(css).length, 0, css);
+});
