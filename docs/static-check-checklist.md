@@ -410,3 +410,11 @@
   (接頭辞付きと、SVG のないページの XHTML)、`@counter-style`、`@font-palette-values`、`@charset`、`@page`、`@view-transition`
 - [x] `translate`・`rotate`・`scale` のプロパティ、回転角の `turn`・`grad`・`rad`
 - [x] `W_CSS_IMPORT_IGNORED`、`W_CSS_KEYFRAME_IMPORTANT`、`W_CSS_FONT_NO_GENERIC`、inline の箱の `transform`
+
+## H. 明示的な DOM 状態の契約（fork）
+
+- [x] HTML スナップショットの data-noshift と矩形契約（E_LAYOUT_NOSHIFT / E_SNAPSHOT_CONTRACT）:
+  viewport 幅・高さの全領域を exact rational の半平面で検査する。対象の矩形の被覆不足は Unknown。
+  e2e/layout-real-site-input.spec.mjs の snapshot game contracts で 320/800px 幅・400/550/551/900px 高さの
+  シフト境界と非重複を Chromium / Firefox / WebKit で照合 (2026-11-20、3/3 成功)。
+  実行中の DOM の到達可能性や Canvas 内部の位置、ペイント・hit testing は保証に含めない。
