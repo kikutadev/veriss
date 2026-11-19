@@ -544,6 +544,15 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    // F74: a relative box with both insets on an axis uses one: left (right in rtl) and top; the other does nothing
+    // (CSS 2.2 §9.4.3; measured in Chromium, Firefox and WebKit).
+    if (!box.pseudo && style.position === 'relative' && !style.$sticky) {
+      const set = key => style.$sources?.[key] && !['auto', undefined].includes(String(style[key]));
+      const ignored = [...(set('left') && set('right') ? [style.direction === 'rtl' ? 'left' : 'right'] : []), ...(set('top') && set('bottom') ? ['bottom'] : [])];
+      for (const key of ignored) if (!layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(key)))
+        layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: [key], css: [{ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector }],
+          message: `${box.label}: ${key}: ${style[key]} has no effect — a position: relative box with both ${key === 'bottom' ? 'top and bottom' : 'left and right'} moves by ${key === 'bottom' ? 'top' : key === 'right' ? 'left' : 'right (rtl)'} only. Remove one, or use position: absolute to stretch between them` });
+    }
     // F72: a positioned box with a negative z-index is painted below its stacking context's in-flow boxes. With no
     // stacking context in its parent, every ancestor up to the nearest one paints over it (a background hides it) and is hit first,
     // so it cannot be clicked (measured in Chromium, Firefox and WebKit). Not where an ancestor might make one.

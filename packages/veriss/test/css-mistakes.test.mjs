@@ -816,3 +816,13 @@ test('F73: a first child\'s margin-top that collapses through a parent with a ba
   assert.equal(w('.card{background:#eee;display:flow-root}').length, 0);
   assert.equal(w('').length, 0);
 });
+
+test('F74: a relative box with both left and right (or top and bottom) ignores one of them', () => {
+  const w = (css, html = '<div class="x a"></div>') => codes(run(`.x{position:relative;${css}}`, html), 'W_LAYOUT_DECLARATION_INERT').filter(x => x.properties.some(p => ['left', 'right', 'top', 'bottom'].includes(p)));
+  const [hit] = w('left:10px;right:30px');
+  assert.deepEqual(hit?.properties, ['right']);
+  assert.deepEqual(w('top:10px;bottom:30px')[0]?.properties, ['bottom']);
+  assert.deepEqual(w('left:10px;right:30px', '<div class="x a" dir="rtl"></div>')[0]?.properties, ['left']);
+  assert.equal(w('right:30px').length, 0);
+  assert.equal(codes(run('.x{position:sticky;top:0;bottom:0}'), 'W_LAYOUT_DECLARATION_INERT').filter(x => x.properties.includes('bottom')).length, 0);
+});

@@ -841,3 +841,13 @@ test('F73: a first child margin collapsing through a parent with a background', 
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_MARGIN_COLLAPSE_THROUGH'), css || 'none').toBe(warn);
   }
 });
+
+test('F74: a relative box with both insets on an axis ignores one', async ({page}) => {
+  for (const [dir, c, ignored] of [['ltr', 'left:10px;right:30px', 'right'], ['rtl', 'left:10px;right:30px', 'left'], ['ltr', 'top:10px;bottom:30px', 'bottom']]) {
+    const at = async css => { await page.setContent(`<!doctype html><html lang="en" dir="${dir}"><head><style>body{margin:0}.w{width:300px}.x{position:relative;width:50px;height:20px;${css}}</style></head><body><div class="w"><div class="x"></div></div></body></html>`); return page.evaluate(() => JSON.stringify(document.querySelector('.x').getBoundingClientRect())); };
+    // Changing the ignored inset moves nothing.
+    expect(await at(c), c).toBe(await at(c.replace(new RegExp(`${ignored}:\\d+px`), `${ignored}:77px`)));
+    const r = analyzeHTML(`<html lang="en" dir="${dir}"><body><div class="w"><div class="x"></div></div></body></html>`, {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.w{width:300px}.x{position:relative;width:50px;height:20px;${c}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).find(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && ['left', 'right', 'top', 'bottom'].includes(w.properties[0]))?.properties, `${dir} ${c}`).toEqual([ignored]);
+  }
+});

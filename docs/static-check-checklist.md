@@ -345,6 +345,9 @@
 - [x] **F73. 背景のある親を突き抜ける子の margin**(`W_LAYOUT_MARGIN_COLLAPSE_THROUGH`): padding・border のない親の、最初
   (最後)の子の margin-top(bottom)は親の外へ相殺されて出るので、親に背景があると、余白が背景の内側でなく外側に出る(CSS 2.2
   §8.3.1。3 つのブラウザーで、親の上端と子の上端が同じ)。padding か display: flow-root を勧める。
+- [x] **F74. 両側の inset を書いた relative**(`W_LAYOUT_DECLARATION_INERT`): position: relative の箱は、left と right の両方が
+  あると left(rtl では right)だけ、top と bottom の両方があると top だけで動く(CSS 2.2 §9.4.3。3 つのブラウザーで、使われない側を
+  変えても位置が同じ)。使われない側を報告する。sticky は両側が意味を持つので除く。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
   (消えない)ので報告しない。
 
