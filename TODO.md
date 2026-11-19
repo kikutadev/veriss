@@ -19,14 +19,14 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 1. 宣言ごと捨てられる値(構文) | 8 / 10 | 進行中 |
 | 2. at-rule(`@media` ほか) | 4 / 8 | 進行中 |
 | 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 9 / 10 | ほぼ済 |
-| 4. 表 | 8 / 9 | ほぼ済 |
-| 5. テキストと折り返し | 6 / 8 | 進行中 |
+| 4. 表 | 9 / 9 | 済 |
+| 5. テキストと折り返し | 7 / 9 | 進行中 |
 | 6. リスト・マーカー・カウンター | 4 / 5 | ほぼ済(1 つ保留) |
 | 7. transform・重なり・描画 | 3 / 6 | 進行中 |
 | 8. フォーム部品・置換要素 | 4 / 8 | 進行中 |
 | 9. セレクタ × DOM(状態・構造) | 6 / 8 | 進行中 |
 | 10. ブラウザで結果が違うもの | 1 / 5 | 着手 |
-| 合計 | 53 / 77(69%) | |
+| 合計 | 55 / 78(71%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -77,7 +77,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] `table > tr`(tbody の挿入、F26)
 - [x] 行・行グループの padding・margin・border・overflow(既存)
 - [x] セルの `max-width`(自動表では効くと確かめて見送り)
-- [ ] `<col>` / `<colgroup>` に効かないプロパティ(`padding`、`height`、`color` など)
+- [x] `<col>` / `<colgroup>` に効かないプロパティ(F108)
 
 ### 5. テキストと折り返し
 
@@ -87,7 +87,8 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] inline の `text-align` / `text-indent`(F45)
 - [x] `text-overflow` の条件(既存)
 - [x] `text-decoration: none` で祖先の線は消えない(F58)
-- [ ] `letter-spacing` / `word-spacing` の不正(`%`、単位のない数)
+- [x] `letter-spacing` / `word-spacing` の不正: 3 ブラウザで `%` は有効、単位のない数は F93 で報告済み、と確かめた
+- [ ] `letter-spacing` / `word-spacing` の `auto`(3 ブラウザで不正: 宣言ごと捨てられる)
 - [ ] `text-wrap: balance` が `white-space: nowrap` を打ち消す(折り返しが戻る)ことの知らせ
 
 ### 6. リスト・マーカー・カウンター
@@ -190,5 +191,6 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F108. 表の列に効かないプロパティ
 - F107. 不正な色(健全性の修正)
 - F106. 1 行のままの `white-space` の下の `word-break` / `line-break` / `hyphens` / `text-wrap-style`

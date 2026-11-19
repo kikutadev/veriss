@@ -108,8 +108,22 @@ export function createCssMistakes({ report, facts, tools }) {
     layoutWarnings.push({ code: 'W_CSS_PSEUDO_NO_CONTENT', severity: 'warning', box: pbox.label, path: pbox.path, css: src ? [{ property: 'content', file: src.file, line: src.line, selector: src.selector }] : [],
       message: `${pbox.label} is styled (${Object.keys(pstyle.$sources).filter(key => key !== 'content').slice(0, 3).join(', ')}) but has no content, so the browser never generates it. Add content: "" (or the text it should show)` });
   }
+  // F108: a table column (col, colgroup) is not an ancestor of the cells and has no box of its own to pad or size: only
+  // width, background, visibility and (with border-collapse: collapse) border act on it (CSS 2.2 §17.3; measured in
+  // Chromium, Firefox and WebKit). min-width is left out: Chromium and Firefox apply it, WebKit does not.
+  function columnInert(box, style) {
+    if (box.pseudo || !['col', 'colgroup'].includes(box.tag) || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path)) return;
+    const idle = ['0', '0px', 'auto', 'none', 'visible', 'baseline', 'start', 'initial', 'unset', 'inherit', 'revert', 'revert-layer', 'ua'];
+    const own = key => style.$sources?.[key] && !idle.includes(String(style.$sources[key].specified ?? style[key]).trim());
+    const keys = [...['top', 'right', 'bottom', 'left'].flatMap(side => [`padding-${side}`, `margin-${side}`]), 'block-size', 'color', 'font-size', 'text-align', 'vertical-align', 'overflow-x', 'overflow-y', 'max-inline-size',
+      ...(String(style['border-collapse']) === 'collapse' ? [] : ['border-top', 'border-right', 'border-bottom', 'border-left'])].filter(own);
+    if (!keys.length) return;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, css: keys.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+      message: `${box.label}: ${keys.join(', ')} ${keys.length === 1 ? 'has' : 'have'} no effect on a table ${box.tag === 'col' ? 'column' : 'column group'}: a column is not an ancestor of its cells (nothing is inherited from it) and has no box to pad or size; only width, background, visibility${String(style['border-collapse']) === 'collapse' ? ' and border' : ' and, with border-collapse: collapse, border'} act on it. Style the cells instead (td:nth-child(…))` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    columnInert(box, style);
     inlineAutoMargin(box, style, ancestors?.at(-1)?.style);
     if (droppedValue(style, 'float-absolute') && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['float'], ...(style.$sources?.float ? { css: [{ property: 'float', file: style.$sources.float.file, line: style.$sources.float.line, selector: style.$sources.float.selector }] } : {}),

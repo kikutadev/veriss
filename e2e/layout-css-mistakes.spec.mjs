@@ -1234,3 +1234,16 @@ test('F107: an invalid color drops the declaration in the browser, and the analy
   await page.setContent('<!doctype html><html lang="en"><head><style>.a{color:hsl(120 100 50)}</style></head><body><div class="a">x</div></body></html>');
   expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).color)).toBe('rgb(0, 255, 0)');
 });
+
+test('F108: on a table column only width, background, visibility and (collapsed) border act', async ({page}) => {
+  const html = '<table><colgroup class="g"><col class="c"><col></colgroup><tbody><tr><td>ab cd</td><td>y</td></tr><tr><td>x</td><td>y</td></tr></tbody></table>';
+  const base = 'td{font:16px monospace}';
+  for (const decl of ['padding:20px', 'height:100px', 'color:rgb(255,0,0)', 'margin:20px', 'text-align:right', 'font-size:30px', 'vertical-align:bottom', 'max-width:5px', 'overflow:hidden', 'border:3px solid rgb(0,0,255)'])
+    for (const target of ['.c', '.g']) expect(await pixelsAndBoxes(page, `${base}${target}{${decl}}`, html), `${target} ${decl}`).toEqual(await pixelsAndBoxes(page, base, html));
+  // these do act on a column (so the checks above are not vacuous)
+  for (const decl of ['width:200px', 'background:rgb(0,0,255)']) expect(await pixelsAndBoxes(page, `${base}.c{${decl}}`, html), decl).not.toEqual(await pixelsAndBoxes(page, base, html));
+  const collapsed = `${base}table{border-collapse:collapse}`;
+  expect(await pixelsAndBoxes(page, `${collapsed}.c{border:3px solid rgb(0,0,255)}`, html)).not.toEqual(await pixelsAndBoxes(page, collapsed, html));
+  const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{padding:20px;color:red}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).filter(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.c').flatMap(w => w.properties)).toEqual(['padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'color']);
+});

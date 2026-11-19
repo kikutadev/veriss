@@ -1154,3 +1154,17 @@ test('F107: an invalid color drops the declaration, so the earlier color stays (
   assert.equal(codes(run('.a{box-shadow:0 0 2px rgb(10%, 0, 0)}'), 'W_CSS_COLOR_INVALID').length, 1);
   assert.equal(codes(run('.a{background:url(#12345) no-repeat}'), 'W_CSS_COLOR_INVALID').length, 0);
 });
+
+test('F108: on a table column (col / colgroup) only width, background, border (collapsed) and visibility do anything', () => {
+  const html = '<table class="t"><colgroup class="g"><col class="c"><col></colgroup><tbody><tr><td>a</td><td>b</td></tr></tbody></table>';
+  const inert = css => codes(run(css, html), 'W_LAYOUT_DECLARATION_INERT').filter(w => w.box === '.c' || w.box === '.g').flatMap(w => w.properties);
+  assert.deepEqual(inert('.c{padding:20px}'), ['padding-top', 'padding-right', 'padding-bottom', 'padding-left']);
+  assert.deepEqual(inert('.c{color:red;font-size:30px;text-align:right}'), ['color', 'font-size', 'text-align']);
+  assert.deepEqual(inert('.g{height:100px;vertical-align:bottom}'), ['block-size', 'vertical-align']);
+  assert.deepEqual(inert('.c{border:3px solid blue}'), ['border-top', 'border-right', 'border-bottom', 'border-left']);
+  // these do act on a column
+  assert.deepEqual(inert('.c{width:200px;background:blue}'), []);
+  assert.deepEqual(inert('.t{border-collapse:collapse}.c{border:3px solid blue}'), []);
+  // min-width differs by browser (WebKit ignores it): not reported
+  assert.deepEqual(inert('.c{min-width:200px}'), []);
+});
