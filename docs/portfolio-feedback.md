@@ -60,3 +60,38 @@ portfolio の `scripts/verify-veriss.mjs` で `--capture` を一度実行し、�
 状態別の HTML/CSS 検証 CLI/API、幅・高さ両軸の矩形契約（within-viewport / contains / disjoint / data-noshift）、明示した文字寸法・フォント契約、未判定時の終了コードを追加。全 gate 成功（6単体群 fail=0、component-lint 4評価不変、3ブラウザー330 E2E passed、監督ランナー exit=0・残留0）。gate 開始後のソース差分なし。
 
 潮界防衛の WebKit 実 DOM で home / tech の2状態を captureSnapshot で収集し、開始ボタンの画面内収容、開始・技術開発ボタンの非重複、技術開発ダイアログと末尾のホームに戻るボタンの包含・画面内収容を API に渡した。4契約とも全体モデルが未構築のため Unknown。別途 WebKit の幅×高さ 320×568、390×844、650×510、651×510、844×390、1920×1080 で実矩形を照合すると home の2条件は全6点で成立。末尾の戻るボタンは5点で初期表示領域外だが dialog は overflow:auto、320×568 でもスクロール後のクリックで閉じられた。上部に別の閉じるボタンも存在する。この2契約は初期表示の要件として妥当でなく、ゲームの不具合とは断定しない。次の課題は局所モデルの健全な独立化と、スクロール到達性・固定操作ボタンの契約の区別。ゲーム本体に変更なし。
+
+### Game UI model v1 による実ゲーム評価
+
+設計・意味・API: [game-ui-model.md](game-ui-model.md), [ADR-0018](adr/0018-game-ui-model.md)。
+2026-11-20、`tools/eval-game-ui.mjs ../game/voxel-tide-defense/dist` を独立 QA 監督下で実行。
+WebKit、外部通信を遮断した HTTPS の local route、DPR 1・inset 0、各 viewport は新規 context。
+対象は home → tech → home → prepare → pause → prepare → combat の抽象部分グラフ。
+viewport 幅320–1920、高さ320–1080 を契約の証明範囲とし、実測は6点（全JS状態を列挙したわけではない）。
+画面遷移後に scene アニメーションの終了を確認する。HTTP では crypto.randomUUID が使えず
+防衛開始に失敗したので、 secure context の HTTPS へ直して再検証した。外部フォントは取得していない。
+
+14契約: 条件付き verified 1、条件付き violated 1、Unknown 12（うち6件は action のため静的証明対象外）。
+6操作×6画面サイズ = 36/36 到達観測成功。矩形の点観測は初期画面の開始ボタン・技術開発ボタン、
+技術ダイアログ、準備画面の操作ボタン、Canvas を比較した。
+全ページCSS は kbd 等の未対応により依然 Unknown。一方、ビルドCSSの field 100% / min-height:400px、
+#scene inset:0、canvas 100% と renderer の mount 寸法契約に基づく独立 scene model は、
+field に Canvas が収まることを全指定範囲で条件付き証明した（prepare/combat、12点観測一致）。
+Canvas が viewport に収まることは height<400 の条件で違反、数理反例 1120×360px。
+844×390px の実測では field/canvas 高さ400px、開始ボタン下端394px（初期表示4px超過）。
+ただし開始ボタンの操作に成功しており、全く操作できない不具合ではない。
+scene 証拠は実装CSSからの独立した限定モデルであり、CSS の全カスケードの完全性や3D内容の証明ではない。
+
+| viewport | 下部 HUD 2矩形の占有率（field 基準） | 開始ボタン初期収容 | 操作6件 |
+|---|---:|---|---:|
+| 320×568 | 22.71% | pass | 6 |
+| 390×844 | 15.79% | pass | 6 |
+| 650×510 | 23.57% | pass | 6 |
+| 651×510 | 15.02% | pass | 6 |
+| 844×390 | 19.91% | fail | 6 |
+| 1920×1080 | 4.22% | pass | 6 |
+
+HUD の1/3は仮の評価契約で、ユーザー合意済みの製品仕様ではない。全HUD・視覚的な遮蔽も測っていない。
+準備/戦闘画面での canvas containment の数学的結果に根拠があっても、
+他の契約と実測の違反は独立に残る。この結果をゲーム全体の証明成功としない。
+ゲーム本体・本番公開先への変更なし。
