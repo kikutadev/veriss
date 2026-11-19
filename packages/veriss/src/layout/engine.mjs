@@ -7,6 +7,8 @@ import { parseCondition } from './conditions.mjs';
 import { tracks, tracks as gridTracks, place, parseAreas, expandTracks } from './grid.mjs';
 import { compileSelector, PARENT, dynamicAttributeTests, ignoringSiblings, placeholderField, requiredCapable, optionalDivergent, optionalDivergence, asFormField, readWriteKnown, asEditable, langMatches, directionality } from './selectors.mjs';
 import { selectorUsage } from './selector-usage.mjs';
+// User-action and other dynamic pseudo-classes: removed from a selector to ask whether it could match in some state (F83).
+const dynamicStates = /:(?:hover|focus-visible|focus-within|focus|active|target-within|target|checked|indeterminate|visited|link|any-link|open|closed|popover-open|modal|playing|paused|user-invalid|user-valid|invalid|valid|placeholder-shown|autofill|-webkit-autofill|enabled|disabled|read-only|read-write|required|optional|default|in-range|out-of-range|empty|state\([^)]*\))(?![\w-])/gi;
 import { selectorScope } from './selector-scope.mjs';
 import { viewportFont, zoomShortfall } from './zoom-font.mjs';
 import { gapSize, trackArea, trackSlice, inheritTracks } from './subgrid.mjs';
@@ -256,7 +258,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     anonymous.forEach((child, k) => { if (runs[k]) { child.contract = runs[k]; child.contractSelector = `${box.contractSelector} text ${k}`; } });
   }
   const styleSources = [...(options.reset ?? []).map((sheet, index) => ({ ...sheet, kind: 'reset', file: sheet.file ?? `<reset:${index}>` })), { css: options.css, kind: 'app', file: options.cssFile ?? '<css>' },...inlineSheets];
-  const { rules, layers, keyframes: keyframeNames = new Set(), missingKeyframes = [], duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], userSelectNone = [], keyframeFrames, fontFaces, transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
+  const { rules, layers, keyframes: keyframeNames = new Set(), missingKeyframes = [], duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], userSelectNone = [], keyframeFrames, fontFaces, transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
   });
@@ -351,6 +353,10 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       layoutWarnings.push({ code: 'W_CSS_LANG_CODE', severity: 'warning', selector: sel.source, css: [{ property: ':lang', file: rule.file, line: rule.line, selector: sel.source }],
         message: `${sel.source}: ${code} is a country code, not a language code, so :lang(${part.value}) matches lang="${code}" only — the language is ${country[code]}. Write :lang(${country[code].split(' ')[0]})` });
     } }
+  for (const note of importantTypo) layoutWarnings.push({ code: 'W_CSS_IMPORTANT_TYPO', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { ${note.property}: ${note.value} }: ${note.word} is not !important, so the browser drops the whole declaration. Write !important (or remove it)` });
+  for (const note of mediaAndFunction) layoutWarnings.push({ code: 'W_CSS_MEDIA_AND_SPACE', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],
+    message: `@media ${note.params}: "and(" with no space is read as a function, so the query is invalid and its rules never apply. Write ${note.params.replace(/\band\(/gi, 'and (')}` });
   for (const note of mediaBadLength) layoutWarnings.push({ code: 'W_CSS_MEDIA_INVALID_LENGTH', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],
     message: `@media ${note.params}: ${note.value} is not a length (${/\s/.test(note.value) ? 'no space is allowed before the unit' : 'a number other than 0 needs a unit'}), so the query is invalid and its rules never apply. Write ${note.value.replace(/\s+/g, '').replace(/^((?:\d*\.)?\d+)$/, '$1px')}` });
   for (const note of mediaVar) layoutWarnings.push({ code: 'W_CSS_MEDIA_VAR', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],
@@ -2408,6 +2414,17 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         if (set('overflow-wrap', 'normal') && ['nowrap', 'pre'].includes(String(style['white-space'])) && !box.children.some(child => !child.anonymous)) reasons.push(['overflow-wrap', `its white-space is ${style['white-space']}, so its lines never wrap and there is nothing to break (use white-space: normal, or text-overflow: ellipsis to mark the cut)`]);
         // F81: column-span takes a box out of its multi-column container's columns; with none above it there is nothing to span.
         if (set('column-span', 'none')) reasons.push(['column-span', 'it is not inside a multi-column container (column-count or column-width), so there are no columns to span'])
+        // F83: transform-origin is the fixed point of a transform; a box that no rule transforms in any state (and that no
+        // animation moves) never uses it (measured in Chromium, Firefox and WebKit). An SVG element can be transformed by its
+        // transform attribute, so it is not checked; a rule whose selector cannot be read without its states counts as moving it.
+        if (style.$sources?.['transform-origin'] && !box.pseudo && box.tag !== 'svg' && !parents.some(p => p.box.tag === 'svg')
+          && ['transform', 'translate', 'rotate', 'scale'].every(key => [undefined, 'none'].includes(style[key])) && String(style['animation-name'] ?? 'none') === 'none'
+          && !rules.some(rule => (rule.declarations ?? []).some(d => ['transform', 'translate', 'rotate', 'scale', 'animation', 'animation-name'].includes(d.property) && !['none', 'initial', 'unset', 'revert', 'revert-layer'].includes(String(d.value).trim()))
+            && (rule.selectors ?? []).some(sel => { try { return matches(compileSelector(String(sel.source).replace(dynamicStates, '')), box); } catch { return true; } })))
+          reasons.push(['transform-origin', 'no rule gives it a transform (transform, translate, rotate or scale) in any state, so there is nothing to place the origin of']);
+        // F88: list-style-position places the marker of a list item; an element that is not one, with nothing inside to inherit
+        // it, has no marker (measured in Chromium, Firefox and WebKit).
+        if (set('list-style-position', 'outside') && ownSource('list-style-position') && !style.$listItem && style.display !== 'list-item' && !(box.children ?? []).length && !box.inline?.length && !['ul', 'ol', 'menu', 'li', 'summary'].includes(box.tag)) reasons.push(['list-style-position', 'it is not a list item (display: list-item) and has no items in it, so there is no marker to place']);
         if (set('resize', 'none')) reasons.push(['resize', `its overflow is ${style['overflow-x']} ${style['overflow-y']}, and only a box whose overflow is not visible can be resized; set overflow: auto on it`]);
         if (set('line-clamp', 'none') && style.$lineClamp === undefined && !['-webkit-box', '-webkit-inline-box'].includes(style.display)) reasons.push(['line-clamp', `it is display: ${style.display}, not -webkit-box`]);
         if (reasons.length) layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: reasons.map(r => r[0]),

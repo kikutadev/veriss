@@ -914,3 +914,48 @@ test('F82: empty-cells: hide does nothing with border-collapse: collapse', () =>
   assert.equal(hit('.t{empty-cells:hide}'), false);
   assert.equal(hit('.t{border-collapse:collapse;empty-cells:show}'), false);
 });
+
+test('F83: transform-origin with no transform in any state does nothing', () => {
+  const inert = (css, html) => codes(run(css, html), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('transform-origin'));
+  assert.equal(run('.a{transform-origin:0 0}').status, 'verified');
+  assert.ok(inert('.a{transform-origin:0 0}'));
+  // a selector that cannot be read without its states (:not(:hover)) counts as one that may transform the box
+  assert.ok(!inert('.a{transform-origin:0 0}.a:not(:hover){transform:scale(1.1)}'));
+  assert.ok(!inert('.a{transform-origin:0 0;transform:rotate(0deg)}'));
+  assert.ok(!inert('.a{transform-origin:0 0;scale:1}'));
+  // a state or an animation that transforms the box uses the origin
+  assert.ok(!inert('.a{transform-origin:0 0}.a:hover{transform:scale(1.1)}'));
+  assert.ok(!inert('.a{transform-origin:0 0}.p:hover .a{rotate:5deg}', '<div class="p"><div class="a"></div></div>'));
+  assert.ok(!inert('.a{transform-origin:0 0;animation:spin 1s}@keyframes spin{to{transform:rotate(1turn)}}'));
+});
+
+test('F88: list-style-position on an element that is not a list item and has nothing inside does nothing', () => {
+  const inert = (css, html) => codes(run(css, html), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('list-style-position'));
+  assert.ok(inert('.a{list-style-position:inside}'));
+  assert.ok(!inert('.a{list-style-position:outside}'));
+  assert.ok(!inert('.a{display:list-item;list-style-position:inside}'));
+  // the items inside inherit it
+  assert.ok(!inert('.a{list-style-position:inside;height:auto}li{height:20px}', '<ul class="a"><li></li></ul>'));
+});
+
+test('F86: a misspelled !important drops the whole declaration', () => {
+  for (const typo of ['!imporant', '!importent', '! improtant']) {
+    const r = run(`.a{height:40px ${typo}}`);
+    assert.equal(r.status, 'verified', typo);
+    assert.equal(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), 20, typo);
+    assert.equal(codes(r, 'W_CSS_IMPORTANT_TYPO').length, 1, typo);
+  }
+  for (const ok of ['!important', '!IMPORTANT', '! important']) {
+    const r = run(`.a{height:40px ${ok}}`);
+    assert.equal(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), 40, ok);
+    assert.equal(codes(r, 'W_CSS_IMPORTANT_TYPO').length, 0, ok);
+  }
+});
+
+test('F87: "and(" in a media query is a function token: the query is invalid and never matches', () => {
+  const r = run('@media screen and(min-width:0px){.a{height:40px}}');
+  assert.equal(r.status, 'verified');
+  assert.equal(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), 20);
+  assert.equal(codes(r, 'W_CSS_MEDIA_AND_SPACE').length, 1);
+  assert.equal(codes(run('@media screen and (min-width:0px){.a{height:40px}}'), 'W_CSS_MEDIA_AND_SPACE').length, 0);
+});

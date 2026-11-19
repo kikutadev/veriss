@@ -13,11 +13,7 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 
 「現状」は今の解析器の結果。
 
-- [ ] **F83. transform のない `transform-origin`**: 変形がなければ原点は何にも使われない。現状: verified、警告なし
 - [ ] **F84. 空白を詰める `white-space` の下の `tab-size`**(normal / nowrap / pre-line ではタブは空白 1 つに潰れる)。現状: Unknown
-- [ ] **F86. `!important` の綴り間違い**(`!imporant`、`!importent` など): 宣言ごと捨てられる。現状: Unknown
-- [ ] **F87. media query の `and(`**(`and` の後に空白がない): 関数トークンになり query 全体が不正で決して一致しない(3 ブラウザで実測)。`)and (` のように `and` の前に空白がないだけなら有効。現状: Unknown
-- [ ] **F88. list-item でない要素の `list-style-position`**: マーカーがないので効かない。現状: verified、警告なし
 - [ ] **F89. 変形された子のない要素の `perspective`**: 3D 変形する子孫がなければ効かない。現状: Unknown
 - [ ] **F90. 段組の外の `break-before` / `break-after` / `break-inside`**: 画面では効かないが印刷では効く。印刷を考えるかどうかを決めてから扱う(要検討)
 
@@ -31,3 +27,7 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 - F80. `white-space: nowrap` / `pre` の下の `overflow-wrap`
 - F81. 段組の外の `column-span`
 - F82. `border-collapse: collapse` の表の `empty-cells: hide`
+- F83. transform のない `transform-origin`
+- F86. `!important` の綴り間違い
+- F87. media query の `and(`
+- F88. list-item でない要素の `list-style-position`

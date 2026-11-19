@@ -362,6 +362,10 @@
 - [x] **F80. `white-space: nowrap` / `pre` の下の `overflow-wrap`**(`W_LAYOUT_DECLARATION_INERT`): 折り返さない行には折る場所がないので効かない。中に折り返しを戻す要素があるときは継承先で効くので警告しない
 - [x] **F81. multi-column の外の `column-span`**(`W_LAYOUT_DECLARATION_INERT`、以前は Unknown): 段組の祖先がなければ跨ぐ段がない。`initial` / `unset` は `none` として扱い、`inherit` は Unknown のまま
 - [x] **F82. `border-collapse: collapse` の表の `empty-cells: hide`**(`W_LAYOUT_DECLARATION_INERT`): 空のセルを隠すのは分離境界モデルだけで、collapse では背景も枠も描かれる(3 ブラウザでスクリーンショット比較)
+- [x] **F83. transform のない `transform-origin`**(`W_LAYOUT_DECLARATION_INERT`): どの状態でも transform / translate / rotate / scale が付かず、animation もなければ原点は使われない。状態の疑似クラスを外したセレクタで照合し、読めないセレクタ(`:not(:hover)` など)は「付くかもしれない」とみなす。SVG 要素は transform 属性があるので見ない
+- [x] **F86. `!important` の綴り間違い**(`W_CSS_IMPORTANT_TYPO`、以前は Unknown): `!imporant` など `!important` 以外の `!語` は宣言ごと捨てられる。`!IMPORTANT` と `! important` は有効(3 ブラウザで実測)
+- [x] **F87. media query の `and(`**(`W_CSS_MEDIA_AND_SPACE`、以前は Unknown): 関数トークンになり query は不正で決して一致しない。`)and (` は有効
+- [x] **F88. list-item でない要素の `list-style-position`**(`W_LAYOUT_DECLARATION_INERT`): マーカーがなく、中に継承先もなければ効かない
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

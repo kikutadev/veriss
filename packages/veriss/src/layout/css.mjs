@@ -628,7 +628,7 @@ function flexShorthand(value) {
 }
 
 export function parseLayoutCSS(sheets, diagnostic) {
-  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
@@ -768,6 +768,9 @@ export function parseLayoutCSS(sheets, diagnostic) {
           const bad = values.find(v => /^\s*(?:\d*\.)?\d+\s*$/.test(v) && Number(v) !== 0 || /^\s*(?:\d*\.)?\d+\s+[a-z%]+\s*$/i.test(v));
           if (bad) { mediaBadLength.push({ params: node.params.trim(), value: bad.trim(), file: filename, line: node.source.start.line }); continue; }
         }
+        // F87: "and(" (no space) is a function token, not the keyword and: the query is invalid and never matches (measured
+        // in Chromium, Firefox and WebKit). In a list only that query fails, so only a single query is handled.
+        if (node.name.toLowerCase() === 'media' && /\band\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { mediaAndFunction.push({ params: node.params.trim(), file: filename, line: node.source.start.line }); continue; }
         if (node.name.toLowerCase() === 'media' && /var\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) {
           mediaVar.push({ params: node.params.trim(), file: filename, line: node.source.start.line });
           continue;
@@ -923,6 +926,10 @@ export function parseLayoutCSS(sheets, diagnostic) {
       for (const declaration of node.nodes) {
         if (declaration.type === 'comment') continue;
         if (declaration.type !== 'decl') { problem('U_LAYOUT_CSS', 'Nested CSS rules are outside the subset', declaration.source.start.line); continue; }
+        // F86: a "!word" other than !important at the end of a value makes the declaration invalid: the browser drops it
+        // (measured in Chromium, Firefox and WebKit). PostCSS keeps it in the value; it is dropped here and reported.
+        { const bang = !declaration.prop.startsWith('--') && !declaration.important && /!\s*([a-z][\w-]*)\s*$/i.exec(declaration.value);
+          if (bang && bang[1].toLowerCase() !== 'important') { importantTypo.push({ property: declaration.prop.toLowerCase(), value: declaration.value.trim(), word: bang[0].replace(/\s+/g, ''), selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         try {
           const custom=declaration.prop.startsWith('--'),property=custom ? declaration.prop : declaration.prop.toLowerCase();
           const expression=custom || /var\(/i.test(declaration.value) ? variableValue(declaration.value) : undefined;
@@ -951,7 +958,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
     if (!missingKeyframes.some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) missingKeyframes.push({ name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
+  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
 }
 
 // The UA default family and the user's default font size are not author

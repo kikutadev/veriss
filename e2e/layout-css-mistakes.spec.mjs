@@ -954,3 +954,56 @@ test('F82: empty-cells: hide does nothing with border-collapse: collapse', async
   expect(r.status).toBe('verified');
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('empty-cells'))).toBe(true);
 });
+
+const pixelsAndBoxes = async (page, css, html) => {
+  await page.setContent(`<!doctype html><html lang="en"><head><style>*{margin:0}${css}</style></head><body>${html}</body></html>`);
+  const boxes = await page.evaluate(() => [...document.querySelectorAll('body *')].map(e => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
+  return [boxes, (await page.screenshot({clip: {x: 0, y: 0, width: 300, height: 120}})).toString('base64')];
+};
+
+test('F83: transform-origin with no transform does nothing', async ({page}) => {
+  const base = '.a{width:100px;height:50px;background:rgb(255,0,0)}';
+  expect(await pixelsAndBoxes(page, `${base}.a{transform-origin:0 0}`, '<div class="a"></div>')).toEqual(await pixelsAndBoxes(page, base, '<div class="a"></div>'));
+  // with a transform it moves the result (so the check above is not vacuous)
+  expect(await pixelsAndBoxes(page, `${base}.a{transform:scale(.5);transform-origin:0 0}`, '<div class="a"></div>')).not.toEqual(await pixelsAndBoxes(page, `${base}.a{transform:scale(.5)}`, '<div class="a"></div>'));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;transform-origin:0 0}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('transform-origin'))).toBe(true);
+});
+
+test('F88: list-style-position on an element that is not a list item does nothing', async ({page}) => {
+  const base = '.a{width:100px;padding-left:40px;font:16px monospace}';
+  expect(await pixelsAndBoxes(page, `${base}.a{list-style-position:inside}`, '<div class="a">x</div>')).toEqual(await pixelsAndBoxes(page, base, '<div class="a">x</div>'));
+  // on a list item it moves the marker inside (so the check above is not vacuous)
+  expect(await pixelsAndBoxes(page, `${base}.a{display:list-item;list-style-position:inside}`, '<div class="a">x</div>')).not.toEqual(await pixelsAndBoxes(page, `${base}.a{display:list-item}`, '<div class="a">x</div>'));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;list-style-position:inside}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('list-style-position'))).toBe(true);
+});
+
+test('F86: a misspelled !important drops the declaration; !IMPORTANT and "! important" are valid', async ({page}) => {
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}';
+  const height = async extra => {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${css}${extra}</style></head><body><div class="a"></div></body></html>`);
+    return page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height);
+  };
+  for (const [mark, expected] of [['!imporant', 20], ['!importent', 20], ['! improtant', 20], ['!important', 40], ['!IMPORTANT', 40], ['! important', 40]]) {
+    expect(await height(`.a{height:40px ${mark}}`), mark).toBe(expected);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `${css}.a{height:40px ${mark}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, mark).toBe('verified');
+    expect(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), mark).toBe(expected);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_IMPORTANT_TYPO'), mark).toBe(expected === 20);
+  }
+});
+
+test('F87: "and(" in a media query never matches; "and (" does', async ({page}) => {
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}';
+  for (const [query, expected] of [['screen and(min-width:0px)', 20], ['screen and (min-width:0px)', 40]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${css}@media ${query}{.a{height:40px}}</style></head><body><div class="a"></div></body></html>`);
+    expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height), query).toBe(expected);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `${css}@media ${query}{.a{height:40px}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, query).toBe('verified');
+    expect(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), query).toBe(expected);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_AND_SPACE'), query).toBe(expected === 20);
+  }
+});
