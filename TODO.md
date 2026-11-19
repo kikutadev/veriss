@@ -139,8 +139,8 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
-- [ ] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
-- [ ] M2. import の向きを調べる境界テスト
+- [x] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
+- [x] M2. import の向きを調べる境界テスト
 - [ ] M3. 構文の検査の結果を `notes[]` にまとめる(28 の配列)
 - [ ] M4. 捨てた宣言を `dropped[]` にまとめる(11 の `$…Inert`)
 - [ ] M5. `rules/css-mistakes` を engine から出す
