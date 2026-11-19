@@ -279,8 +279,8 @@ function expand(property, value) {
     const values = property === 'margin' ? [parts[0], parts[1] ?? parts[0], parts[2] ?? parts[0], parts[3] ?? parts[1] ?? parts[0]] : sides.length === 2 ? [parts[0], parts[1] ?? parts[0]] : [parts[0]];
     return sides.map((side, i) => [`margin-${side}`, margin(values[i])]);
   }
-  if (property === 'border' || property === 'border-inline' || property === 'border-block') {
-    const sides = property === 'border' ? ['left', 'right', 'top', 'bottom'] : property === 'border-inline' ? ['left', 'right'] : ['top', 'bottom'];
+  if (property === 'border' || property === 'border-inline' || property === 'border-block' || /^border-(?:top|right|bottom|left)$/.test(property)) {
+    const sides = property === 'border' ? ['left', 'right', 'top', 'bottom'] : property === 'border-inline' ? ['left', 'right'] : property === 'border-block' ? ['top', 'bottom'] : [property.slice(7)];
     // The color is kept as paint (border-<side>-color) for the non-text contrast rules.
     if (wide.has(value)) return sides.flatMap(side => [[`border-${side}`, value], [`border-${side}-color`, value]]);
     const p = postcss.list.space(value);

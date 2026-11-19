@@ -39,3 +39,19 @@ test('ordinary anchor rel tokens do not require a rendering adapter',()=>{
   }
   assert.equal(run('<main rel="stylesheet"></main>').status,'unknown');
 });
+
+test('physical single-side border shorthands match the supported longhands',()=>{
+  for(const side of ['top','right','bottom','left']){
+    for(const [value,width,style,color] of [['2px solid #123456','2px','solid','#123456'],['0','0','none','currentcolor'],['none','0','none','currentcolor']]){
+      const html='<main></main>';
+      const options={css:css+'main{width:160px;height:50px;',viewport:{min:320,max:1920,height:{min:480,max:1080}}};
+      const report=d=>analyzeHTML(html,{...options,css:options.css+d+'}'});
+      const ref=report('border-'+side+'-width:'+width+';border-'+side+'-style:'+style+';border-'+side+'-color:'+color);
+      assert.equal(ref.status,'verified',side+' '+value);
+      const actual=report('border-'+side+':'+value);
+      assert.equal(actual.status,'verified',side+' '+value);
+      assert.deepEqual(actual.sizes,ref.sizes);
+    }
+  }
+  assert.equal(run(page,'main{border-top:2px dashed red}').status,'unknown');
+});
