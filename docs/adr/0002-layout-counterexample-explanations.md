@@ -32,8 +32,8 @@ sourceが追えないfactは不足として表示する。近くのCSS宣言を�
 既存LayoutIRとnoshiftの反例で開始できる。[0001](0001-static-layout-instability-verification.md)の
 scoreやframeが未実装でも独立に完了できる。
 
-- 汎用抽出: `packages/css-verifier/src/layout/`のgrid、linear、conditions、位置計算。
-- 証明結果: `packages/css-verifier/src/transitions.mjs`と契約の診断型。
+- 汎用抽出: `packages/veriss/src/layout/`のgrid、linear、conditions、位置計算。
+- 証明結果: `packages/veriss/src/transitions.mjs`と契約の診断型。
 - Isle側: `lib/layout-noshift.mjs`、`lib/layout-summary.mjs`。
 - 表示: `playground/layout.worker.mjs`、`playground/layout-checker.mjs`、`playground/main.mjs`。
 
@@ -72,7 +72,7 @@ scoreやframeが未実装でも独立に完了できる。
 | 計画 | 状態 | 根拠 |
 | --- | --- | --- |
 | 1. 探索 | 済 | 既存の反例はviewport・差分・pathを持つが、track・gap・padding・条件の出典を持たなかった |
-| 2. Red | 済 | `packages/css-verifier/test/explanations.test.mjs`。無関係な同名class規則を引用しないことも検査 |
+| 2. Red | 済 | `packages/veriss/test/explanations.test.mjs`。無関係な同名class規則を引用しないことも検査 |
 | 3. Green: コア | 一部 | cascadeの勝者・負けた宣言・条件不成立の宣言を`explanation`の両辺へ付与。affine演算単位のfact graphではなく、使った宣言の経路 |
 | 4. Green: adapter/CLI | 一部 | `layout --summary`の`offered by`/`required by`行。key列とtemplate位置の結合、noshiftの40px移動の原因trackは未実装 |
 | 5. playground | 未着手 | |

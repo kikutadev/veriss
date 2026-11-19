@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
-import {analyzeHTML} from '../../../packages/css-verifier/src/html.mjs';
-import {createNoShiftContract} from '../../../packages/css-verifier/src/transitions.mjs';
-import {verifyNoShift} from '../../../packages/css-verifier/src/transitions-node.mjs';
+import {analyzeHTML} from '../../../packages/veriss/src/html.mjs';
+import {createNoShiftContract} from '../../../packages/veriss/src/transitions.mjs';
+import {verifyNoShift} from '../../../packages/veriss/src/transitions-node.mjs';
 import {scenarios} from './fixtures.mjs';
 
 const viewport={min:320,max:960,height:{min:240,max:720}};

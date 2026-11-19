@@ -1,9 +1,9 @@
-# @mizchi/css-verifier-react
+# @mizchi/veriss-react
 
-A React (JSX/TSX) adapter for `@mizchi/css-verifier`, with the style systems that leave a static stylesheet.
+A React (JSX/TSX) adapter for `@mizchi/veriss`, with the style systems that leave a static stylesheet.
 
 ```js
-import {analyzeReact} from '@mizchi/css-verifier-react';
+import {analyzeReact} from '@mizchi/veriss-react';
 analyzeReact(source, {pageCSS, viewport, accessibility: true});            // StyleX or Linaria in the module
 analyzeReact(source, {pageCSS, viewport, css: readFileSync('app.css', 'utf8')}); // plain classNames
 ```

@@ -7,7 +7,7 @@
 
 ## 背景
 
-現在の[CSS検証コア](../../packages/css-verifier/README.md)は、閉じたCSS部分集合から
+現在の[CSS検証コア](../../packages/veriss/README.md)は、閉じたCSS部分集合から
 有理数・区分線形の矩形を抽出する。[noshift/1](../layout-transitions.md)は明示した対象の
 存在・位置・寸法を二状態間で比較し、Isle adapterは有限な状態候補とkeyを対応付ける。
 可視領域、text fragment、frameの順序、入力時刻をモデル化する機能はまだない。
@@ -122,7 +122,7 @@ textを含むsceneは、開始位置とfragmentを導出するか検査可能な
 - [ ] 同一アプリで観測契約の有無による配信HTML・JS・CSSの増分が0 byte。
 
 追加するevalは`evals/scenarios/layout-instability/`、モデルは必要な段階で`models/layout_frames/`へ置く計画。
-既存の回帰確認は`just css-verifier-check`、`just noshift-check`、`just check-types`。
+既存の回帰確認は`just veriss-check`、`just noshift-check`、`just check-types`。
 各milestone専用のjust recipeは、その実装時に追加する。
 
 ## 代替案と未決事項

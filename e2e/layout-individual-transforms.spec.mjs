@@ -1,7 +1,7 @@
 // The individual transform properties: translate, rotate and scale apply before transform, in that order (CSS
 // Transforms 2 §6). In each browser, random combinations paint the box where the one transform list
 // translate(...) rotate(...) scale(...) <transform> paints it, which is how the analysis composes them
-// (packages/css-verifier/test/individual-transforms.test.mjs checks the analysis gives that list's result).
+// (packages/veriss/test/individual-transforms.test.mjs checks the analysis gives that list's result).
 import {test, expect} from '@playwright/test';
 
 let seed = 7;
@@ -44,7 +44,7 @@ test('3D transforms without depth paint the box where their 2D equivalents do', 
 
 // Checklist B2: an arbitrary rotation composed with translations and scales. Wherever the browser paints the rotated
 // box over the next button, the analysis does not claim it covers nothing: it reports a cover or leaves it undecided.
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 test('composed arbitrary rotations: where the browser paints the box over the next one, the analysis does not clear it', async ({page}) => {
   await page.setViewportSize({width: 400, height: 300});
   const g = 'display:grid;grid-template-columns:minmax(0,1fr)';

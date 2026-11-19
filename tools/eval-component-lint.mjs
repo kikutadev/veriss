@@ -9,7 +9,7 @@ import {readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync} from 'n
 import {join, extname, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {lint} from '../packages/adapter-core/src/index.mjs';
-import {loadTextMetrics} from '../packages/css-verifier/src/text-node.mjs';
+import {loadTextMetrics} from '../packages/veriss/src/text-node.mjs';
 import {expandSvelte, analyzeSvelte, unscopeCSS} from '../packages/svelte-adapter/src/index.mjs';
 import {expandVue, analyzeVue} from '../packages/vue-adapter/src/index.mjs';
 import {expandReact, analyzeReact} from '../packages/react-adapter/src/index.mjs';
@@ -18,7 +18,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const scenario = join(root, 'evals/scenarios/component-lint');
 const args = process.argv.slice(2), opt = {};
 for (let i = 0; i < args.length; i += 2) opt[args[i].replace(/^--/, '')] = args[i + 1];
-const fontFile = join(root, 'packages/css-verifier/text-metrics/fixtures/roboto-variable.ttf');
+const fontFile = join(root, 'packages/veriss/text-metrics/fixtures/roboto-variable.ttf');
 const fonts = {Roboto: {file: fontFile}};
 const face = `@font-face{font-family:Roboto;src:url(data:font/ttf;base64,${readFileSync(fontFile).toString('base64')})}`;
 const pageCSS = '*{box-sizing:border-box;margin:0}html{font-family:Roboto;line-height:1.5}';

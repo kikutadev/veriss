@@ -8,7 +8,7 @@
 ## 背景
 
 `vlmkit check integrity` は、描画したページを 1280/768/375px で DOM と画素から判定する。
-css-verifier はすでに border box の位置と寸法を viewport の affine 式として証明しているので、
+veriss はすでに border box の位置と寸法を viewport の affine 式として証明しているので、
 同じ規則を特定の幅のサンプルではなく、宣言した viewport の全域で判定できる。
 
 ## 判断
@@ -70,7 +70,7 @@ vlmkit と同じく、absolute の box が関わる重なりは意図的なオ�
 
 | 検査 | 内容 |
 | --- | --- |
-| `packages/css-verifier/test/integrity.test.mjs` | opt-in、契約で溢れを許した行のページ溢れと突出の正確な閾値、absolute のラベルの衝突、24px の target、clip と入れ子スクロールの警告 |
+| `packages/veriss/test/integrity.test.mjs` | opt-in、契約で溢れを許した行のページ溢れと突出の正確な閾値、absolute のラベルの衝突、24px の target、clip と入れ子スクロールの警告 |
 | `e2e/layout-integrity.spec.mjs` | 8構成を vlmkit 0.24.0 で 1280/768/375px に検査し、規則ごとに静的な区間と一致することを確認。免除は両側で検出として数え、vlmkit の text-clipped は clipped-content として扱う。フォント契約のあるテキスト(Roboto subset)は text-collision も一致を要求し、契約のない text は「vlmkit が報告するなら静的も報告」のみ |
 
 結果は `evals/results/layout-integrity/report.json` に残る。

@@ -2,7 +2,7 @@
 // malformed functions, repeated keywords, swapped axes), whatever the table decides agrees with CSS.supports in this
 // browser — true only where the browser parses the declaration, false only where it does not. Undecided is allowed.
 import {test, expect} from '@playwright/test';
-import {supportsCondition} from '../packages/css-verifier/src/layout/supports.mjs';
+import {supportsCondition} from '../packages/veriss/src/layout/supports.mjs';
 
 const values = {
   color: ['red', 'foo', '#abc', '#abcd', '#abcde', 'rgb(0 0 0 / 50%)', 'rgb(0, 0, 0)', 'rgb(0 0)', 'oklch(70% 0.1 200)', 'oklch(a b c)', 'color-mix(in srgb, red, blue)', 'color-mix(in srgb, red 30%, #00f)', 'color-mix(red, blue)', 'color-mix(in srgb, foo, blue)', 'hsl(120deg 50% 50%)', 'currentcolor', 'rebeccapurple'],

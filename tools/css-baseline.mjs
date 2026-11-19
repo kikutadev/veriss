@@ -8,7 +8,7 @@
 //
 // --reset applies a stylesheet before each page (a CSS reset): what still differs is what the reset leaves open.
 //
-// The engine's own value for a fact (what css-verifier assumes today) is given beside it where it has one.
+// The engine's own value for a fact (what veriss assumes today) is given beside it where it has one.
 import {chromium, firefox, webkit} from 'playwright';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {join, resolve} from 'node:path';
@@ -21,7 +21,7 @@ const out = resolve(root, opt.out ?? 'evals/results/css-baseline');
 const engines = {chromium, firefox, webkit};
 const browsers = (opt.browsers ?? 'chromium,firefox,webkit').split(',');
 const resetCSS = opt.reset ? readFileSync(opt.reset, 'utf8') : '';
-const font = readFileSync(join(root, 'packages/css-verifier/text-metrics/fixtures/roboto-variable.ttf')).toString('base64');
+const font = readFileSync(join(root, 'packages/veriss/text-metrics/fixtures/roboto-variable.ttf')).toString('base64');
 const face = `@font-face{font-family:Roboto;src:url(data:font/ttf;base64,${font})}`;
 
 // [group, fact, page HTML, function in the page returning the value, the engine's assumption]
@@ -107,7 +107,7 @@ for (const name of browsers) {
 }
 const rows = facts.map(([group, fact, , , assumed]) => ({group, fact, assumed, values: Object.fromEntries(browsers.map(b => [b, results[b].facts[fact]])), differs: new Set(browsers.map(b => results[b].facts[fact])).size > 1}));
 writeFileSync(join(out, 'baseline.json'), JSON.stringify({browsers: Object.fromEntries(browsers.map(b => [b, results[b].version])), rows}, null, 2) + '\n');
-const md = [`# CSS ベースライン(${browsers.map(b => `${b} ${results[b].version}`).join('、')})`, '', `違うものは ${rows.filter(r => r.differs).length} / ${rows.length} 項目。「エンジンの前提」は css-verifier が今置いている値です。`, '',
+const md = [`# CSS ベースライン(${browsers.map(b => `${b} ${results[b].version}`).join('、')})`, '', `違うものは ${rows.filter(r => r.differs).length} / ${rows.length} 項目。「エンジンの前提」は veriss が今置いている値です。`, '',
   `| 分類 | 項目 | エンジンの前提 | ${browsers.join(' | ')} | 違い |`, `|---|---|---|${browsers.map(() => '---').join('|')}|---|`,
   ...rows.map(r => `| ${r.group} | ${r.fact} | ${String(r.assumed).replace(/\|/g, '/')} | ${browsers.map(b => String(r.values[b]).replace(/\|/g, '/')).join(' | ')} | ${r.differs ? '**違う**' : ''} |`)].join('\n');
 writeFileSync(join(out, 'baseline.md'), md + '\n');

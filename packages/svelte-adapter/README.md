@@ -1,13 +1,13 @@
-# @mizchi/css-verifier-svelte
+# @mizchi/veriss-svelte
 
-A Svelte 5 component adapter for `@mizchi/css-verifier`, written to check that the verifier core is not tied to
+A Svelte 5 component adapter for `@mizchi/veriss`, written to check that the verifier core is not tied to
 Isle's template language. It depends on the core; the core does not depend on it.
 
 ```js
-import {analyzeSvelte} from '@mizchi/css-verifier-svelte';
+import {analyzeSvelte} from '@mizchi/veriss-svelte';
 const report = analyzeSvelte(source, {pageCSS, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}, selectors: true});
 report.status;            // verified only if every template state is verified and nothing was Unknown
-report.states;            // [{choices, html, report}] — one css-verifier report per state
+report.states;            // [{choices, html, report}] — one veriss report per state
 report.selectors.warnings // selectors unused in every state (agrees with Svelte's css_unused_selector)
 report.findings          // [{code, box, severity, message, states}] — every error/warning and the states it holds in
 ```

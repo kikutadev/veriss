@@ -1,23 +1,23 @@
-# CSS verifier
+# veriss
 
 An experimental, framework-independent CSS verification library. It analyzes a
 finite box tree and a complete author stylesheet without rendering a page or
-executing application code. Isle is one input adapter; the core has no dependency
+executing application code. [Isle](https://github.com/mizchi/isle) is one user; the core has no dependency
 on the Isle compiler, its syntax, or a browser renderer.
 
-The provisional package name is `@mizchi/css-verifier`. It is private and has not
-been published. From this checkout, create and install a local archive:
+The package is `@mizchi/veriss`. It is not published to npm; depend on it from git (pnpm), pinned to a commit:
 
-```sh
-pnpm --dir packages/css-verifier pack --pack-destination /tmp
-pnpm add /tmp/mizchi-css-verifier-0.0.1.tgz
+```json
+{ "dependencies": { "@mizchi/veriss": "github:mizchi/veriss#<commit>&path:packages/veriss" } }
 ```
+
+The built text-metrics module (`text-metrics/_build/.../font_ffi.js`) is committed, so a consumer needs no MoonBit toolchain.
 
 ## Verify static HTML
 
 ```js
-import {analyzeHTML} from '@mizchi/css-verifier/html';
-import {verifyLayoutReport} from '@mizchi/css-verifier/z3/node';
+import {analyzeHTML} from '@mizchi/veriss/html';
+import {verifyLayoutReport} from '@mizchi/veriss/z3/node';
 
 const report = analyzeHTML(
   '<main class="row">' + '<div class="cell"></div>'.repeat(4) + '</main>',
@@ -44,7 +44,7 @@ attributes currently need a different adapter; pass CSS as a complete stylesheet
 ## Supply a box tree from another tool
 
 ```js
-import {analyzeLayout} from '@mizchi/css-verifier';
+import {analyzeLayout} from '@mizchi/veriss';
 
 const report = analyzeLayout(
   {tag: 'div', classes: ['message'], text: true},
@@ -153,7 +153,7 @@ geometry is decided and never change the status, regions or proof.
 `{text}` box contracts into size contracts:
 
 ```js
-import {loadTextMetrics} from '@mizchi/css-verifier/text/node';
+import {loadTextMetrics} from '@mizchi/veriss/text/node';
 const metrics = await loadTextMetrics({fonts: {'Noto Sans JP': {file: 'NotoSansJP.ttf'}}});
 const font = {family: 'Noto Sans JP', size: 16, lineHeight: 24, weight: 400};
 const report = analyzeLayout(tree, metrics.resolveOptions({
@@ -198,8 +198,8 @@ contract. `/transitions/node` verifies exact presence and border-rectangle
 equality for explicitly matched targets:
 
 ```js
-import {createNoShiftContract} from '@mizchi/css-verifier/transitions';
-import {verifyNoShift} from '@mizchi/css-verifier/transitions/node';
+import {createNoShiftContract} from '@mizchi/veriss/transitions';
+import {verifyNoShift} from '@mizchi/veriss/transitions/node';
 
 const contract = createNoShiftContract({
   name: 'Load',
@@ -229,7 +229,7 @@ accept an externally initialized Z3 API, including Wasm in a browser Worker.
 `/z3/node`, `/contracts/node` and `/transitions/node` own solver startup and teardown. All verification
 is tooling; no verifier or solver belongs in the application's UI runtime.
 
-Run `just css-verifier-check` from the repository root. The
+Run `just veriss-check` from the repository root. The
 [responsive example](examples/responsive.mjs) checks a correct breakpoint and
 finds a one-pixel failure interval in an incorrect one without a browser.
 

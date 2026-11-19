@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import {analyzeStates} from '../src/index.mjs';
-import {loadTextMetrics} from '../../css-verifier/src/text-node.mjs';
+import {loadTextMetrics} from '../../veriss/src/text-node.mjs';
 
 // With font files, the component's texts whose computed font is one of them are measured (widths and line breaks)
 // instead of assumed: a content-sized column of text can then be checked.
-const file = fileURLToPath(new URL('../../css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
+const file = fileURLToPath(new URL('../../veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
 const fonts = {Roboto: {file}};
 const css = '.row{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px}.label,.value{font-family:Roboto;font-size:16px;line-height:24px;font-weight:400;color:#000}';
 const states = [{html: '<div class="row"><span class="label">Account name</span><span class="value">Example</span></div>', choices: {}}];

@@ -88,7 +88,7 @@ Svelte、Vue、Linaria のコンポーネントでは、セレクタと、セレ
 
 Svelte はセレクタのすべての compound をスコープするので、コンポーネントの外の祖先は当たらない(未使用のセレクタで、Svelte のコンパイラと `W_CSS_SELECTOR_*` が報告する)。`E_SCOPE_OUTSIDE` にはしない。Vue の scoped はスタイルを当てる要素だけをスコープするので、祖先はコンポーネントの外の要素にも当たる。StyleX はセレクタを持たない。外部のスタイルシート(`--css`)はページの CSS として扱い、検査の対象にしない。
 
-adapter は、子のコンポーネントなどの境界を、状態のマークアップに `<!--isle-boundary:component Item-->` のようなコメントとして残す。css-verifier の `scope` オプション(`{mode: 'scoped' | 'global', ancestors?: 'scoped', owned?: [...], firstLine?}`)が、これと解析した木を照合する。
+adapter は、子のコンポーネントなどの境界を、状態のマークアップに `<!--isle-boundary:component Item-->` のようなコメントとして残す。veriss の `scope` オプション(`{mode: 'scoped' | 'global', ancestors?: 'scoped', owned?: [...], firstLine?}`)が、これと解析した木を照合する。
 
 ## レイアウトシフトの契約(`data-noshift`)
 
@@ -163,8 +163,8 @@ flex や grid の容器で、テキストが button や div、文字のない sp
 ## API
 
 ```js
-import {analyzeVue} from '@mizchi/css-verifier-vue';
-import {lint, formatText} from '@mizchi/css-verifier-adapter-core';
+import {analyzeVue} from '@mizchi/veriss-vue';
+import {lint, formatText} from '@mizchi/veriss-adapter-core';
 const result = analyzeVue(source, {pageCSS, viewport, accessibility: true, selectors: true, assumeText: true, sourceLines: true});
 console.log(formatText(lint(result, {file: 'Card.vue', source})));
 ```

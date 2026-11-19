@@ -102,9 +102,9 @@ test('data-noshift: E_LAYOUT_NOSHIFT exactly when Chromium moves the marked elem
 // Text beside a button in a flex row is an anonymous flex item: modeled as an unstyled span (measured with the font),
 // it places the button where Chromium does.
 test('anonymous flex items of text: the elements beside them are where Chromium puts them', async ({page}) => {
-  const {loadTextMetrics} = await import('../packages/css-verifier/src/text-node.mjs');
+  const {loadTextMetrics} = await import('../packages/veriss/src/text-node.mjs');
   const {readFileSync: read} = await import('node:fs');
-  const fontFile = new URL('../packages/css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url);
+  const fontFile = new URL('../packages/veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url);
   const textMetrics = await loadTextMetrics({fonts: {Roboto: {file: fontFile.pathname}}});
   const face = `@font-face{font-family:Roboto;src:url(data:font/ttf;base64,${read(fontFile).toString('base64')})}`;
   const page0 = '*{box-sizing:border-box;margin:0}html{font-family:Roboto}html,body{display:grid;grid-template-columns:minmax(0,1fr)}body{margin:0}';

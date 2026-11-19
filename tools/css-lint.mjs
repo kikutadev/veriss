@@ -30,7 +30,7 @@ for (let i = 0; i < args.length; i++) {
 }
 if (!files.length && !opt.suggestReset) { console.error('usage: css-lint [--viewport 320-1280] [--font Family=file.ttf] [--page-css file] [--css file] [--profile recommended|all] [--format text|json] <files>'); process.exit(2); }
 if (opt.suggestReset) {
-  const {suggestReset} = await import('../packages/css-verifier/src/layout/ua-reset.mjs');
+  const {suggestReset} = await import('../packages/veriss/src/layout/ua-reset.mjs');
   const r = suggestReset({browsers: String(opt.suggestReset).split(','), target: opt.ua ?? 'chromium'});
   console.log(r.css + (r.notes.length ? `\n/* Not in the reset (decide them in your design):\n${r.notes.map(n => ` * - ${n}`).join('\n')}\n */\n` : ''));
   process.exit(0);
@@ -41,7 +41,7 @@ const pageCSS = opt.pageCss ? readFileSync(opt.pageCss, 'utf8') : '*{box-sizing:
 const options = {...(opt.defaultFontSize !== 'none' ? {defaultFontSize: Number(opt.defaultFontSize)} : {}), ...(opt.defaultColors !== 'none' ? {defaultColors: true} : {}), scrollIntent: 'css', ...(opt.ua ? (String(opt.ua).includes(',') ? {uas: String(opt.ua).split(',')} : {ua: opt.ua}) : {}), sourceLines: true, eachCounts: (opt.eachCounts ?? '0,2').split(',').map(Number), pageCSS, viewport: {...range(opt.viewport), height: range(opt.height)}, accessibility: true, integrity: true, selectors: true, scrollbars: [{name: 'overlay', inlineSize: 0, blockSize: 0}], ...(opt.assumeText ? {assumeText: true} : {})};
 
 // --font Family=file.ttf: the component's texts in that family are measured from the font file (widths, line breaks).
-if (opt.fonts) { const {loadTextMetrics} = await import('../packages/css-verifier/src/text-node.mjs'); options.textMetrics = await loadTextMetrics({fonts: opt.fonts}); options.fonts = opt.fonts; if (opt.textResize !== 'off') options.textResize = true; }
+if (opt.fonts) { const {loadTextMetrics} = await import('../packages/veriss/src/text-node.mjs'); options.textMetrics = await loadTextMetrics({fonts: opt.fonts}); options.fonts = opt.fonts; if (opt.textResize !== 'off') options.textResize = true; }
 
 const adapters = {
   '.svelte': async () => (await import('../packages/svelte-adapter/src/index.mjs')).analyzeSvelte,

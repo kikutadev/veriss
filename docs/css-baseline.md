@@ -60,7 +60,7 @@ e2e(Chromium で 390 件)のうち、Firefox で 34 件、WebKit で 43 件が C
 
 ## UA profile(初期条件)
 
-フォームの部品の UA スタイルは、レイアウトのオプション `ua` で選びます(`packages/css-verifier/src/layout/ua-profile.mjs`)。
+フォームの部品の UA スタイルは、レイアウトのオプション `ua` で選びます(`packages/veriss/src/layout/ua-profile.mjs`)。
 
 - `ua: 'chromium' | 'firefox' | 'webkit'`: 測った値の profile。ボタン・文字入力欄・textarea・select の padding と border、チェックボックスと radio の margin、range の margin、ボタンの色、コントロールのフォント。
 - `ua: { base: 'webkit', button: { padding: ['0px', '10px', '0px', '10px'] } }`: profile の一部を置き換えた初期条件(社内の基準のブラウザー、独自の UA の想定など)。

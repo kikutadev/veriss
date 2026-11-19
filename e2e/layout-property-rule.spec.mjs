@@ -1,7 +1,7 @@
 // @property: where the analysis decides what var() of a registered custom property reads (inherits, initial-value,
 // initial, unset, invalid values), the box is as tall in the browser as the analysis says.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
 const reg = (inherits, initial = '10px', syntax = '<length>') => `@property --h{syntax:"${syntax}";inherits:${inherits};${initial === null ? '' : `initial-value:${initial}`}}`;

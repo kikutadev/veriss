@@ -2,7 +2,7 @@
 // page (where scrollbars are classic): the verifier's pageScroll says which states fit and which overflow, as the
 // browser scrolls, and W_LAYOUT_SCROLLBAR_SHIFT holds exactly where html's inline size changes between the states.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {analyzeStates} from '../packages/adapter-core/src/index.mjs';
 
 const css = '*{margin:0}.short{height:100px}.long{height:900px}';

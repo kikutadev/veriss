@@ -7,7 +7,7 @@
 
 ## 背景
 
-css-verifier は、普通の CSS と DOM の木を受け取り、cascade を解いてから幾何を証明する。
+veriss は、普通の CSS と DOM の木を受け取り、cascade を解いてから幾何を証明する。
 この設計で 120 を超える検査パターンを足してきた。その中で、検査で見つかる誤りの多くは幾何の誤りではなかった。
 **selector と木の対応が崩れている**誤りだった。実装済みの検査のうち、次の 3 つは、どれも cascade と selector が component の境界と関係なく働くために起きる。
 
@@ -59,7 +59,7 @@ component Card(open: bool, items: list<Item>) {
 5. **lowering**: 出力は普通の CSS である。
    - 節点ごとの `@scope` か、hash した class を使う。
    - 検査器へは、selector の照合を経ずに「節点 → 計算値」の表を直接渡す。
-   - css-verifier のコアはそのまま使える。selector を解く段がなくなるので、`U_LAYOUT_SELECTOR` の Unknown も減る。
+   - veriss のコアはそのまま使える。selector を解く段がなくなるので、`U_LAYOUT_SELECTOR` の Unknown も減る。
 
 ## 既存の仕組みとの関係
 

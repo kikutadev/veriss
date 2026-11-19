@@ -2,8 +2,8 @@
 // animation) exactly where the analysis reports E_LAYOUT_ANIMATION_SHIFT for it, including where only the easing's
 // overshoot past the keyframes moves it.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
-import {easedFrames} from '../packages/css-verifier/src/layout/animation-extremes.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
+import {easedFrames} from '../packages/veriss/src/layout/animation-extremes.mjs';
 
 const html = '<div class="p"><div class="a"></div><div class="b"></div></div>';
 const base = '*{box-sizing:border-box;margin:0}body{display:grid;grid-template-columns:minmax(0,1fr)}.p{display:flex;flex-wrap:wrap;width:250px}.a{width:100px;height:20px;flex:none}.b{width:108px;height:20px;flex:none;margin-left:auto}';

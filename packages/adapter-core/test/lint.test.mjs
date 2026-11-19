@@ -245,8 +245,8 @@ test('text beside a button in a flex row is an anonymous item (an unstyled span)
 });
 
 test('a text the font file cannot measure (a character it lacks) is Unknown with the reason, not an assumed pass', async () => {
-  const {loadTextMetrics} = await import('../../css-verifier/src/text-node.mjs');
-  const file = fileURLToPath(new URL('../../css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
+  const {loadTextMetrics} = await import('../../veriss/src/text-node.mjs');
+  const file = fileURLToPath(new URL('../../veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
   const textMetrics = await loadTextMetrics({fonts: {Roboto: {file}}});
   const src = name => `<div class="row"><span class="n">${name}</span></div>\n<style>.row { display: grid; grid-template-columns: minmax(0, 1fr); } .n { display: block; white-space: nowrap; font-family: Roboto; font-size: 14px; line-height: 20px; }</style>`;
   const r = analyzeSvelte(src('Chloé is editing'), {...scopeOptions, textMetrics, fonts: {Roboto: {}}});
@@ -256,8 +256,8 @@ test('a text the font file cannot measure (a character it lacks) is Unknown with
 });
 
 test('uas: a finding that holds in some browsers only says which (a button label that fits Firefox\'s 4px padding only)', async () => {
-  const {loadTextMetrics} = await import('../../css-verifier/src/text-node.mjs');
-  const file = fileURLToPath(new URL('../../css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
+  const {loadTextMetrics} = await import('../../veriss/src/text-node.mjs');
+  const file = fileURLToPath(new URL('../../veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
   const textMetrics = await loadTextMetrics({fonts: {Roboto: {file}}});
   const source = `<div class="bar"><button class="b" type="button">Publish now</button></div>\n<style>.bar { display: grid; grid-template-columns: 100px; } .b { display: block; white-space: nowrap; font-family: Roboto; font-size: 16px; line-height: 24px; }</style>`;
   const result = analyzeSvelte(source, {...scopeOptions, textMetrics, fonts: {Roboto: {}}, uas: ['chromium', 'firefox', 'webkit']});

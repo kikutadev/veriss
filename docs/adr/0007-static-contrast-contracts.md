@@ -73,7 +73,7 @@ theme/state条件、source、解決の完全性を保持する。
 - [ ] 同一アプリの配信HTML・JS・CSS増分0 byte。
 
 追加evalは`evals/scenarios/static-contrast/`を計画する。
-既存の回帰確認は`just css-verifier-check`、`just check-types`。
+既存の回帰確認は`just veriss-check`、`just check-types`。
 新しいcolor数値テストとpaint抽出テスト、最小のPlaywright差分oracleを実装時に追加する。
 
 ## 代替案と未決事項

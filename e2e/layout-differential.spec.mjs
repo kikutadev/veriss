@@ -2,7 +2,7 @@
 // analysis says verified, every box's rectangle must be Chromium's (a verified result with another geometry is a
 // soundness bug: tr { height }, flex-grow with a width and a column item's min-height were found this way).
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 // A rectangle value is affine in the viewport: constant + coefficient × width + heightCoefficient × height.
 const num = t => t === undefined ? 0 : Number(String(t).split('/').reduce((x, y) => x / y));

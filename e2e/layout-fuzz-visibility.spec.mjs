@@ -6,7 +6,7 @@
 // equal; 4 cases Unknown at the analysis work limit).
 //   FUZZ_SEEDS=200 FUZZ_FIRST=1000 npx playwright test -c playwright.layout.config.mjs e2e/layout-fuzz-visibility.spec.mjs
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {generateCase, viewports} from './support/visibility-fuzz.mjs';
 
 const seeds = Number(process.env.FUZZ_SEEDS ?? 15), first = Number(process.env.FUZZ_FIRST ?? 1);

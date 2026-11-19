@@ -1,5 +1,5 @@
 // @supports: a condition is decided only from declarations and selectors every target browser supports
-// (packages/css-verifier/src/layout/supports.mjs, checked against CSS.supports in e2e/layout-supports.spec.mjs);
+// (packages/veriss/src/layout/supports.mjs, checked against CSS.supports in e2e/layout-supports.spec.mjs);
 // anything else stays Unknown.
 import test from 'node:test';
 import assert from 'node:assert/strict';

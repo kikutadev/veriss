@@ -2,7 +2,7 @@
 // Each case loads a page, lets it run without input, and sums the layout-shift entries. These are measurements,
 // not checks of the static analysis.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {applyBrowserBaseline} from './support/browser-baseline.mjs';
 // Outside Chromium: skip tests whose oracle only Chromium has, expect failures where the browser's CSS baseline differs.
 test.beforeEach(({}, testInfo) => applyBrowserBaseline(testInfo));
@@ -80,8 +80,8 @@ test('static image reservation checks agree with Chromium layout shifts', async 
 });
 
 test('noshift ignores transforms like Chromium layout shifts: a transformed state verifies, a resized one does not', async ({page}) => {
-  const {createNoShiftContract} = await import('../packages/css-verifier/src/transitions.mjs');
-  const {verifyNoShift} = await import('../packages/css-verifier/src/transitions-node.mjs');
+  const {createNoShiftContract} = await import('../packages/veriss/src/transitions.mjs');
+  const {verifyNoShift} = await import('../packages/veriss/src/transitions-node.mjs');
   const viewport = {min: 800, max: 800, height: {min: 600, max: 600}};
   const html = '<main class="page"><div class="card"><div class="inner"></div></div><div class="below"></div></main>';
   const base = '*{box-sizing:border-box;margin:0}.page{display:grid;grid-template-columns:minmax(0,1fr);padding:8px;row-gap:8px}.card{display:grid;grid-template-columns:minmax(0,1fr);height:100px;padding:10px;background:#ddd}.inner{height:20px;background:#888}.below{height:40px;background:#444}';
@@ -211,7 +211,7 @@ test('static carousel slide-switch findings agree with Chromium layout shifts', 
 
 test('font swap warnings: text whose box follows the web font shifts in Chromium; warned-free cases do not', async ({page}) => {
   const {readFileSync} = await import('node:fs');
-  const roboto = readFileSync(new URL('../packages/css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
+  const roboto = readFileSync(new URL('../packages/veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url));
   await page.route('**/roboto.ttf', async route => { await new Promise(r => setTimeout(r, 700)); await route.fulfill({body: roboto, contentType: 'font/ttf'}); });
   const viewport = {min: 800, max: 800, height: {min: 600, max: 600}};
   const face = display => `@font-face{font-family:Roboto;src:url(/roboto.ttf);font-display:${display}}`;

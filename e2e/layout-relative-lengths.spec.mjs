@@ -1,7 +1,7 @@
 // Checklist D2: em lengths (against the element's px font-size) and a flex item's percentage width with flex-basis
 // auto: every box is where the browser puts it, as wide.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
 const frac = v => String(v).split('/').map(Number).reduce((a, b) => a / b);

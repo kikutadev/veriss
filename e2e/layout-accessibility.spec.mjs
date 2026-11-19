@@ -6,8 +6,8 @@
 import {test, expect} from '@playwright/test';
 import {spawnSync} from 'node:child_process';
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {analyzeHTML, htmlBoxTree} from '../packages/css-verifier/src/html.mjs';
-import {normalizeTree} from '../packages/css-verifier/src/tree.mjs';
+import {analyzeHTML, htmlBoxTree} from '../packages/veriss/src/html.mjs';
+import {normalizeTree} from '../packages/veriss/src/tree.mjs';
 import {applyBrowserBaseline} from './support/browser-baseline.mjs';
 // Outside Chromium: skip tests whose oracle only Chromium has, expect failures where the browser's CSS baseline differs.
 test.beforeEach(({}, testInfo) => applyBrowserBaseline(testInfo));

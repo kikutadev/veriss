@@ -2,7 +2,7 @@
 // long moving transition needs a reduce rule: W_A11Y_TRANSITION_MOTION holds exactly where the browser, under reduce,
 // still runs a transition of a moving property over 5s.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const base = '*{margin:0}body{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:30px}.s{background:#fff;color:#000}';
 const cases = [

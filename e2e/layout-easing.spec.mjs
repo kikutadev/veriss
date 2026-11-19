@@ -1,8 +1,8 @@
-// Easing ranges (packages/css-verifier/src/layout/easing.mjs): animating left from 0 to 100px with each easing, every
+// Easing ranges (packages/veriss/src/layout/easing.mjs): animating left from 0 to 100px with each easing, every
 // value the browser computes over the iteration (1001 samples) lies within [min, max] × 100px, and the extremes are
 // reached (the bound is within 0.05px; steps() excepted).
 import {test, expect} from '@playwright/test';
-import {easingRange} from '../packages/css-verifier/src/layout/easing.mjs';
+import {easingRange} from '../packages/veriss/src/layout/easing.mjs';
 
 const easings = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'cubic-bezier(0.34, 1.56, 0.64, 1)', 'cubic-bezier(0.68, -0.6, 0.32, 1.6)', 'cubic-bezier(0.5, -0.5, 0.5, 1.5)', 'cubic-bezier(0, 2, 1, -1)', 'cubic-bezier(0.1, 0.9, 0.9, 0.1)', 'linear(0, 1.2 60%, 1)', 'linear(0, -0.3, 1)', 'steps(4)', 'steps(3, jump-both)'];
 

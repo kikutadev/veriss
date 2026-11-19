@@ -1,4 +1,4 @@
-// Svelte 5 component adapter for @mizchi/css-verifier.
+// Svelte 5 component adapter for @mizchi/veriss.
 //
 // A component is a family of DOM trees: every {#if} branch, class: directive and {#each} item count is a choice. The
 // adapter enumerates the combinations (bounded), renders each as HTML, and runs the generic analysis on each one.
@@ -13,7 +13,7 @@
 // Unknown (never verified): child components, {@html}, {@render}, <slot>, dynamic class={…} that is not a literal
 // conditional, style: directives and style={…}, <svelte:element>, and more states than `maxStates`.
 import { parse } from 'svelte/compiler';
-import { analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/css-verifier-adapter-core';
+import { analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/veriss-adapter-core';
 
 const escapeText = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const escapeAttr = s => escapeText(s).replace(/"/g, '&quot;');
@@ -174,7 +174,7 @@ export const unscopeCSS = css => css.replace(/:global\(([^()]*)\)/g, '$1');
 /**
  * Analyse every template state of a Svelte component.
  * @param {string} source the .svelte file
- * @param {object} options css-verifier options (viewport, boxes, accessibility, selectors, …) plus:
+ * @param {object} options veriss options (viewport, boxes, accessibility, selectors, …) plus:
  *   pageCSS — CSS for the page around the component (html, body); page(html) — the document around it;
  *   maxStates, eachCounts — the enumeration bounds.
  */

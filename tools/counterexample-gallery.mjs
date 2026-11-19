@@ -5,14 +5,14 @@
 //   node tools/counterexample-gallery.mjs   (writes docs/counterexamples/*.png and docs/counterexamples/README.md)
 import {chromium} from 'playwright';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
-import {loadTextMetrics} from '../packages/css-verifier/src/text-node.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
+import {loadTextMetrics} from '../packages/veriss/src/text-node.mjs';
 import {expandSvelte, unscopeCSS} from '../packages/svelte-adapter/src/index.mjs';
 import {generateContrastCase} from '../e2e/support/contrast-fuzz.mjs';
 
 const out = new URL('../docs/counterexamples/', import.meta.url);
 mkdirSync(out, {recursive: true});
-const fontFile = new URL('../packages/css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url);
+const fontFile = new URL('../packages/veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url);
 const roboto = readFileSync(fontFile);
 const metrics = await loadTextMetrics({fonts: {Roboto: {file: fontFile.pathname}}});
 const ro = (size = 16, lineHeight = 24) => ({family: 'Roboto', size, lineHeight, weight: 400});

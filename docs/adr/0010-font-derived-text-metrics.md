@@ -23,7 +23,7 @@ CSSの`font-*`・`line-height`・`text-transform`は装飾として無視して�
   コアは計算値のフォントが契約と一致することを検査し、一致しなければUnknownにする。
 
 MoonBitのFFIはフォントの解析とshapingだけを持ち、丸め・定義域の上界・契約への変換はJS
-(`packages/css-verifier/src/text.mjs`)、CSSとの照合はコア(`src/layout/text-font.mjs`)に置く。
+(`packages/veriss/src/text.mjs`)、CSSとの照合はコア(`src/layout/text-font.mjs`)に置く。
 FFIはbuild時専用で、アプリの配信runtimeには含めない。
 
 ### 丸め
@@ -60,7 +60,7 @@ Viteの検査付きbuildでは配信する`<html lang>`)を継承し、CSSから
 ### 行分割(固定文字列の折り返し)
 
 `wrap: 'normal'`(または`'anywhere'`)と固定文字列の`text`契約は、行数のprofileに解決する
-(`breakLines`、[`src/text.mjs`](../../packages/css-verifier/src/text.mjs))。
+(`breakLines`、[`src/text.mjs`](../../packages/veriss/src/text.mjs))。
 
 - **分割位置**: Chromiumで全ての順序対(約80文字の6400対)と空白をはさむ対を描画して確かめた規則。
   - 空白の後は常に分割できる(閉じ括弧の前でも)。
@@ -111,9 +111,9 @@ UAの見出し・強調のフォント(h1–h6のsizeとweight、strong/bのweig
 
 ## 依存関係と変更箇所
 
-- FFI: `packages/css-verifier/text-metrics/`(`mizchi/font@0.8.0`、fixtureはOFLのNoto Sans JP/Robotoのsubset。
+- FFI: `packages/veriss/text-metrics/`(`mizchi/font@0.8.0`、fixtureはOFLのNoto Sans JP/Robotoのsubset。
   `fixtures/sources.json`の元フォント・subset対象文字・pyftsubsetの指定から再生成できる。ASCII・仮名全体・全角約物を含み、旧fixtureの文字の幅は変わらない)。
-- 導出: `src/text.mjs`、`src/text-node.mjs`(`@mizchi/css-verifier/text`、`/text/node`)。
+- 導出: `src/text.mjs`、`src/text-node.mjs`(`@mizchi/veriss/text`、`/text/node`)。
 - コア: `src/layout/css.mjs`(text系プロパティを継承付きで保持)、`text-font.mjs`、`engine.mjs`、`input.mjs`。
 - Isle: CLIの`layout.json`の`fonts`、Viteの検査付きbuildの`layout.fonts`(`lib/layout-build.mjs`の`resolveCheckedLayout`)、`lib/layout-summary.mjs`の`text:`行。
   Viteではentryからの相対パスでフォントを読み、`text`契約をbuildStartで寸法契約へ解決する。フォントは監視対象になり、
@@ -124,7 +124,7 @@ UAの見出し・強調のフォント(h1–h6のsizeとweight、strong/bのweig
 
 | 検査 | 内容 |
 | --- | --- |
-| `packages/css-verifier/test/text-font.test.mjs` | 手書き契約でコアを単独検査。照合を外す変異で失敗することを確認 |
+| `packages/veriss/test/text-font.test.mjs` | 手書き契約でコアを単独検査。照合を外す変異で失敗することを確認 |
 | `tests/css-text-metrics.test.mjs` | 丸め、空白の畳み込み、wght、上界表、拒否する入力、CLIの例 |
 | `e2e/layout-text-fonts.spec.mjs` | Chromiumで同じフォントを描画。7文字列が`[advance, 上界]`、ランダム200文字列が上界以下、上界の余裕が2/64 px以下、例のcardが報告どおりの幅で溢れる。折り返し11構成(日本語・混在・Latin・括弧・小書き仮名・繰り返し記号、`anywhere`・`break-word`)と全クラスのランダム60文字列、ASCIIの語・記号とその日本語混在80文字列を`lang=en`/`ja`で描画し、行数がモデル以下、閾値直下の帯の外では一致(行数なしの幅は除く)。分割可能位置は全ての対と3000文字列を幅0で照合。[折り返しの例](../../examples/layout-contracts/text-wrap.json)のtitleの高さと、bodyが溢れる幅が一致 |
 

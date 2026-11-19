@@ -5,11 +5,11 @@
 import {test, expect} from '@playwright/test';
 import {spawnSync} from 'node:child_process';
 import {mkdirSync, writeFileSync, readFileSync} from 'node:fs';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
-import {loadTextMetrics} from '../packages/css-verifier/src/text-node.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
+import {loadTextMetrics} from '../packages/veriss/src/text-node.mjs';
 
 // Text with a font-derived contract (ADR-0010) is compared by its painted line.
-const fonts = new URL('../packages/css-verifier/text-metrics/fixtures/', import.meta.url);
+const fonts = new URL('../packages/veriss/text-metrics/fixtures/', import.meta.url);
 const face = `@font-face{font-family:"Roboto";src:url(data:font/ttf;base64,${readFileSync(new URL('roboto-variable.ttf', fonts)).toString('base64')})}`;
 const roboto = {family: 'Roboto', size: 16, lineHeight: 20, weight: 400};
 const type = 'font-family:"Roboto";font-size:16px;line-height:20px;font-weight:400;';

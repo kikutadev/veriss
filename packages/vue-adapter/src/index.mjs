@@ -1,4 +1,4 @@
-// Vue 3 SFC adapter for @mizchi/css-verifier. The template's branches are choices: v-if / v-else-if / v-else chains,
+// Vue 3 SFC adapter for @mizchi/veriss. The template's branches are choices: v-if / v-else-if / v-else chains,
 // v-show (display: none when false), :class objects, arrays and literal conditionals, literal-conditional bindings
 // of other attributes, and v-for item counts. Every combination is analysed by the core (adapter-core), the same way
 // as the Svelte adapter. A condition is named by its expression source; !x negates x.
@@ -8,7 +8,7 @@
 // :slotted(x) and :global(x) become x): analysed alone, a component's scoped selectors match its own elements.
 import { parse } from 'vue/compiler-sfc';
 import { parseExpression, parse as parseScript } from '@babel/parser';
-import { product, merge, choose, conditionKey, analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/css-verifier-adapter-core';
+import { product, merge, choose, conditionKey, analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/veriss-adapter-core';
 
 const ELEMENT = 1, TEXT = 2, COMMENT = 3, INTERPOLATION = 5, ATTRIBUTE = 6, DIRECTIVE = 7;
 const COMPONENT = 1, SLOT = 2, TEMPLATE = 3;
@@ -190,7 +190,7 @@ export function expandVue(source, { maxStates = 64, eachCounts = [0, 1, 2], sour
   return { states, css, unknowns, assumptions: [...assumptions], scope };
 }
 
-/** Analyse every template state of a Vue SFC (options: css-verifier options, pageCSS, page, maxStates, eachCounts). */
+/** Analyse every template state of a Vue SFC (options: veriss options, pageCSS, page, maxStates, eachCounts). */
 export function analyzeVue(source, { maxStates, eachCounts, sourceLines, ...options } = {}) {
   return analyzeStates(expandVue(source, { maxStates, eachCounts, sourceLines }), options);
 }

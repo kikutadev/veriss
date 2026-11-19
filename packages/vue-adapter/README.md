@@ -1,9 +1,9 @@
-# @mizchi/css-verifier-vue
+# @mizchi/veriss-vue
 
-A Vue 3 SFC adapter for `@mizchi/css-verifier` (through `@mizchi/css-verifier-adapter-core`).
+A Vue 3 SFC adapter for `@mizchi/veriss` (through `@mizchi/veriss-adapter-core`).
 
 ```js
-import {analyzeVue} from '@mizchi/css-verifier-vue';
+import {analyzeVue} from '@mizchi/veriss-vue';
 const report = analyzeVue(source, {pageCSS, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}, selectors: true});
 report.status; report.findings; report.selectors.warnings;
 ```

@@ -1,4 +1,4 @@
-// React (JSX) adapter for @mizchi/css-verifier, with the style systems that leave a static stylesheet: StyleX
+// React (JSX) adapter for @mizchi/veriss, with the style systems that leave a static stylesheet: StyleX
 // (stylex.create + stylex.props) and Linaria (css`` and styled.tag``), plus plain className strings with an external
 // stylesheet. The JSX a component returns is a family of DOM trees: `cond && <X/>`, `cond ? <A/> : <B/>`, `xs.map(…)`
 // item counts, and conditional class or style arguments are choices; the core (adapter-core) analyses every state.
@@ -13,7 +13,7 @@
 // spreads other than stylex.props, and more states than maxStates.
 import { parse } from '@babel/parser';
 import postcss from 'postcss';
-import { product, merge, choose, conditionKey, analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/css-verifier-adapter-core';
+import { product, merge, choose, conditionKey, analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/veriss-adapter-core';
 
 const escapeText = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const escapeAttr = s => escapeText(s).replace(/"/g, '&quot;');
@@ -333,7 +333,7 @@ export function expandReact(source, { component, maxStates = 64, eachCounts = [0
 /**
  * Analyse every state of a React component.
  * @param {string} source the module
- * @param {object} options css-verifier options plus pageCSS, page, css (an external stylesheet for plain classNames),
+ * @param {object} options veriss options plus pageCSS, page, css (an external stylesheet for plain classNames),
  *   component, maxStates, eachCounts
  */
 export function analyzeReact(source, { component, maxStates, eachCounts, sourceLines, css = '', ...options } = {}) {

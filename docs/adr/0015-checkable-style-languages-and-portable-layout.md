@@ -8,7 +8,7 @@
 
 ## 背景: 何が検査を決められなくしているか
 
-css-verifier は、普通の CSS と DOM の木から、viewport の範囲全体で幾何を証明する。決められないところは Unknown にする。
+veriss は、普通の CSS と DOM の木から、viewport の範囲全体で幾何を証明する。決められないところは Unknown にする。
 これまでに足した検査(`docs/layout-checking.md`、`docs/static-check-checklist.md`)から、Unknown と誤りの原因は次の 5 つに分かれる。
 
 | 原因 | 例 | いまの扱い |
@@ -49,7 +49,7 @@ S1 と S2 は CSS の selector と cascade から来る。S3 と S4 は、書き
 
 ### 案 A: 検査済みの CSS サブセット(profile)。新しい構文なし
 
-標準の CSS のうち、css-verifier が決められる部分を **profile** として名前で固定する。外れた書き方は lint で知らせる。
+標準の CSS のうち、veriss が決められる部分を **profile** として名前で固定する。外れた書き方は lint で知らせる。
 
 ```css
 /* profile: checked/portable — flex・block・px と %・状態は :hover / :focus-visible だけ */
@@ -124,7 +124,7 @@ PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、al
 
 - 決まる理由: IR は解決済みの値だけを持つので、検査は幾何の証明だけになる。S1・S2 は IR を作る側(front-end)の責任になる。
   - 作れない front-end は、その節点を「推論」「Unknown」と印を付けて渡す。
-- 長所: 案 A〜D を同時に受け入れられる。css-verifier はすでに内部で「箱 + 計算値」の木を作っており、それを公開する形になる。
+- 長所: 案 A〜D を同時に受け入れられる。veriss はすでに内部で「箱 + 計算値」の木を作っており、それを公開する形になる。
   - crater の `Node`/`Style` にも近い。
 - 短所: それ自体は書く言語ではない。どの front-end を推すかは別に決める。
 
@@ -140,7 +140,7 @@ PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、al
 
 ## 判断(提案)
 
-1. **E を核にする**: レイアウト IR を公開の境界にする。css-verifier・crater-layout・ほかのエンジンが同じ IR を読む。まず css-verifier の内部の木を IR として書き出す。
+1. **E を核にする**: レイアウト IR を公開の境界にする。veriss・crater-layout・ほかのエンジンが同じ IR を読む。まず veriss の内部の木を IR として書き出す。
 2. **A を既定の入口にする**: いまの「普通の CSS + adapter」の経路に名前の付いた profile(`portable` / `web`)を与え、違反を lint で出す。既存の利用者は何も変えずに始められる。
 3. **B を次に足す**: S3・S4 の契約を CSS の側に書けるようにする。`data-noshift` と `boxes` の内容を `@contract` に移せるようにし、両方を受け付ける。
 4. **D を Web 以外のホストのための front-end にする**: React Native 型の環境では selector がないので、D が自然な書き方になる。D から Web の CSS(atomic)と IR の両方に落とす。
@@ -151,7 +151,7 @@ PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、al
 ### サブセットの層
 
 - **portable**: 次の 3 つの共通部分。
-  - css-verifier が証明できるもの
+  - veriss が証明できるもの
   - crater の `core_subset`
   - Yoga(React Native)が同じ意味で持つもの
   - 内容は、block・flex(row/column、wrap、gap、grow/shrink/basis、align)、px と %、box-sizing、static と relative/absolute の配置、文字は計測関数経由。
@@ -159,16 +159,16 @@ PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、al
 
 ### エンジンの組み方
 
-- **参照の意味(仕様)**: css-verifier の記号的な配置を、IR の意味の定義とする。viewport の範囲の上で区分的にアフィンな幾何を出すので、具体的な viewport を 1 つ代入すれば、具体的な箱になる。
+- **参照の意味(仕様)**: veriss の記号的な配置を、IR の意味の定義とする。viewport の範囲の上で区分的にアフィンな幾何を出すので、具体的な viewport を 1 つ代入すれば、具体的な箱になる。
 - **実行するエンジン**:
   - 案 1: crater-layout を wasm / JS の Yoga 互換 API で使う。端末やネイティブのホストに組み込む。
   - 案 2: Yoga に落とす。flex だけの portable のさらに部分集合で、React Native に直接渡せる。
   - どちらも IR を入力にする。
-- **文字の計測**: IR の `TextMeasureSpec` を、ホストの計測関数(crater の `MeasureFunc`、Yoga の measure callback)に渡す。css-verifier の font から導出した計測(ADR-0010)と同じ値を使えば、検査とエンジンで文字の箱が一致する。
+- **文字の計測**: IR の `TextMeasureSpec` を、ホストの計測関数(crater の `MeasureFunc`、Yoga の measure callback)に渡す。veriss の font から導出した計測(ADR-0010)と同じ値を使えば、検査とエンジンで文字の箱が一致する。
 
 ### 一致の確かめ方(三者の差分照合)
 
-1. 同じ IR を、css-verifier(記号)、crater-layout(具体)、Chromium(lowering した CSS)の 3 つで配置する。
+1. 同じ IR を、veriss(記号)、crater-layout(具体)、Chromium(lowering した CSS)の 3 つで配置する。
 2. portable 層では、3 つの箱が 1/64px で一致することを求める。いまの crater の WPT の許容差 15px は、この層では使わない。
 3. いまの `e2e/layout-differential.spec.mjs`(宣言を 1 つずつ・2 つずつ変える照合)を、crater にもかける形に広げる。
 
@@ -184,7 +184,7 @@ PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、al
 
 ## 未決の点
 
-- IR の版と互換性(css-verifier と crater で同じ型を持つか、JSON の schema にするか)。
+- IR の版と互換性(veriss と crater で同じ型を持つか、JSON の schema にするか)。
 - 状態(hover、focus、pressed)を、Web 以外のホストで何に対応させるか。
 - `portable` 層の文字: 折り返しの規則(行分割)をホストの間でどこまで揃えられるか(Web 以外では、ホストの text engine が別の規則を持つ)。
 - 案 B の構文: at-rule にするか、`@property` のような既存の規則に寄せるか。CSS の将来の仕様(`@contract` に当たるもの)と衝突しないか。
@@ -192,6 +192,6 @@ PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、al
 ## 検証(実装する場合)
 
 1. IR の書き出し: いまの e2e のすべてのページで、IR から配置し直した幾何が、現行の結果と同じになること。
-2. portable 層の三者照合: 宣言を 1 つずつ・2 つずつ変える照合(現行の差分照合と同じ形)を、css-verifier・crater・Chromium の 3 つにかけて、1/64px で一致すること。外れた組み合わせは、portable から外すか、エンジンを直す。
+2. portable 層の三者照合: 宣言を 1 つずつ・2 つずつ変える照合(現行の差分照合と同じ形)を、veriss・crater・Chromium の 3 つにかけて、1/64px で一致すること。外れた組み合わせは、portable から外すか、エンジンを直す。
 3. 案 B の契約: `data-noshift` と `boxes` で書いた既存の例を `@contract` に書き換え、診断が同じになること。
 4. 案 D の front-end: 同じ component を D と手書きの CSS で書き、Web(Chromium)と crater で箱が一致すること。

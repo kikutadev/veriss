@@ -5,7 +5,7 @@
 // the static E_A11Y_CONTRAST verdict must equal the pixel ratio's (and its ratio agree within rounding); cases within
 // 0.1 of the threshold, where 8-bit pixels cannot decide, are counted and skipped.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {generateContrastCase} from './support/contrast-fuzz.mjs';
 import {viewports} from './support/visibility-fuzz.mjs';
 

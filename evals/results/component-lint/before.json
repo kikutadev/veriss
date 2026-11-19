@@ -1260,7 +1260,7 @@
       "errors": 0,
       "warnings": 1,
       "assumptions": [
-        "2 text box(es) measured with the given font files (Roboto): their widths and line breaks are derived, not assumed",
+        "3 text box(es) measured with the given font files (Roboto): their widths and line breaks are derived, not assumed",
         "the user-agent default colors (canvastext black on a white canvas) under the light preference, where the page declares no dark color-scheme; a user's own default colors and forced colors are not checked",
         "rem (and a root font-size in %, em or medium) resolved at a 16px browser default font size; other user settings are not checked",
         "text resized to 200% (a 32px default font size) analysed too (SC 1.4.4)"

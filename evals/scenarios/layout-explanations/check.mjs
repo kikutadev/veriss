@@ -2,8 +2,8 @@
 // both sides, and nothing unrelated. Static only; no browser is used.
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-import {analyzeLayout} from '../../../packages/css-verifier/src/index.mjs';
-import {verifyLayoutReport} from '../../../packages/css-verifier/src/layout-z3-node.mjs';
+import {analyzeLayout} from '../../../packages/veriss/src/index.mjs';
+import {verifyLayoutReport} from '../../../packages/veriss/src/layout-z3-node.mjs';
 
 const cells = (n, extra = {}) => Array.from({length: n}, () => ({tag: 'div', classes: ['cell'], ...extra}));
 const strip = value => JSON.parse(JSON.stringify(value, (key, v) => key === 'explanation' ? undefined : v));

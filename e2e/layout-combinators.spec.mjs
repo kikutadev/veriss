@@ -1,6 +1,6 @@
 // Complex selectors (>, descendant, +, ~) against Chromium: random trees and rules, compare every box's height.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
 function random(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }

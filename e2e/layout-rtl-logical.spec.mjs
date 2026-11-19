@@ -1,7 +1,7 @@
 // Logical inline sides (padding-inline-start/end, padding-inline) resolve by the box's direction, mixed in the
 // cascade with physical sides: random rules under dir=rtl and ltr, every leaf's position against Chromium.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
 function random(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; }; }

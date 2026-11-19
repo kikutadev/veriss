@@ -1,6 +1,6 @@
 // CSS Nesting: where the analysis flattens nested rules, every box is as tall in the browser as the analysis says.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
 const body = '<div class="card"><div class="k"></div><div class="card"><div class="k in"></div><p class="k"></p></div></div><div class="k out"></div>';

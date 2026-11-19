@@ -88,7 +88,7 @@ text(匿名 box)、契約・noshift の対象、解析 root、領域で変わる
 
 | 検査 | 内容 |
 | --- | --- |
-| `packages/css-verifier/test/flex-contents.test.mjs` | 固定+伸縮、比の配分と padding、Σgrow < 1、固定 item の溢れ、サブセット外10種の unknown、交差軸の伸長、contents の平坦化と継承 |
+| `packages/veriss/test/flex-contents.test.mjs` | 固定+伸縮、比の配分と padding、Σgrow < 1、固定 item の溢れ、サブセット外10種の unknown、交差軸の伸長、contents の平坦化と継承 |
 | `e2e/layout-flex.spec.mjs` | 25構成×4 viewport(行分割の閾値ちょうどの幅を追加)で、モデルの矩形(位置・寸法)が Chromium と1/64 px以内で一致。伸縮 item の padding を落とす変異、column で border を落とす変異、凍結を無効にする変異、縮小を base に比例させない変異、行分割の閾値を1pxずらす変異、center の係数・交差軸の揃えを壊す変異を検出 |
 | `evals/scenarios/layout-rejections` | `flex` の例を「初期値の item → U_LAYOUT_FLEX、伸縮 item に書くと verified」へ更新 |
 

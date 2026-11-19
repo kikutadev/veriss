@@ -1,7 +1,7 @@
 // The shared part of the component adapters (Svelte, Vue, React with StyleX or Linaria). An adapter turns one
 // component into its template states — { html, choices } with the conditions each takes — plus its CSS; this module
 // analyses every state with the generic core and reports what holds per state. The core knows nothing of components.
-import { analyzeHTML, phrasingTags } from '@mizchi/css-verifier/html';
+import { analyzeHTML, phrasingTags } from '@mizchi/veriss/html';
 import { parseFragment, serialize } from 'parse5';
 import { noShift } from './noshift.mjs';
 
@@ -155,7 +155,7 @@ function markText(html, start = 0) {
 /**
  * Analyse the states of one component.
  * @param {{states: {html: string, choices: object}[], css: string, unknowns?: {code, message}[], assumptions?: string[]}} component
- * @param {object} options css-verifier options plus pageCSS (CSS of the page around the component) and page(html).
+ * @param {object} options veriss options plus pageCSS (CSS of the page around the component) and page(html).
  */
 const printableASCII = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('');
 // A text leaf's computed font (reportTextFonts) as a text contract measured with the given font files, or null when

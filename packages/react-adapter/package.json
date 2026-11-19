@@ -1,9 +1,9 @@
 {
-  "name": "@mizchi/css-verifier-react",
+  "name": "@mizchi/veriss-react",
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "React (JSX) adapter for @mizchi/css-verifier with StyleX and Linaria style resolution: JSX branches as states.",
+  "description": "React (JSX) adapter for @mizchi/veriss with StyleX and Linaria style resolution: JSX branches as states.",
   "exports": {
     ".": {
       "import": "./src/index.mjs"
@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@babel/parser": "7.29.12",
-    "@mizchi/css-verifier-adapter-core": "workspace:*",
+    "@mizchi/veriss-adapter-core": "workspace:*",
     "postcss": "8.5.32"
   },
   "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@babel/plugin-syntax-jsx": "7.29.7",
     "@linaria/core": "8.2.0",
     "@linaria/react": "8.2.0",
     "@stylexjs/babel-plugin": "0.19.1",

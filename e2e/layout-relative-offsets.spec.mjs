@@ -1,7 +1,7 @@
 // Checklist D1: position: relative with px offsets. Every box (the offset one, its children, an absolute box inside it,
 // its siblings) is where the browser puts it, in ltr, and in rtl for block offsets (an rtl inline offset is Unknown).
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
 const body = '<div class="a"><div class="k"></div><div class="x"></div></div><div class="b"></div>';

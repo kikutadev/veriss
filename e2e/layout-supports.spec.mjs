@@ -1,8 +1,8 @@
-// @supports: every condition the analysis decides (packages/css-verifier/src/layout/supports.mjs) has the same answer
+// @supports: every condition the analysis decides (packages/veriss/src/layout/supports.mjs) has the same answer
 // as CSS.supports in this browser, and a guarded rule applies (or not) as the analysis says.
 import {test, expect} from '@playwright/test';
-import {supportsCondition, supportedSelectors} from '../packages/css-verifier/src/layout/supports.mjs';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {supportsCondition, supportedSelectors} from '../packages/veriss/src/layout/supports.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const samples = {
   display: ['grid', 'inline-grid', 'flex', 'inline-flex', 'contents', 'flow-root', 'block', 'inline-block', 'none'],

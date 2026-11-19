@@ -2,7 +2,7 @@
 // static rectangles (affine in the viewport) are evaluated at sample sizes and
 // compared with Chromium. Browser rendering is not used to accept source.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {applyBrowserBaseline} from './support/browser-baseline.mjs';
 // Outside Chromium: skip tests whose oracle only Chromium has, expect failures where the browser's CSS baseline differs.
 test.beforeEach(({}, testInfo) => applyBrowserBaseline(testInfo));

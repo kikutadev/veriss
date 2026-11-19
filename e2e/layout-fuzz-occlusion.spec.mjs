@@ -3,7 +3,7 @@
 // region holding the viewport) must equal Chromium's hit test: some other element overlapping the button with
 // positive area receives the pointer at the centre of that overlap. Unknown cases are counted, never agreement.
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {generateOcclusionCase} from './support/occlusion-fuzz.mjs';
 import {viewports} from './support/visibility-fuzz.mjs';
 

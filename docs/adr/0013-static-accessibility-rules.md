@@ -7,7 +7,7 @@
 
 ## 背景
 
-css-verifier は、カスケードの結果(計算値)と border box の位置・寸法を viewport の全域で証明している。
+veriss は、カスケードの結果(計算値)と border box の位置・寸法を viewport の全域で証明している。
 多くのアクセシビリティの欠陥は、DOM の事実(要素の種類、名前、`aria-hidden`、id、木の順序)と
 CSS の結果(`display`・`visibility`・`pointer-events`・色・配置・重なり)の**組み合わせ**で決まる。
 どちらか一方だけを見る lint や、特定の幅で描画する実行時検査では、メディアクエリで変わる状態を取りこぼす。
@@ -401,7 +401,7 @@ ADR-0007 の制約に従う。
 
 | 検査 | 内容 |
 | --- | --- |
-| `packages/css-verifier/test/accessibility.test.mjs` | 64件(frame・media・字間を含む。focus・hover・text spacing を含む。ARIA の構造と値、page の規則、orientation を含む。テキストの比較を含む。table と fieldset を含む。inline の内容を含む。list・radio・landmark・role を含む。画像・form control・in-flow の覆いを含む。equivalent・essential・AAA を含む。円の近似が内側・外側で正しく、未決の帯が 0.05px 未満であることを含む)。各規則の違反・非違反・メディアクエリの区間、Unknown になる条件、HTML adapter の属性 |
+| `packages/veriss/test/accessibility.test.mjs` | 64件(frame・media・字間を含む。focus・hover・text spacing を含む。ARIA の構造と値、page の規則、orientation を含む。テキストの比較を含む。table と fieldset を含む。inline の内容を含む。list・radio・landmark・role を含む。画像・form control・in-flow の覆いを含む。equivalent・essential・AAA を含む。円の近似が内側・外側で正しく、未決の帯が 0.05px 未満であることを含む)。各規則の違反・非違反・メディアクエリの区間、Unknown になる条件、HTML adapter の属性 |
 | `tests/layout-accessibility.test.mjs` | Isle template の静的・動的な属性 |
 | `tests/layout-build.test.mjs` | Vite の `layout.accessibility`:名前のない button で build が失敗し、証明書に契約が残る。title がない・zoom を禁じる viewport で失敗する |
 | `e2e/layout-accessibility.spec.mjs` | 33構成を 1280/768/375px(reflow は 320/340/375)で Chromium と照合し、全規則で一致。名前は AX tree(CDP)、重なりと覆いは hit testing、フォーカスは `focus()`、順序は矩形、コントラストは計算値の色。1280px では `vlmkit check a11y contrast` とも一致 |

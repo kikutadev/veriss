@@ -1,8 +1,8 @@
 // UA profiles (the ua layout option): unstyled form controls laid out with the profile of the browser the test runs in
 // match that browser's rectangles. The same page differs between Chromium, Firefox and WebKit (padding, borders,
-// margins); each profile carries its own browser's values (packages/css-verifier/src/layout/ua-profile.mjs).
+// margins); each profile carries its own browser's values (packages/veriss/src/layout/ua-profile.mjs).
 import {test, expect} from '@playwright/test';
-import {analyzeHTML} from '../packages/css-verifier/src/html.mjs';
+import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 
 const reset = '*{margin:0}html,body{margin:0;display:grid;grid-template-columns:minmax(0,1fr)}';
 // Controls with only a size: their UA padding, border and margins decide where they and the boxes after them go.
@@ -42,7 +42,7 @@ test('without the ua option, a field\'s UA padding and border stay unknown (the 
 
 // The suggested reset: with it applied, the target profile (chromium) describes every browser — the unstyled
 // controls land where the chromium model puts them, in Firefox and WebKit too.
-import {suggestReset} from '../packages/css-verifier/src/layout/ua-reset.mjs';
+import {suggestReset} from '../packages/veriss/src/layout/ua-reset.mjs';
 const resetCSS = suggestReset().css;
 for (const [name, html, css] of cases) {
   test(`${name}: with the suggested reset, the chromium profile places it in every browser`, async ({page}, testInfo) => {
@@ -64,8 +64,8 @@ for (const [name, html, css] of cases) {
 // (86.7px in Roboto 16px) fits. The verdict with this browser's profile agrees with this browser.
 test('a button label that fits one browser\'s padding only: the verdict with its profile agrees with the browser', async ({page}, testInfo) => {
   const {readFileSync} = await import('node:fs');
-  const {loadTextMetrics} = await import('../packages/css-verifier/src/text-node.mjs');
-  const file = new URL('../packages/css-verifier/text-metrics/fixtures/roboto-variable.ttf', import.meta.url).pathname;
+  const {loadTextMetrics} = await import('../packages/veriss/src/text-node.mjs');
+  const file = new URL('../packages/veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url).pathname;
   const metrics = await loadTextMetrics({fonts: {Roboto: {file}}});
   const face = `@font-face{font-family:Roboto;src:url(data:font/ttf;base64,${readFileSync(file).toString('base64')})}`;
   const ua = testInfo.project.name;

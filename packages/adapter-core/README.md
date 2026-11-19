@@ -1,11 +1,11 @@
-# @mizchi/css-verifier-adapter-core
+# @mizchi/veriss-adapter-core
 
 The part the component adapters (Svelte, Vue, React with StyleX or Linaria) share: template states as choices,
-the analysis of every state with `@mizchi/css-verifier`, the findings per state, and the lint output. It depends
+the analysis of every state with `@mizchi/veriss`, the findings per state, and the lint output. It depends
 on the core; the core knows nothing of components.
 
 ```js
-import {analyzeStates, lint, formatText, recommended} from '@mizchi/css-verifier-adapter-core';
+import {analyzeStates, lint, formatText, recommended} from '@mizchi/veriss-adapter-core';
 
 // An adapter turns a component into its states ({html, choices}) and its CSS.
 const result = analyzeStates({states, css, unknowns, assumptions}, {pageCSS, viewport, accessibility: true, assumeText: true});
