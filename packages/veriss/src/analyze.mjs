@@ -3,7 +3,7 @@ import {analyzeBoxTree} from './layout/engine.mjs';
 import {validateOptions} from './layout/input.mjs';
 
 // Shared with the HTML adapter; not part of the package export surface.
-export function analyzeInput(tree,options,adapterDiagnostics=[]) {
+export function analyzeInput(tree,options,adapterDiagnostics=[],preferences=[]) {
   if(!options || Object.hasOwn(options,'component') || Object.hasOwn(options,'props')) throw new TypeError('Invalid CSS verifier options: use name and a finite box tree');
   const {name='Document',...configuration}=options;
   if(typeof name!=='string' || !/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(name)) throw new TypeError('Invalid CSS verification subject name');
@@ -14,7 +14,7 @@ export function analyzeInput(tree,options,adapterDiagnostics=[]) {
   const ratios=configuration.devicePixelRatios ?? [undefined];
   for(const profile of configuration.scrollbars ?? [undefined]) for(const ratio of ratios) {
     // Contracts are attached by the engine; each case owns its tree.
-    reports.push(analyzeBoxTree(structuredClone(root),{...configuration,name,...(ratio!==undefined ? {$devicePixelRatio:ratio} : {})},profile,budget,[],inputDiagnostics));
+    reports.push(analyzeBoxTree(structuredClone(root),{...configuration,name,...(ratio!==undefined ? {$devicePixelRatio:ratio} : {})},profile,budget,[],inputDiagnostics,preferences));
     if(budget.remaining<0) break;
   }
   const report=reports[0];
