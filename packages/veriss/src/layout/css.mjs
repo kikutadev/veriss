@@ -1,6 +1,7 @@
 import postcss from 'postcss';
 import { calcOperatorProblem } from './calc-syntax.mjs';
 import { drop } from './dropped.mjs';
+import { colorSyntaxProblem } from '../color/index.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
@@ -86,6 +87,8 @@ const geometry = new Set(['aspect-ratio', 'display', 'appearance', 'box-sizing',
 // revert-layer (checklist C4) passes through every property like the other CSS-wide keywords; the cascade resolves it.
 // Properties that take only a length (or a keyword / percentage), never a bare number (F93).
 const lengthOnly = /^(?:(?:min-|max-)?(?:width|height|inline-size|block-size)|margin(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|padding(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|top|right|bottom|left|inset(?:-(?:inline|block)(?:-(?:start|end))?)?|gap|row-gap|column-gap|font-size|border-(?:top-|bottom-)?(?:left-|right-)?radius|border-(?:top|right|bottom|left)-width|border-width|outline-width|outline-offset|letter-spacing|word-spacing|text-indent|flex-basis)$/;
+// Properties that take a color, alone or inside a shorthand (F107).
+const colorProperty = /^(?:color|background(?:-color)?|border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?(?:-color)?|outline(?:-color)?|caret-color|accent-color|fill|stroke|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow|flood-color|lighting-color|stop-color|scrollbar-color)$/;
 const wide = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
 const decoration = /^(?:background-(?:position|size|repeat|clip|origin|attachment)|border-radius|text-shadow|text-decoration-(?:color|style|thickness)|text-underline-offset|transition-behavior|list-style-(?:position|image))$/;
 // Properties a :hover/:focus rule may set: they repaint (or restack) without changing geometry.
@@ -954,6 +957,15 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
         { const prop = declaration.prop.toLowerCase(), problem = /^grid-template-(?:columns|rows)$/.test(prop) && gridTrackProblem(declaration.value);
           if (problem) { note('W_CSS_GRID_TRACKS_INVALID', { property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F107: a color the grammar does not allow (hsl(0, 0, 0), rgb(0 0 0, .5), #12345, …) makes the whole declaration
+        // invalid: the browser drops it and the earlier color stays (measured in Chromium, Firefox and WebKit). Read in the
+        // properties that take a color (also inside a shorthand), outside url() and strings.
+        { const prop = declaration.prop.toLowerCase();
+          if (colorProperty.test(prop)) {
+            const text = declaration.value.replace(/url\([^)]*\)|"[^"]*"|'[^']*'/gi, ' ');
+            const bad = [...text.matchAll(/#[0-9a-z]+\b|\b(?:rgba?|hsla?)\((?:[^()]|\([^()]*\))*\)/gi)].map(m => [m[0], colorSyntaxProblem(m[0])]).find(([, problem]) => problem);
+            if (bad) { note('W_CSS_COLOR_INVALID', { property: prop, value: declaration.value.trim(), color: bad[0], problem: bad[1], selector: node.selector, file: filename, line: declaration.source.start.line }); continue; }
+          } }
         // F93: a bare number other than 0 where only a length is allowed (width: 100) is invalid in standards mode — the
         // mode analysed here — so the browser drops the declaration (measured in Chromium, Firefox and WebKit; only quirks
         // mode, in WebKit, takes it as px).

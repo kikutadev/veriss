@@ -1136,3 +1136,21 @@ test('F106: line-breaking properties do nothing where white-space keeps the text
   assert.equal(run('.p{white-space:nowrap;word-break:break-all}', '<div class="p"><div class="a"></div></div>').status, 'unknown');
   assert.deepEqual(inert('.p{white-space:nowrap;hyphens:auto}', 'hyphens', '<div class="p"><div class="a"></div></div>')[1], false);
 });
+
+test('F107: an invalid color drops the declaration, so the earlier color stays (as in the browser)', () => {
+  const page = css => analyzeHTML('<html lang="en"><body><p class="t">some text</p></body></html>', {name: 'P', accessibility: true, boxes: {'.t': {overflow: 'clip', overflowBlock: 'clip'}},
+    css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}body{background:#fff}.t{height:20px;overflow:hidden;font:16px sans-serif;color:#999}${css}`, viewport: {min: 320, max: 800, height: {min: 300, max: 600}}});
+  for (const bad of ['hsl(0, 0, 0)', 'rgb(0 0 0, .5)', '#00000', 'rgb(0 0 0 1)']) {
+    const r = page(`.t{color:${bad}}`);
+    assert.equal(codes(r, 'W_CSS_COLOR_INVALID').length, 1, bad);
+    // #999 on white stays: below 4.5:1
+    assert.ok(r.diagnostics.some(d => d.code === 'E_A11Y_CONTRAST'), `${bad}: ${JSON.stringify(r.diagnostics.map(d => d.code))}`);
+  }
+  const ok = page('.t{color:hsl(0 0 0)}');
+  assert.equal(codes(ok, 'W_CSS_COLOR_INVALID').length, 0);
+  assert.ok(!ok.diagnostics.some(d => d.code === 'E_A11Y_CONTRAST'));
+  // shorthands and other color properties; url() and strings are not read
+  assert.equal(codes(run('.a{border:1px solid #12345}'), 'W_CSS_COLOR_INVALID').length, 1);
+  assert.equal(codes(run('.a{box-shadow:0 0 2px rgb(10%, 0, 0)}'), 'W_CSS_COLOR_INVALID').length, 1);
+  assert.equal(codes(run('.a{background:url(#12345) no-repeat}'), 'W_CSS_COLOR_INVALID').length, 0);
+});

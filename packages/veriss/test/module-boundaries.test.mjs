@@ -17,9 +17,9 @@ test('pure tools import nothing of veriss', () => {
   for (const file of pure) assert.deepEqual(importsOf(file), [], file);
 });
 
-test('color/ is used only through the rules that judge colors (today: layout/accessibility.mjs)', () => {
+test('color/ is used by the rules that judge colors and by the syntax stage (to read a color as the browser does)', () => {
   const users = files('.').filter(file => !file.startsWith('color/') && importsOf(file).some(target => target.startsWith('color/')));
-  assert.deepEqual(users, ['layout/accessibility.mjs']);
+  assert.deepEqual(users.sort(), ['layout/accessibility.mjs', 'layout/css.mjs']);
 });
 
 test('the syntax validators are imported only by the syntax stage (layout/css.mjs)', () => {

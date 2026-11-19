@@ -1220,3 +1220,17 @@ test('F106: word-break, line-break, hyphens and text-wrap-style do nothing under
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes(decl.split(':')[0])), decl).toBe(true);
   }
 });
+
+test('F107: an invalid color drops the declaration in the browser, and the analyzer drops and reports it', async ({page}) => {
+  const cases = [['rgb(0 0 0, .5)', true], ['rgb(0, 0, 0 / .5)', true], ['#12345', true], ['hsl(120, 100, 50)', true], ['rgb(10%, 20, 30)', true], ['rgb(255 0 0 0.5)', true], ['rgb(0 0 0 /)', true],
+    ['rgb(0,0,0)', false], ['rgb(0 0 0 / 50%)', false], ['rgb(0, 0, 0, .5)', false], ['#1234', false], ['hsl(120 100 50)', false], ['hsl(120, 100%, 50%)', false], ['rgb(10% 20 30)', false]];
+  for (const [color, dropped] of cases) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>.a{color:rgb(1, 2, 3)}.a{color:${color}}</style></head><body><div class="a">x</div></body></html>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).color) === 'rgb(1, 2, 3)', color).toBe(dropped);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}.a{color:${color}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_COLOR_INVALID'), color).toBe(dropped);
+  }
+  // modern hsl numbers are percentages: hsl(120 100 50) is pure green in every browser
+  await page.setContent('<!doctype html><html lang="en"><head><style>.a{color:hsl(120 100 50)}</style></head><body><div class="a">x</div></body></html>');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).color)).toBe('rgb(0, 255, 0)');
+});

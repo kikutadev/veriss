@@ -25,3 +25,19 @@ test('backdrop: the ancestors\' backgrounds, innermost first, until an opaque on
   assert.match(backdrop([{backgroundColor: 'transparent', backgroundImage: 'none', opacity: '1', color: '#333'}]).unknown, /opaque background/);
   assert.deepEqual(backdrop([{backgroundColor: 'transparent', backgroundImage: 'none', opacity: '1', color: '#333'}], {canvas: '#fff', canvastext: '#000'}).bg, parseColor('#fff'));
 });
+
+test('F107: the color grammar of rgb() / hsl() and hex, as the browsers read it (soundness fix)', async () => {
+  const {colorSyntaxProblem} = await import('../src/color/index.mjs');
+  // measured in Chromium, Firefox and WebKit: dropped
+  for (const v of ['rgb(0 0 0, .5)', 'rgb(0, 0, 0 / .5)', '#12345', '#12', '#1234567', 'hsl(120, 100, 50)', 'rgb(10%, 20, 30)', 'rgb(255 0 0 0.5)', 'rgb(0 0 0 /)']) {
+    assert.ok(colorSyntaxProblem(v), v);
+    assert.equal(parseColor(v), null, v);
+  }
+  // valid
+  for (const v of ['rgb(0,0,0)', 'rgba(0,0,0)', 'rgb(0 0 0 / 50%)', 'rgb(0, 0, 0, .5)', '#1234', 'hsl(120 100 50)', 'hsl(120, 100%, 50%)', 'hsl(120deg 100% 50%)', 'rgb(10% 20 30)', 'rgb(none 0 0)', 'red', 'rgb(var(--c))'])
+    assert.equal(colorSyntaxProblem(v), null, v);
+  // modern hsl numbers are percentages: hsl(120 100 50) is hsl(120 100% 50%), pure green
+  assert.deepEqual(parseColor('hsl(120 100 50)'), parseColor('hsl(120, 100%, 50%)'));
+  assert.deepEqual(parseColor('hsl(120 100 50)'), {r: 0, g: 255, b: 0, a: 1});
+  assert.deepEqual(parseColor('rgb(10% 20 30)'), {r: 25.5, g: 20, b: 30, a: 1});
+});

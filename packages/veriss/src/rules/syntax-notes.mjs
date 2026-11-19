@@ -2,6 +2,8 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_COLOR_INVALID: note => ({ code: 'W_CSS_COLOR_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { ${note.property}: ${note.value} }: ${note.color} is not a valid color (${note.problem}), so the browser drops the whole declaration and the earlier ${note.property} stays. ${/comma/.test(note.problem) ? 'Write the space form (hsl(0 0% 0%), rgb(0 0 0 / 50%)) or keep every value of the comma form the same kind' : /hex/.test(note.problem) ? 'Write 3, 4, 6 or 8 hex digits' : 'Write rgb(r g b / alpha) or hsl(h s l / alpha)'}` }),
   W_CSS_MARKER_IGNORED: note => ({ code: 'W_CSS_MARKER_IGNORED', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector}: ${note.property} is ignored — ::marker takes only color, content, font and white-space properties (and animations): margins, padding, backgrounds and sizes of the marker do nothing. Style the list item, or use ::before for a marker box of your own` }),
   W_CSS_COUNTER_UNUSED: note => ({ code: 'W_CSS_COUNTER_UNUSED', severity: 'warning', counter: note.name, selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],

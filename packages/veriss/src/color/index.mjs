@@ -16,8 +16,38 @@ function hsl(h, s, l) {
   const f = n => { const k = (n + h / 30) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
   return [f(0) * 255, f(8) * 255, f(4) * 255];
 }
+// F107: the grammar of hex, rgb() / rgba() and hsl() / hsla() (CSS Color 4), as Chromium, Firefox and WebKit read it
+// (measured): hex has 3, 4, 6 or 8 digits; the legacy comma form has 3 values (4 with alpha), no "/", no none, rgb all
+// numbers or all percentages, hsl saturation and lightness as percentages; the modern space form has 3 components,
+// then "/" and the alpha. Why a value breaks it, or null (valid, or not judged: var(), calc(), relative colors).
+export function colorSyntaxProblem(value) {
+  const v = String(value).trim().toLowerCase();
+  if (v.startsWith('#')) return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/.test(v) ? null : `${v} has ${v.length - 1} hex digits (a color has 3, 4, 6 or 8)`;
+  const m = /^(rgba?|hsla?)\((.*)\)$/s.exec(v);
+  if (!m || /\b(?:var|calc|env|attr|min|max|clamp)\(|\bfrom\b/.test(m[2])) return null;
+  const hsl = m[1].startsWith('hsl');
+  const num = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/, pct = /^[+-]?(?:\d+\.?\d*|\.\d+)%$/, hue = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:deg|grad|rad|turn)?$/;
+  if (m[2].includes(',')) {
+    if (m[2].includes('/')) return 'the comma form cannot take a "/"';
+    const parts = m[2].split(',').map(p => p.trim());
+    if (parts.length !== 3 && parts.length !== 4) return `${parts.length} comma-separated values (3, or 4 with the alpha)`;
+    if (parts.includes('none')) return 'none is not allowed in the comma form';
+    const [a, b, c, alpha] = parts;
+    if (alpha !== undefined && !num.test(alpha) && !pct.test(alpha)) return `the alpha ${alpha} is not a number or a percentage`;
+    if (hsl) return !hue.test(a) ? `the hue ${a} is not an angle` : pct.test(b) && pct.test(c) ? null : 'in the comma form saturation and lightness must be percentages';
+    return [a, b, c].every(p => num.test(p)) || [a, b, c].every(p => pct.test(p)) ? null : 'the comma form cannot mix numbers and percentages';
+  }
+  const [main, alpha, ...more] = m[2].split('/').map(p => p.trim());
+  if (more.length) return 'more than one "/"';
+  if (alpha !== undefined && alpha !== 'none' && !num.test(alpha) && !pct.test(alpha)) return alpha === '' ? 'nothing after "/"' : `the alpha ${alpha} is not a number or a percentage`;
+  const parts = main.split(/\s+/).filter(Boolean);
+  if (parts.length !== 3) return `${parts.length} space-separated components (3, then "/" and the alpha)`;
+  const bad = parts.find((p, i) => p !== 'none' && !(hsl && i === 0 ? hue.test(p) : num.test(p) || pct.test(p)));
+  return bad === undefined ? null : `${bad} is not a ${hsl && parts.indexOf(bad) === 0 ? 'hue' : 'number or percentage'}`;
+}
 /** {r, g, b (0–255), a (0–1)} or null when the value is not a modeled color. */
 export function parseColor(value) {
+  if (colorSyntaxProblem(value)) return null;
   value = String(value).trim().toLowerCase();
   if (value === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
   if (named[value]) value = named[value];
@@ -37,7 +67,8 @@ export function parseColor(value) {
     const [r, g, b] = parts.slice(0, 3).map(p => Math.min(255, Math.max(0, channel(p, 255))));
     return { r, g, b, a };
   }
-  const [r, g, b] = hsl(((parseFloat(parts[0]) % 360) + 360) % 360, channel(parts[1], 1), channel(parts[2], 1));
+  const sl = p => p === 'none' ? 0 : p.endsWith('%') ? Number(p.slice(0, -1)) / 100 : Number(p) / 100; // modern hsl: 50 is 50%
+  const [r, g, b] = hsl(parts[0] === 'none' ? 0 : ((parseFloat(parts[0]) % 360) + 360) % 360, sl(parts[1]), sl(parts[2]));
   return { r, g, b, a };
 }
 export const over = (top, bottom) => {
