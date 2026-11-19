@@ -76,3 +76,7 @@ tools/gate.sh                                     # push の前に毎回。20〜
 ## fork: relational/1 (2026-11-20)
 
 汎用 UI の関係述語 profile を既存 contracts API に統合した。現行仕様は [layout-contract-ir.md](layout-contract-ir.md#relational1-汎用-ui-関係述語)。以前の game-ui 専用 API と snapshot 別実装は共通コアへ移行。
+
+- 検証: `ef4e2f8` (並行 CSS 改善 `ca45d91` との統合版), `tools/gate.sh` exit 0。6単体テスト群失敗0、component-lint 4回差分なし、3ブラウザー E2E 342件成功、QA supervisor 残留0。
+- 独立した汎用モデルのゲートも exit 0 / Playwright passed を確認した (最初の標準出力ログは一時パスの誤削除で失われたため、統合版の完全なログを正とする)。
+- 状態グラフと局所座標モデルの根拠は利用側が宣言する。観測は別判定であり、実測点だけで連続定義域を証明しない。名前付き述語の合成は可能だが、実装からの全状態導出や証明済み子コンポーネントの無条件合成は対象外。
