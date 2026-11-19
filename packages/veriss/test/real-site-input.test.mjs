@@ -128,6 +128,19 @@ test('viewport-fixed horizontal translation checks painted fit, not the pre-tran
   assert.ok(right.diagnostics.some(d=>d.code==='E_LAYOUT_ABSOLUTE_END'));
 });
 
+test('fully off-canvas fixed drawer retains layout obligations instead of reporting painted overflow',()=>{
+  const html='<!doctype html><html><body><div class="drawer"></div></body></html>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}.drawer{position:fixed;left:0;top:0;width:240px;height:240px;transform:translateX(-100%)}';
+  const options={viewport:{min:320,max:1280,height:{min:320,max:900}},integrity:true};
+  for(const css of [base,base+'.drawer{visibility:hidden}',base+'.drawer{width:100%;visibility:hidden}']){
+    const r=analyzeHTML(html,{...options,css});
+    assert.equal(r.status,'verified',JSON.stringify(r.diagnostics));
+  }
+  const partial=analyzeHTML(html,{...options,css:base+'.drawer{transform:translateX(-50%)}'});
+  assert.equal(partial.status,'violated');
+  assert.ok(partial.diagnostics.some(d=>d.code==='E_LAYOUT_ABSOLUTE_START'));
+});
+
 test('minified unitless zero rotation is identical to zero degrees',()=>{
   const html='<main><div class="item"></div></main>';
   const css='*{box-sizing:border-box;margin:0;padding:0}.item{width:100px;height:40px;transform:rotate(0deg)}';

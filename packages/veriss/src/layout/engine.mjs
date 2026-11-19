@@ -1629,14 +1629,21 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         // after layout; unlike ordinary absolute descendants it does not extend
         // the scrollable document by its untranslated rectangle. Preserve the
         // original layout coordinate for provenance and shift analysis.
-        const fitOrigin = style.$fixed && containing.path === 'viewport' && affineOf(style) && !linearOf(style)
+        const fitOrigin = style.$fixed && containing.path === 'viewport' && affineOf(style) && !linearOf(style) && style.visibility === 'visible'
           ? translated(style, origin, {inline, block:blockSize}) : origin;
         if (!fitOrigin) throw Object.assign(new Error('Fixed painted origin cannot be resolved'), {code:'U_LAYOUT_CSS'});
-        for (const [axis, dimension] of [['inline',inline],['block',blockSize]]) {
-          // Against a containing block that clips on this axis, reaching past it is the box being cut off.
-          const cut = containing.clips && containing.clips[axis === 'inline' ? 'x' : 'y'];
-          obligation(fitOrigin[axis], scalar(0), box, region, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_START', axis);
-          obligation(containing[axis], sum(fitOrigin[axis],dimension), box, region, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_END', axis);
+        // Fully off-canvas drawers are intentionally outside the paint area. Keep
+        // their original layout obligation and let the accessibility pass decide
+        // whether hidden/offscreen controls are focusable. For partially visible
+        // fixed boxes use the painted origin, on the precise region where visible.
+        const pieces = fitOrigin === origin ? { yes: [region], no: [] } : partition(region, sum(fitOrigin.inline, inline), '>');
+        for (const [part, fit] of [...pieces.yes.map(r=>[r,fitOrigin]), ...pieces.no.map(r=>[r,origin])]) {
+          for (const [axis, dimension] of [['inline',inline],['block',blockSize]]) {
+            // Against a containing block that clips on this axis, reaching past it is the box being cut off.
+            const cut = containing.clips && containing.clips[axis === 'inline' ? 'x' : 'y'];
+            obligation(fit[axis], scalar(0), box, part, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_START', axis);
+            obligation(containing[axis], sum(fit[axis],dimension), box, part, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_END', axis);
+          }
         }
         positioned = {origin:{inline:affine(origin.inline),block:affine(origin.block)},containingBlock:{path:containing.path,inline:affine(containing.inline),block:affine(containing.block)}};
       }
