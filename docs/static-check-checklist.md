@@ -371,6 +371,8 @@
 - [x] **F93. 単位のない長さ**(`W_CSS_UNITLESS_LENGTH`、以前は Unknown): `width: 100` など長さしか取らないプロパティの 0 以外の素の数は不正で、宣言ごと捨てられる。解析は標準モード(`<!doctype html>`)を前提にする(quirks モードの WebKit は px として受け付ける)。`line-height` や `flex` のように数を取るプロパティは対象外
 - [x] **F84. 空白を詰める `white-space` の下の `tab-size`**(`W_LAYOUT_DECLARATION_INERT`、以前は Unknown): normal / nowrap / pre-line ではタブが空白になって潰れるので効かない。継承されるので、中に要素のない箱だけを判定し、pre / pre-wrap や子のある箱は Unknown のまま
 - [x] **F94. 表の行・行グループの `border-radius`**(`W_LAYOUT_DECLARATION_INERT`): 分離・collapse どちらの境界モデルでも、行の背景も枠も丸まらない(3 ブラウザでスクリーンショット比較)。角のセルを丸める
+- [x] **F96. 固定レイアウトの表で 1 行目以外のセルの `width`**(`W_LAYOUT_DECLARATION_INERT`): 列幅は 1 行目のセル(か col)だけで決まる。2 つ目の tbody の行も 1 行目ではない。thead / tfoot のある表は描かれる順がソース順と違いうるので判定しない
+- [x] **F98. 表のセル・行・列と inline 要素の `aspect-ratio`**(`W_LAYOUT_DECLARATION_INERT`、以前は Unknown): inline ボックスと表の内部ボックスには適用されない(3 ブラウザで、中身がテキスト・箱・空、自動・固定レイアウトの 18 通りを実測)。img など置換要素は inline でも効くので除く
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

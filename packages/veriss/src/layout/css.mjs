@@ -1374,6 +1374,14 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   // tables): the row's height rules. Dropped here (reported by the engine).
   if (!box.pseudo && ['td', 'th'].includes(box.tag) && ['ua', 'table-cell'].includes(String(values.display))) for (const [key, initial] of [['min-block-size', 'auto'], ['max-block-size', 'none']])
     if (sources[key] && !['auto', 'none', '0', '0px'].includes(String(values[key]))) { (values.$cellInert ??= []).push([key, values[key]]); values[key] = initial; }
+  // F98: aspect-ratio applies to every box except inline boxes and internal table boxes (CSS Sizing 4 §5.1; measured in
+  // Chromium, Firefox and WebKit on cells with text, a box or nothing, in automatic and fixed tables, and on spans): it
+  // does nothing there. A replaced element (img, video, …) takes it even when inline.
+  if (!box.pseudo && sources['aspect-ratio'] && String(values['aspect-ratio']) !== 'auto') {
+    const tablePart = ['td', 'th', 'tr', 'thead', 'tbody', 'tfoot', 'col', 'colgroup'].includes(box.tag) && ['ua', 'table-cell', 'table-row', 'table-row-group', 'table-header-group', 'table-footer-group', 'table-column', 'table-column-group'].includes(String(values.display));
+    const inline = String(values.display) === 'inline' && !['img', 'video', 'canvas', 'iframe', 'embed', 'object', 'svg', 'input', 'select', 'textarea', 'button'].includes(box.tag);
+    if (tablePart || inline) { values.$aspectInert = { value: values['aspect-ratio'], where: tablePart ? 'table' : 'inline' }; values['aspect-ratio'] = 'auto'; }
+  }
   // F60: in the collapsing border model the table has no padding (measured in Chromium, Firefox and WebKit: same layout
   // with it and without); used as 0 here, reported by the engine.
   if (!box.pseudo && (['table', 'inline-table'].includes(values.display) || (box.tag === 'table' && values.display === 'ua')) && String(values['border-collapse']) === 'collapse') {

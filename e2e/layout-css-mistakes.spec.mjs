@@ -1079,3 +1079,41 @@ test('F84: tab-size does nothing where white-space collapses tabs', async ({page
   expect(r.status).toBe('verified');
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('tab-size'))).toBe(true);
 });
+
+test('F96: in a fixed table a width on a cell after the first row does nothing', async ({page}) => {
+  const row = cls => `<tr><td class="${cls}">x</td><td>y</td></tr>`;
+  const base = 'table{table-layout:fixed;width:300px}';
+  for (const body of [`<tbody>${row('a')}${row('b')}</tbody>`, `<tbody>${row('a')}</tbody><tbody>${row('b')}</tbody>`]) {
+    const html = `<table>${body}</table>`;
+    expect(await pixelsAndBoxes(page, `${base}.b{width:200px}`, html), body).toEqual(await pixelsAndBoxes(page, base, html));
+    // on the first row's cell it sizes the column (so the check above is not vacuous)
+    expect(await pixelsAndBoxes(page, `${base}.a{width:200px}`, html), body).not.toEqual(await pixelsAndBoxes(page, base, html));
+  }
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const arow = cls => `<tr><td class="c ${cls}"><div class="x"></div></td><td class="c"><div class="x"></div></td></tr>`;
+  const r = analyzeHTML(`<html lang="en"><body><main class="p"><table class="t"><tbody>${arow('a')}${arow('b')}</tbody></table></main></body></html>`,
+    {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.t{table-layout:fixed;width:300px}.c{padding:8px}.x{display:block;height:24px;width:24px}.b{width:200px}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect(r.sizes.find(s => s.box === '.c.b').rect.inlineSize.constant).toBe('147');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.c.b' && w.properties.includes('inline-size'))).toBe(true);
+});
+
+
+test('F98: aspect-ratio does nothing on table cells and rows or on non-replaced inline elements', async ({page}) => {
+  const T = t => `<table><tbody><tr class="r"><td class="a">${t}</td><td>y</td></tr></tbody></table>`;
+  for (const t of ['some text here', '', '<div style="width:60px;height:10px"></div>'])
+    for (const layout of ['td{width:100px}', '', 'table{width:300px}', 'table{table-layout:fixed;width:300px}']) {
+      expect(await pixelsAndBoxes(page, `${layout}.a{aspect-ratio:1}`, T(t)), `${layout} ${t}`).toEqual(await pixelsAndBoxes(page, layout, T(t)));
+      expect(await pixelsAndBoxes(page, `${layout}.r{aspect-ratio:2}`, T(t)), `row ${layout} ${t}`).toEqual(await pixelsAndBoxes(page, layout, T(t)));
+    }
+  for (const html of ['<p><span class="a">some text</span></p>', '<p><span class="a"></span>x</p>'])
+    expect(await pixelsAndBoxes(page, '.a{aspect-ratio:1;width:100px}', html), html).toEqual(await pixelsAndBoxes(page, '.a{width:100px}', html));
+  // on an inline-block it does size the box (so the checks above are not vacuous)
+  const ib = '<p><span class="a"></span>x</p>';
+  expect(await pixelsAndBoxes(page, '.a{display:inline-block;width:100px;aspect-ratio:1}', ib)).not.toEqual(await pixelsAndBoxes(page, '.a{display:inline-block;width:100px}', ib));
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const r = analyzeHTML('<html lang="en"><body><main class="p"><table class="t"><tbody><tr><td class="c a"><div class="x"></div></td></tr></tbody></table></main></body></html>',
+    {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.c{padding:8px}.x{display:block;height:24px;width:24px}.a{aspect-ratio:1}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('aspect-ratio'))).toBe(true);
+});

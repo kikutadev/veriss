@@ -1024,3 +1024,37 @@ test('F84: tab-size does nothing where white-space collapses tabs (and no longer
   // on a box with an element inside it is inherited there: still Unknown
   assert.equal(run('.p{tab-size:2}', '<div class="p"><div class="a"></div></div>').status, 'unknown');
 });
+
+test('F96: in a fixed table a width on a cell after the first row does nothing', () => {
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const row = cls => `<tr><td class="c ${cls}"><div class="x"></div></td><td class="c"><div class="x"></div></td></tr>`;
+  const hit = (css, body = `<tbody>${row('a')}${row('b')}</tbody>`) => {
+    const r = analyzeHTML(`<html lang="en"><body><main class="p"><table class="t">${body}</table></main></body></html>`,
+      {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.t{table-layout:fixed;width:300px}.c{padding:8px}.x{display:block;height:24px;width:24px}${css}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+    assert.equal(r.status, 'verified', css);
+    return codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.includes('inline-size')).map(w => w.box);
+  };
+  assert.deepEqual(hit('.b{width:200px}'), ['.c.b']);
+  assert.deepEqual(hit('.a{width:200px}'), []);
+  // a second tbody: its first row is not the table's first row
+  assert.deepEqual(hit('.b{width:200px}', `<tbody>${row('a')}</tbody><tbody>${row('b')}</tbody>`), ['.c.b']);
+  // with a thead or tfoot the rendered order can differ from the source: not judged
+  assert.deepEqual(hit('.b{width:200px}', `<thead>${row('a')}</thead><tbody>${row('b')}</tbody>`), []);
+});
+
+
+test('F98: aspect-ratio on a table cell or row, or on a non-replaced inline element, does nothing', () => {
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const table = css => analyzeHTML('<html lang="en"><body><main class="p"><table class="t"><tbody><tr class="r"><td class="c a"><div class="x"></div></td><td class="c"><div class="x"></div></td></tr></tbody></table></main></body></html>',
+    {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.c{padding:8px}.x{display:block;height:24px;width:24px}${css}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+  const inert = r => codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.includes('aspect-ratio')).map(w => w.box);
+  const base = table(''), cell = table('.a{aspect-ratio:1}');
+  assert.equal(cell.status, 'verified');
+  assert.deepEqual(inert(cell), ['.c.a']);
+  assert.deepEqual(cell.sizes.map(s => s.rect), base.sizes.map(s => s.rect));
+  assert.deepEqual(inert(table('.r{aspect-ratio:2}')), ['.r']);
+  assert.deepEqual(inert(run('.s{aspect-ratio:1}', '<div class="a"><span class="s"></span></div>')), ['.s']);
+  // a block, and a replaced element even when inline, do take it
+  assert.deepEqual(inert(run('.a{aspect-ratio:1;height:auto;width:100px}')), []);
+  assert.deepEqual(inert(run('img{aspect-ratio:1;width:50px}', '<div class="a"><img src="x.png" alt="x"></div>')), []);
+});

@@ -660,6 +660,19 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: [key], css: [{ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector }],
             message: `${box.label}: ${key === 'min-inline-size' ? 'min-width' : 'max-width'} has no effect on a table cell of a fixed table (table-layout: fixed sizes the columns from the first row's widths). Give the column a width (on the first row's cell or a col)` });
     }
+    // F96: a fixed table sizes its columns from its first row only (measured in Chromium, Firefox and WebKit): a width on a
+    // cell of a later row does nothing. A thead or tfoot is drawn first or last whatever its place in the source, so a table
+    // with one is not judged.
+    if (!box.pseudo && ['td', 'th'].includes(box.tag) && style.$sources?.['inline-size'] && String(style['inline-size']) !== 'auto') {
+      const row = box[PARENT], section = row?.[PARENT], tableBox = section?.[PARENT], table = [...(ancestors ?? [])].reverse().find(a => a.box?.tag === 'table')?.style;
+      const sections = (tableBox?.children ?? []).filter(c => !c.anonymous && c.tag !== 'caption' && c.tag !== 'colgroup' && c.tag !== 'col');
+      const first = sections[0]?.children?.find(c => c.tag === 'tr');
+      if (row?.tag === 'tr' && tableBox?.tag === 'table' && table && String(table['table-layout']) === 'fixed' && String(table['inline-size'] ?? 'auto') !== 'auto'
+        && sections.every(c => c.tag === 'tbody') && first && first !== row && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('inline-size')))
+        layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['inline-size'], css: [{ property: 'width', file: style.$sources['inline-size'].file, line: style.$sources['inline-size'].line, selector: style.$sources['inline-size'].selector }],
+          message: `${box.label}: width has no effect: with table-layout: fixed only the first row's cells (or col elements) size the columns. Put the width on the first row's cell or on a col` });
+    }
+    if (style.$aspectInert && !box.pseudo) aspectInert(box, style);
     if (style.$cellInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(style.$cellInert[0][0])))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: style.$cellInert.map(([key]) => key), css: style.$cellInert.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
         message: `${box.label}: ${style.$cellInert.map(([key, value]) => `${key === 'min-block-size' ? 'min-height' : 'max-height'}: ${value}`).join(', ')} ${style.$cellInert.length === 1 ? 'has' : 'have'} no effect on a table cell (the row's height decides it). Use height on the cell or the row, or put the bound on a div inside the cell` });
@@ -2791,15 +2804,17 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       });
     }
     for (const box of [...sections, ...rows]) box.tablePart = true;
-    // min/max sizes on a table cell have no defined effect (CSS 2.2 §17.5.2; measured: Chromium ignores td
-    // { min-height: 50px } and td { max-width: 50px }), and a table's min/max height is spread over its rows (measured:
+    // min/max sizes on a table cell have no defined effect in CSS 2.2 (§17.5.2). Measured in Chromium, Firefox and WebKit:
+    // min/max-height do nothing (F43, dropped in css.mjs); min/max-width do nothing in a fixed table, but in an automatic
+    // table they bound the column (td { max-width: 20px } narrows a column of wrapping text). A table's min/max height is
+    // spread over its rows (measured:
     // .t { min-height: 100px } makes 20px cells 100px). Neither is modeled.
     const sizeBound = (st, keys) => keys.find(key => st.$sources?.[key] && !['auto', 'none', '0', '0px'].includes(String(st[key])));
     const tableBound = sizeBound(style, ['min-block-size', 'max-block-size']);
     if (tableBound) fail(`${table.label}: ${tableBound} on a table spreads over its rows, which is not modeled; size the cells instead`);
     for (const row of rows) for (const rs of styles(row, region, parents, style, false, false)) for (const cell of row.children) for (const c of styles(cell, rs.region, parents, rs.style, false, false)) {
       const key = sizeBound(c.style, ['min-block-size', 'max-block-size', 'min-inline-size', 'max-inline-size']);
-      if (key) fail(`${cell.label}: ${key} on a table cell has no defined effect (Chromium ignores it), which is not modeled; give the cell a block-size or inline-size`);
+      if (key) fail(`${cell.label}: ${key} on a table cell sizes the column in ways that are not modeled (in an automatic table it bounds the column; in a fixed one it does nothing); give the cell a block-size or inline-size`);
     }
     // A row's or row group's height sets the rows' height (CSS 2.2 §17.5.3; measured: tr { height: 50px } makes 20px cells
     // a 50px row; its width does not change the columns, reported as inert below),
@@ -3303,6 +3318,12 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // overflow do nothing (measured in Chromium); its children are laid out in its place and inherit from it.
   const contentsBoxKeys = ['inline-size', 'block-size', 'min-inline-size', 'min-block-size', 'max-inline-size', 'max-block-size',
     ...['top', 'right', 'bottom', 'left'].flatMap(side => [`padding-${side}`, `margin-${side}`, `border-${side}`]), 'background-color', 'background-image', 'overflow-x', 'overflow-y', 'aspect-ratio'];
+  function aspectInert(box, style) {
+    if (layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('aspect-ratio'))) return;
+    const src = style.$sources?.['aspect-ratio'], { value, where } = style.$aspectInert;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['aspect-ratio'], ...(src ? { css: [{ property: 'aspect-ratio', file: src.file, line: src.line, selector: src.selector }] } : {}),
+      message: where === 'table' ? `${box.label}: aspect-ratio: ${value} has no effect on a table cell, row or column (the table sizes it). Put the ratio on a block inside the cell` : `${box.label}: aspect-ratio: ${value} has no effect on a display: inline element. Make it display: inline-block (or block)` });
+  }
   function tableRowRadius(box, style, state) {
     // F94: a table row or row group is not rounded by border-radius, in either border model (measured in Chromium, Firefox
     // and WebKit: same pixels with a row background and without the radius). Round the first and last cells instead.
@@ -3639,6 +3660,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     if (child.text || child.contract || child.targets?.length) throw new Error('display: contents with text, contracts or noshift targets needs anonymous or absent boxes');
                     if (emit) contentsInert(child, c.style, c.region);
                     if (emit && child.tablePart) tableRowRadius(child, c.style);
+                    if (emit && child.tablePart && c.style.$aspectInert) aspectInert(child, c.style);
                     return [{ region: c.region, children: s.children, contents: c.style }];
                   })));
                   const nested = states.filter(state => state.contents);
