@@ -366,6 +366,7 @@
 - [x] **F86. `!important` の綴り間違い**(`W_CSS_IMPORTANT_TYPO`、以前は Unknown): `!imporant` など `!important` 以外の `!語` は宣言ごと捨てられる。`!IMPORTANT` と `! important` は有効(3 ブラウザで実測)
 - [x] **F87. media query の `and(`**(`W_CSS_MEDIA_AND_SPACE`、以前は Unknown): 関数トークンになり query は不正で決して一致しない。`)and (` は有効
 - [x] **F88. list-item でない要素の `list-style-position`**(`W_LAYOUT_DECLARATION_INERT`): マーカーがなく、中に継承先もなければ効かない
+- [x] **F89. calc の `+` / `-` の両側の空白**(`W_CSS_CALC_OPERATOR_SPACE`、健全性の修正: 以前は `calc(100%-10px)` を 100% − 10px として verified にしていた): 空白がないと符号付きの数として読まれて値が不正になり、宣言ごと捨てられる。`min()` / `max()` / `clamp()` と入れ子も同じ。`*` と `/` は空白なしで有効(3 ブラウザで 16 通り実測)
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

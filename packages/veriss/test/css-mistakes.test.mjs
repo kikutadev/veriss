@@ -959,3 +959,14 @@ test('F87: "and(" in a media query is a function token: the query is invalid and
   assert.equal(codes(r, 'W_CSS_MEDIA_AND_SPACE').length, 1);
   assert.equal(codes(run('@media screen and (min-width:0px){.a{height:40px}}'), 'W_CSS_MEDIA_AND_SPACE').length, 0);
 });
+
+test('F89: calc(100%-10px) is invalid: the declaration is dropped (it was computed as 100% - 10px)', () => {
+  const r = run('.a{width:calc(100%-10px)}');
+  assert.equal(r.status, 'verified');
+  assert.equal(r.sizes.find(s => s.box === '.a').rect.inlineSize.constant, '0');
+  const [hit] = codes(r, 'W_CSS_CALC_OPERATOR_SPACE');
+  assert.ok(hit && /100% - 10px/.test(hit.message));
+  const ok = run('.a{width:calc(100% - 10px)}');
+  assert.equal(ok.sizes.find(s => s.box === '.a').rect.inlineSize.constant, '-10');
+  assert.equal(codes(ok, 'W_CSS_CALC_OPERATOR_SPACE').length, 0);
+});

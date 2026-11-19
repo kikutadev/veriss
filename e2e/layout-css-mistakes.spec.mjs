@@ -1007,3 +1007,18 @@ test('F87: "and(" in a media query never matches; "and (" does', async ({page}) 
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_AND_SPACE'), query).toBe(expected === 20);
   }
 });
+
+test('F89: + and - in calc() need spaces on both sides; without them the declaration is dropped', async ({page}) => {
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}';
+  await page.setViewportSize({width: 800, height: 300});
+  for (const [value, expected] of [['calc(100%-10px)', 800], ['calc(100% -10px)', 800], ['calc(100%- 10px)', 800], ['min(100%-10px, 900px)', 800], ['calc(100% - 10px)', 790], ['calc(50% - -10px)', 410], ['calc(50%*2 - 10px)', 790]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${css}.a{width:${value}}</style></head><body><div class="a"></div></body></html>`);
+    expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().width), value).toBe(expected);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `${css}.a{width:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, value).toBe('verified');
+    const w = r.sizes.find(s => s.box === '.a').rect.inlineSize;
+    const n = x => { const [a, b = '1'] = String(x).split('/'); return Number(a) / Number(b); };
+    expect(n(w.coefficient) * 800 + n(w.constant), value).toBe(expected);
+    expect((r.layoutWarnings ?? []).some(x => x.code === 'W_CSS_CALC_OPERATOR_SPACE'), value).toBe(expected === 800);
+  }
+});
