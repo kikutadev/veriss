@@ -42,7 +42,7 @@ test('ordinary anchor rel tokens do not require a rendering adapter',()=>{
 
 test('physical single-side border shorthands match the supported longhands',()=>{
   for(const side of ['top','right','bottom','left']){
-    for(const [value,width,style,color] of [['2px solid #123456','2px','solid','#123456'],['0','0','none','currentcolor'],['none','0','none','currentcolor']]){
+    for(const [value,width,style,color] of [['2px solid #123456','2px','solid','#123456'],['0','0','none','currentcolor'],['none','3px','none','currentcolor']]){
       const html='<main></main>';
       const options={css:css+'main{width:160px;height:50px;',viewport:{min:320,max:1920,height:{min:480,max:1080}}};
       const report=d=>analyzeHTML(html,{...options,css:options.css+d+'}'});
@@ -54,4 +54,13 @@ test('physical single-side border shorthands match the supported longhands',()=>
     }
   }
   assert.equal(run(page,'main{border-top:2px dashed red}').status,'unknown');
+});
+
+test('side border reset keeps the initial width if style is set later',()=>{
+  const html='<main></main>';
+  const a=run(html,'main{border-left:none} main{border-left-style:solid}');
+  const b=run(html,'main{border-left:3px solid currentcolor}');
+  assert.equal(a.status,'verified');
+  assert.deepEqual(a.sizes,b.sizes);
+  assert.equal(run(html,'main{border-left:inherit}').status,'unknown');
 });
