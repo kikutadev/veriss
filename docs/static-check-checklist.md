@@ -55,6 +55,9 @@
   した)。flex の項目の `min()`・`max()`・`clamp()` の幅と basis も、区間ごとに分けて解く(A5 の `max(0px, calc(…))` の行き過ぎも
   これで解ける)。伸ばされない(align-self: start などの)grid・row の flex の項目の中の `%` の高さは auto になる(3 つのブラウザーで
   測った)ので、block の中の block と同じく `W_LAYOUT_DECLARATION_INERT` を出して auto として解く。
+  viewport 単位と px の単純な min/max/clamp による gap と padding も、境界で領域を分割し、区分アフィン式のまま解く。
+  明示 grid トラック・flex の折返し・block 内の grid の矩形を Chromium / Firefox / WebKit で比較し、overflow の対照も確認した。
+  可変 subgrid / auto-repeat の gap、flex item や intrinsic / positioned box の可変 padding、% を含む式などは Unknown のまま。
 - [x] **D3. inline の中の行の配置**: 文字の行と inline の箱の位置。大きい。
   最初の一歩として、測った文字の中の inline の箱(`inlineBounds`)を `text-align: center`・`right`・`end` でも出す(以前は start と
   left だけ)。行の幅の区間で外接・内接をずらし、改行が揺れる幅は除く(ADR-0013)。3 つのブラウザーで一致。

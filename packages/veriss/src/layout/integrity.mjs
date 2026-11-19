@@ -15,7 +15,7 @@
 // or where positions are not modeled) are outside the positional rules, as in
 // the browser, where clipped content cannot reach the page edge.
 import { q, exact, number } from './linear.mjs';
-import { scalar, width, sum, diff, times, evaluate, sample, clip, partition } from './region.mjs';
+import { scalar, asAffine, width, sum, diff, times, evaluate, sample, clip, partition } from './region.mjs';
 
 export function intersect(a, b) {
   let region = a;
@@ -37,7 +37,7 @@ function textExtents(row) {
   const contract = row.box.contract, factor = alignments[row.textAlign];
   // Wrapped lines (kind 'lines') are bounded by the border box.
   if (!contract?.textMetrics || contract.textMetrics.kind === 'lines' || !contract.font || factor === undefined) return [{ region: row.region, extent: box(row) }];
-  const start = sum(row.origin.inline, scalar(row.content.left)), top = sum(row.origin.block, scalar(row.content.top));
+  const start = sum(row.origin.inline, asAffine(row.content.left)), top = sum(row.origin.block, asAffine(row.content.top));
   const width = scalar(contract.minInlineSize), block = [[top, sum(top, scalar(contract.font.lineHeight))]];
   const place = left => {
     const extent = { inline: [[left, sum(left, width)]], block: [...block], basis: 'text' };

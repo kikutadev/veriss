@@ -205,3 +205,55 @@ test('relational profile proves ordinary account settings responsiveness and sta
   expect(broken.contracts[1].status).toBe('violated');
   expect(broken.contracts[2].status).toBe('violated');
 });
+
+test('viewport-dependent grid and flex gaps match browser rectangles over width and height branches',async({page})=>{
+  const html='<!doctype html><html lang="en"><body><main><div class="a"></div><div class="b"></div><div class="c"></div></main></body></html>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}main>div{height:40px;min-width:0;min-height:0}';
+  const cases=[
+    'main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(10px,3vh,21px) clamp(12px,4vw,30px)}',
+    'main{display:flex;flex-wrap:wrap;gap:clamp(10px,3vh,21px) clamp(12px,4vw,30px)}main>div{flex:0 0 150px}',
+    'main{display:flex;flex-direction:column;gap:clamp(10px,3vh,21px)}',
+    'main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));height:220px;row-gap:clamp(10px,3vh,21px)}',
+    'main{display:grid;grid-template-columns:150px 150px;gap:clamp(12px,4vw,30px)}'
+  ];
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const [index,extra] of cases.entries()){
+    const css=base+extra,report=analyzeHTML(html,{css,viewport:{min:240,max:1000,height:{min:320,max:800}},integrity:true});
+    expect(report.status,JSON.stringify(report.diagnostics)).toBe(index===4?'violated':'verified');
+    await page.setContent(html.replace('<body>','<head><style>'+css+'</style></head><body>'));
+    for(const width of [240,300,313,320,468,469,500,750,1000])for(const height of [320,334,700,800]){
+      await page.setViewportSize({width,height});
+      const actual=await page.locator('main>div').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height]}));
+      const inRange=(r,v)=>(v>r.min||v===r.min&&r.minInclusive)&&(v<r.max||v===r.max&&r.maxInclusive);
+      const at=a=>rat(a.constant)+rat(a.coefficient)*width+rat(a.heightCoefficient)*height;
+      for(const [i,name] of ['.a','.b','.c'].entries()){
+        const row=report.sizes.find(s=>s.box===name&&inRange(s.range,width)&&inRange(s.heightRange,height)&&s.region.constraints.every(c=>{const n=at(c);return c.strict?n>1e-8:n>=-1e-8}));
+        expect(row?.rect,JSON.stringify({index,width,height,name})).toBeTruthy();
+        const predicted=['inlineStart','blockStart','inlineSize','blockSize'].map(k=>at(row.rect[k]));
+        for(const [j,v] of predicted.entries())expect(Math.abs(v-actual[i][j]),JSON.stringify({index,width,height,name,predicted,actual:actual[i]})).toBeLessThan(0.1);
+      }
+    }
+  }
+});
+
+test('viewport padding and gaps compose through nested responsive boxes',async({page})=>{
+  const html='<!doctype html><html lang="en"><body><main class="shell"><section class="grid"><div class="a"></div><div class="b"></div></section></main></body></html>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}.shell{padding:clamp(10px,3vh,30px) clamp(24px,5vw,76px)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:clamp(16px,2vw,30px)}.grid>div{height:40px;min-width:0}';
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const broken of [false,true]){
+    const sheet=broken?css.replace('repeat(2,minmax(0,1fr))','240px 240px'):css;
+    const report=analyzeHTML(html,{css:sheet,viewport:{min:320,max:1920,height:{min:320,max:1080}},integrity:true});
+    expect(report.status,JSON.stringify(report.diagnostics)).toBe(broken?'violated':'verified');
+    await page.setContent(html.replace('<body>','<head><style>'+sheet+'</style></head><body>'));
+    for(const width of [320,480,800,1440,1500,1520,1920])for(const height of [320,334,1000,1080]){
+      await page.setViewportSize({width,height});
+      const at=a=>rat(a.constant)+rat(a.coefficient)*width+rat(a.heightCoefficient)*height;
+      for(const selector of ['.shell','.grid','.a','.b']){
+        const row=report.sizes.find(s=>s.box===selector&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8));
+        expect(row?.rect).toBeTruthy();
+        const actual=await page.locator(selector).evaluate(n=>{const r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height]});
+        for(const [i,key] of ['inlineStart','blockStart','inlineSize','blockSize'].entries())expect(Math.abs(at(row.rect[key])-actual[i])).toBeLessThan(0.1);
+      }
+    }
+  }
+});

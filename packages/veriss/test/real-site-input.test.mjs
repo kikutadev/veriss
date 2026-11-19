@@ -166,3 +166,43 @@ test('viewport flex basis variants use the same fixed viewport profile',()=>{
   }
   assert.equal(analyzeHTML(html,{...options,css:css.replace('display:flex','display:flex;flex-direction:column').replace('38vh','38dvh')}).status,'unknown');
 });
+
+test('viewport-dependent grid gap preserves exact piecewise coordinates and overflow witnesses',()=>{
+  const html='<main><div class="a"></div><div class="b"></div></main>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,4vw,48px)}main>div{height:40px;min-width:0}';
+  const options={viewport:{min:240,max:1600,height:{min:320,max:800}},integrity:true};
+  const r=analyzeHTML(html,{...options,css});
+  assert.equal(r.status,'verified',JSON.stringify(r.diagnostics));
+  const at=(a,w,h)=>{const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};return rat(a.constant)+rat(a.coefficient)*w+rat(a.heightCoefficient)*h};
+  for(const w of [240,300,301,500,1199,1200,1600]){
+    const b=r.sizes.find(s=>s.box==='.b'&&(w>s.range.min||w===s.range.min&&s.range.minInclusive)&&(w<s.range.max||w===s.range.max&&s.range.maxInclusive));
+    const g=Math.max(12,Math.min(w*.04,48));
+    assert.ok(b?.rect);assert.equal(at(b.rect.inlineStart,w,500),(w+g)/2);
+    assert.equal(at(b.rect.inlineSize,w,500),(w-g)/2);
+  }
+  const overflow=analyzeHTML(html,{...options,css:css.replace('repeat(2,minmax(0,1fr))','150px 150px')});
+  assert.equal(overflow.status,'violated');
+  assert.ok(overflow.diagnostics.some(d=>d.code==='E_LAYOUT_TRACKS'&&d.witness));
+  assert.equal(analyzeHTML(html,{...options,css:css.replace('clamp(12px,4vw,48px)','clamp(12px,4%,48px)')}).status,'unknown');
+});
+
+test('viewport-dependent padding and gaps compose inside a block and responsive grid',()=>{
+  const html='<main class="shell"><section class="grid"><div class="a"></div><div class="b"></div></section></main>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}.shell{padding:clamp(10px,3vh,30px) clamp(24px,5vw,76px)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:clamp(16px,2vw,30px)}.grid>div{height:40px;min-width:0}';
+  const options={viewport:{min:320,max:1920,height:{min:320,max:1080}},integrity:true};
+  const r=analyzeHTML(html,{...options,css});
+  assert.equal(r.status,'verified',JSON.stringify(r.diagnostics));
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const w of [320,480,800,1440,1520,1920])for(const h of [320,400,1000,1080]){
+    const at=a=>rat(a.constant)+rat(a.coefficient)*w+rat(a.heightCoefficient)*h;
+    const b=r.sizes.find(s=>s.box==='.b'&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8));
+    const p=Math.max(24,Math.min(w*.05,76)),g=Math.max(16,Math.min(w*.02,30));
+    assert.ok(b?.rect);
+    assert.ok(Math.abs(at(b.rect.inlineStart)-(w+g)/2)<1e-8);
+    assert.ok(Math.abs(at(b.rect.inlineSize)-(w-2*p-g)/2)<1e-8);
+    assert.ok(Math.abs(at(b.rect.blockStart)-Math.max(10,Math.min(30,h*.03)))<1e-8);
+  }
+  const bad=analyzeHTML(html,{...options,css:css.replace('repeat(2,minmax(0,1fr))','240px 240px')});
+  assert.equal(bad.status,'violated');
+  assert.ok(bad.diagnostics.some(d=>d.code==='E_LAYOUT_TRACKS'&&d.witness));
+});

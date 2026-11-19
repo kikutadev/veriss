@@ -1,6 +1,8 @@
 import { q, add, sub, mul, div, cmp, exact, number } from './linear.mjs';
 const z = q(0);
 export const scalar = value => ({ x: z, y: z, b: q(value) });
+// Accept an already-affine dimension or a rational constant.
+export const asAffine = value => value.x !== undefined ? value : scalar(value);
 export const width = { x: q(1), y: z, b: z };
 export const height = { x: z, y: q(1), b: z };
 export const sum = (a, b) => ({ x: add(a.x, b.x), y: add(a.y, b.y), b: add(a.b, b.b) });
