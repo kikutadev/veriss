@@ -125,3 +125,27 @@ test('game model separates DOM/canvas geometry, HUD union and live action observ
   expect(report.contracts.find(c=>c.id==='action').observations.map(o=>o.status)).toEqual(['passed','passed','passed']);
   expect(report.outcome).toBe('failed');
 });
+
+test('fixed translation fit follows the rendered box at responsive boundaries',async({page})=>{
+  const base='*{box-sizing:border-box;margin:0;padding:0}html,body{font-size:16px}.island{position:fixed;bottom:14px;left:50%;width:min(344px,100vw - 22px);height:57px;border:1px solid #3c4943}';
+  for(const [transform,expected] of [['translate(-50%)translateZ(0)',true],['none',false],['translate(-110%)',false],['translate(10%)',false]]){
+    const css=base+'.island{transform:'+transform+'}';
+    const html='<!doctype html><html lang="en"><body><div class="island"></div></body></html>';
+    const report=analyzeHTML(html,{css,viewport:{min:320,max:1920,height:{min:320,max:1080}},integrity:true});
+    expect(report.status).toBe(expected?'verified':'violated');
+    await page.setContent(html.replace('<body>','<head><style>'+css+'</style></head><body>'));
+    let outside=false;
+    for(const width of [320,365,366,367,527,688,1025,1920]){
+      await page.setViewportSize({width,height:600});
+      const r=await page.locator('.island').evaluate(el=>{const b=el.getBoundingClientRect();return {left:b.left,right:b.right,y:b.y,width:b.width}});
+      const rat=s=>{const [n,d='1']=String(s??0).split('/');return Number(n)/Number(d)};
+      const at=a=>rat(a.constant)+rat(a.coefficient)*width+rat(a.heightCoefficient)*600;
+      const row=report.sizes.find(s=>s.box==='.island'&&(width> s.range.min||width===s.range.min&&s.range.minInclusive)&&(width<s.range.max||width===s.range.max&&s.range.maxInclusive));
+      expect(row?.rect).toBeTruthy();
+      expect(r.left).toBeCloseTo(at(row.rect.inlineStart),2);
+      expect(r.width).toBeCloseTo(at(row.rect.inlineSize),2);
+      outside ||= r.left < -0.01 || r.right > width+0.01;
+    }
+    expect(outside).toBe(!expected);
+  }
+});

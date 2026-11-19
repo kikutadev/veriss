@@ -109,3 +109,21 @@ test('noscript fallback stays hidden in an explicitly scripting-enabled snapshot
   const combined=analyzeHTML(html,{...options,scripting:'enabled',css:sheet+'@media (scripting: none) and (min-width: 500px){.item{width:200px}}'});
   assert.equal(combined.status,'unknown');
 });
+
+test('viewport-fixed horizontal translation checks painted fit, not the pre-transform coordinate',()=>{
+  const html='<!doctype html><html lang="en"><body><div class="island"></div></body></html>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}html,body{font-size:16px}.island{position:fixed;bottom:14px;left:50%;width:min(344px,100vw - 22px);height:57px;border:1px solid #3c4943}';
+  const opt={viewport:{min:320,max:1920,height:{min:320,max:1080}},integrity:true};
+  const centered=analyzeHTML(html,{...opt,css:css+'.island{transform:translate(-50%)translateZ(0)}'});
+  assert.equal(centered.status,'verified',JSON.stringify(centered.diagnostics));
+  assert.ok(centered.checks.length>0);
+  const uncentered=analyzeHTML(html,{...opt,css});
+  assert.equal(uncentered.status,'violated');
+  assert.ok(uncentered.diagnostics.some(d=>d.code==='E_LAYOUT_ABSOLUTE_END'));
+  const left=analyzeHTML(html,{...opt,css:css+'.island{transform:translate(-110%)}'});
+  assert.equal(left.status,'violated');
+  assert.ok(left.diagnostics.some(d=>d.code==='E_LAYOUT_ABSOLUTE_START'));
+  const right=analyzeHTML(html,{...opt,css:css+'.island{transform:translate(10%)}'});
+  assert.equal(right.status,'violated');
+  assert.ok(right.diagnostics.some(d=>d.code==='E_LAYOUT_ABSOLUTE_END'));
+});

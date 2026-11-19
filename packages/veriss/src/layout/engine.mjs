@@ -1625,11 +1625,18 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         const containing = available.containingBlock;
         if (!containing || !blockSize) throw new Error('Absolute box has no independently resolved local containing block');
         const origin = absoluteOrigin(style, containing, {inline, block:blockSize});
+        // A viewport-fixed box with a pure translation is positioned visually
+        // after layout; unlike ordinary absolute descendants it does not extend
+        // the scrollable document by its untranslated rectangle. Preserve the
+        // original layout coordinate for provenance and shift analysis.
+        const fitOrigin = style.$fixed && containing.path === 'viewport' && affineOf(style) && !linearOf(style)
+          ? translated(style, origin, {inline, block:blockSize}) : origin;
+        if (!fitOrigin) throw Object.assign(new Error('Fixed painted origin cannot be resolved'), {code:'U_LAYOUT_CSS'});
         for (const [axis, dimension] of [['inline',inline],['block',blockSize]]) {
           // Against a containing block that clips on this axis, reaching past it is the box being cut off.
           const cut = containing.clips && containing.clips[axis === 'inline' ? 'x' : 'y'];
-          obligation(origin[axis], scalar(0), box, region, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_START', axis);
-          obligation(containing[axis], sum(origin[axis],dimension), box, region, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_END', axis);
+          obligation(fitOrigin[axis], scalar(0), box, region, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_START', axis);
+          obligation(containing[axis], sum(fitOrigin[axis],dimension), box, region, cut ? 'E_LAYOUT_ABSOLUTE_CLIPPED' : 'E_LAYOUT_ABSOLUTE_END', axis);
         }
         positioned = {origin:{inline:affine(origin.inline),block:affine(origin.block)},containingBlock:{path:containing.path,inline:affine(containing.inline),block:affine(containing.block)}};
       }
