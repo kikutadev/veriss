@@ -37,6 +37,11 @@ const proof = await verifyLayoutReport(report);
 if (proof.status !== 'verified') throw new Error(JSON.stringify(proof));
 ```
 
+For an explicitly scripting-enabled static DOM snapshot, pass `scripting: 'enabled'`.
+This admits hidden `noscript` fallbacks and single-condition `@media (scripting: enabled|none|initial-only)` rules.
+It does not execute JavaScript or check scripting-disabled browsers, compound scripting queries, or visible noscript.
+Without the option these remain Unknown.
+
 The HTML adapter accepts one fragment root. Unsupported rendering attributes,
 foreign/replaced elements, and parse recovery produce `unknown`. Inline `style`
 attributes currently need a different adapter; pass CSS as a complete stylesheet.

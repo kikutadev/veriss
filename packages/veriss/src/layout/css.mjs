@@ -674,7 +674,7 @@ function flexShorthand(value) {
   return [['flex-grow', factors[0] ?? '1'], ['flex-shrink', factors[1] ?? '1'], ['flex-basis', basis ?? '0%']];
 }
 
-export function parseLayoutCSS(sheets, diagnostic) {
+export function parseLayoutCSS(sheets, diagnostic, {scripting} = {}) {
   // Findings of the syntax stage, one shape: { code, ...data } (ADR-0016 M3). The rules/syntax-notes.mjs catalog words them.
   const notes = [], note = (code, data) => { notes.push({ code, ...data }); }, notesOf = code => notes.filter(n => n.code === code);
   const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [];
@@ -835,6 +835,13 @@ export function parseLayoutCSS(sheets, diagnostic) {
         if (node.name.toLowerCase() === 'media' && /(?<![\w:-])(?:and|or|not)\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { note('W_CSS_MEDIA_AND_SPACE', { params: node.params.trim(), written: /(?<![\w:-])(?:and|or|not)\(/i.exec(node.params)[0], file: filename, line: node.source.start.line }); continue; }
         if (node.name.toLowerCase() === 'media' && /var\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) {
           note('W_CSS_MEDIA_VAR', { params: node.params.trim(), file: filename, line: node.source.start.line });
+          continue;
+        }
+        // Only the explicitly selected scripting-enabled static DOM profile.
+        // Compound scripting queries and unspecified environments stay Unknown.
+        const scriptQuery = node.name.toLowerCase() === 'media' && /^\s*\(\s*scripting\s*:\s*(enabled|none|initial-only)\s*\)\s*$/i.exec(node.params);
+        if (scripting === 'enabled' && scriptQuery) {
+          if (scriptQuery[1].toLowerCase() === 'enabled') visit(node.nodes, contexts, layer, filename, depth + 1, preferences);
           continue;
         }
         try {
@@ -1089,7 +1096,7 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   const values = {
     // Media: track/source never render; audio renders only with controls.
     // ::before/::after are inline by default (CSS Pseudo-Elements 4), whatever their element's tag.
-    display: ['before', 'after'].includes(box.pseudo) ? 'inline' : ['track', 'source', 'template', 'datalist'].includes(box.tag) || (box.tag === 'audio' && !box.controls) ? 'none' : ['span', 'a', 'strong', 'em', 'b', 'i', 'small', 'time', 'output', 'label', 'img', 'picture', 'iframe', 'video', 'audio'].includes(box.tag) ? 'inline' : 'block',
+    display: ['before', 'after'].includes(box.pseudo) ? 'inline' : ['track', 'source', 'template', 'datalist', 'noscript'].includes(box.tag) || (box.tag === 'audio' && !box.controls) ? 'none' : ['span', 'a', 'strong', 'em', 'b', 'i', 'small', 'time', 'output', 'label', 'img', 'picture', 'iframe', 'video', 'audio'].includes(box.tag) ? 'inline' : 'block',
     'aspect-ratio': 'auto', 'box-sizing': 'content-box', 'inline-size': 'auto', 'min-inline-size': 'auto', 'max-inline-size': 'none',
     'padding-left': '0', 'padding-right': '0', 'border-left': '0', 'border-right': '0',
     'padding-top': '0', 'padding-bottom': '0', 'border-top': '0', 'border-bottom': '0', 'border-top-color': 'currentcolor', 'border-right-color': 'currentcolor', 'border-bottom-color': 'currentcolor', 'border-left-color': 'currentcolor',
@@ -1331,6 +1338,10 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   // datalist { display: none } (UA, measured in Chromium, Firefox and WebKit): its options show only in the field's
   // suggestion popup; an author display would draw them (not modeled).
   if (box.tag === 'datalist' && values.display !== 'none') throw Object.assign(new Error(`${box.label}: display: ${values.display} on a datalist is not modeled`), { code: 'U_LAYOUT_ELEMENT' });
+  // A scripting-enabled noscript creates no layout box (even where Chromium's
+  // computed display differs from Firefox/WebKit). An authored display override
+  // is conservatively outside the model.
+  if (box.tag === 'noscript' && values.display !== 'none') throw Object.assign(new Error(`${box.label}: visible noscript is not modeled`), {code:'U_LAYOUT_ELEMENT'});
   if (box.tag === 'template' && values.display !== 'none') throw Object.assign(new Error(`${box.label}: display: ${values.display} on a template is not modeled`), { code: 'U_LAYOUT_ELEMENT' });
   // display: contents on a replaced element or form control computes to none (CSS Display Appendix B): it has no
   // children to promote (measured: 0x0 in Chromium, Firefox and WebKit for each of these).

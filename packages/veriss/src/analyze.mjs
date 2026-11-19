@@ -8,7 +8,7 @@ export function analyzeInput(tree,options,adapterDiagnostics=[]) {
   const {name='Document',...configuration}=options;
   if(typeof name!=='string' || !/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(name)) throw new TypeError('Invalid CSS verification subject name');
   validateOptions({...configuration,name});
-  const {root,diagnostics}=normalizeTree(tree,name);
+  const {root,diagnostics}=normalizeTree(tree,name,configuration.scripting);
   const inputDiagnostics=[...diagnostics,...adapterDiagnostics],budget={remaining:2_000_000};
   const reports=[];
   const ratios=configuration.devicePixelRatios ?? [undefined];

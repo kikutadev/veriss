@@ -93,3 +93,19 @@ test('image fetchpriority is a loading hint, not a geometry attribute',()=>{
   }
   assert.equal(run('<main fetchpriority="high"></main>').status,'unknown');
 });
+
+test('noscript fallback stays hidden in an explicitly scripting-enabled snapshot',()=>{
+  const html='<!doctype html><html lang="en"><body><main><noscript><p>fallback</p></noscript><div class="item"></div></main></body></html>';
+  const sheet=css+'main{display:grid;grid-template-columns:minmax(0,1fr)} .item{width:80px;height:40px} @media (scripting: none){.item{width:500px}} @media (scripting: enabled){.item{width:100px}}';
+  const options={css:sheet,viewport:{min:320,max:1920,height:{min:480,max:1080}}};
+  assert.equal(analyzeHTML(html,options).status,'unknown');
+  const actual=analyzeHTML(html,{...options,scripting:'enabled'});
+  assert.equal(actual.status,'verified',JSON.stringify(actual.diagnostics));
+  assert.equal(actual.sizes.find(s=>s.box==='.item').inlineSize.constant,'100');
+  assert.ok(!actual.sizes.some(s=>s.box.startsWith('noscript@')));
+  assert.ok(actual.assumptions.some(s=>s.includes('scripting')));
+  const visible=analyzeHTML(html,{...options,scripting:'enabled',css:sheet+'noscript{display:block}'});
+  assert.equal(visible.status,'unknown');
+  const combined=analyzeHTML(html,{...options,scripting:'enabled',css:sheet+'@media (scripting: none) and (min-width: 500px){.item{width:200px}}'});
+  assert.equal(combined.status,'unknown');
+});

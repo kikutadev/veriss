@@ -264,7 +264,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   const { rules, layers, notes = [], keyframes: keyframeNames = new Set(), dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
-  });
+  },{scripting:options.scripting});
   // A selector testing the value of an attribute that is dynamic on an element (an adapter's placeholder): whether
   // the rule applies there is not known.
   // Likewise a structural pseudo-class on the root of a component: its siblings in the page are not known.
@@ -4187,7 +4187,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   const status = diagnostics.some(d => d.severity === 'unknown') ? 'unknown' : diagnostics.length ? 'violated' : 'verified';
   return { version: 1, ok: status === 'verified', status, component,
     scope: { axis: block ? 'both' : 'inline', viewport: { ...projection(initial, 'x'), ...(block ? { height: options.viewport.height ? projection(initial, 'y') : null } : {}) }, hostInset: options.hostInset ?? 0, ...(block ? { hostBlockInset: options.hostBlockInset ?? 0 } : {}), closedCSS: true, browserRounding: false, blockSizing: block },
-    assumptions: ['The supplied CSS is the complete author cascade and the selected root has no external query-container ancestors; host provides the declared containing sizes without unmodeled scrollbar gutters.',
+    assumptions: [...(options.scripting==='enabled' ? ['The supplied DOM is a static snapshot in a scripting-enabled browser; script-driven mutations and disabled scripting are not checked.'] : []), 'The supplied CSS is the complete author cascade and the selected root has no external query-container ancestors; host provides the declared containing sizes without unmodeled scrollbar gutters.',
       'Each minInlineSize/minBlockSize is a trusted sufficient content-size bound; intrinsicBlockSize is a trusted exact auto-height profile for the permitted content/fonts.',
       'Only horizontal-tb/ltr in-flow and explicitly sized local absolute geometry is checked; ink overflow and browser pixel rounding are outside the contract.',
       ...(rules.some(rule=>rule.declarations.some(d=>d.expression || d.pending)) ? ['Custom properties are unregistered; unknown external inheritance and cycles through fallback references prevent verification when used by geometry.'] : [])],

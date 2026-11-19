@@ -94,7 +94,7 @@ const fields=new Set(['canvasSize','notAttributes','placeholderAttr','inertAttri
 const object=value=>value!==null && typeof value==='object' && !Array.isArray(value);
 
 /** Clone the supplied model: analysis must never attach facts to caller state. */
-export function normalizeTree(tree,name) {
+export function normalizeTree(tree,name,scripting) {
   const seen=new Set(), paths=new Set(), diagnostics=[];
   function visit(input,parent,index,depth) {
     if(!object(input) || Object.keys(input).some(key=>!fields.has(key)) || typeof input.tag!=='string' || !/^[a-z][a-z0-9-]*$/.test(input.tag)) throw new TypeError('Invalid box tree node');
@@ -133,6 +133,7 @@ export function normalizeTree(tree,name) {
       ...(input.boundaries ? {boundaries:input.boundaries.map(b=>({...b}))} : {})};
     box.label=box.id ? `#${box.id}` : box.classes.length ? box.classes.map(c=>`.${c}`).join('') : `${box.tag}@${path}`;
     const unknown=(code,message)=>diagnostics.push({code,severity:'unknown',message,box:box.label,path,source:box.source});
+    if(box.tag==='noscript' && (scripting!=='enabled' || input.children?.length)) unknown('U_LAYOUT_ELEMENT','noscript needs an explicitly scripting-enabled DOM (raw text, no element children)');
     if(!boxTags.has(box.tag)) unknown('U_LAYOUT_ELEMENT',`Native or foreign element needs a size adapter: ${box.tag}`);
     box.children=(input.children ?? []).map((child,i)=>visit(child,path,i,depth+1));
     // Phrasing children of a text leaf are inline content of that leaf (not layout children).

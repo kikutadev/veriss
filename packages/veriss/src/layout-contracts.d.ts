@@ -3,6 +3,8 @@ export interface LayoutDeclaration {contract:import('./layout-contract.mjs').Con
 export interface LayoutOptions {
   /** Opaque subject identifier; also used as the root path. */
   name?: string;
+  /** Explicitly assume a scripting-enabled static snapshot, not script execution. */
+  scripting?: 'enabled';
   /** Trusted exact native gutter geometries of the target environments. */
   scrollbars?: readonly LayoutScrollbarProfile[];
   /** Static counterparts of vlmkit's box-model integrity rules (ADR-0012). */

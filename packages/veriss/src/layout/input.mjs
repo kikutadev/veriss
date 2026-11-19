@@ -1,11 +1,11 @@
 import { q, cmp } from './linear.mjs';
 import { simpleSelector } from './css.mjs';
 import { validateFontContract, validateTextMetrics } from './text-font.mjs';
-export const boxTags = new Set('canvas template datalist dialog details summary svg html body button div main aside section article nav header footer p span a strong em b i small time h1 h2 h3 h4 h5 h6 output label img input select textarea ul ol li form table caption thead tbody tfoot tr th td fieldset legend iframe video audio track source picture dl dt dd marquee'.split(' '));
+export const boxTags = new Set('canvas template noscript datalist dialog details summary svg html body button div main aside section article nav header footer p span a strong em b i small time h1 h2 h3 h4 h5 h6 output label img input select textarea ul ol li form table caption thead tbody tfoot tr th td fieldset legend iframe video audio track source picture dl dt dd marquee'.split(' '));
 // Form controls and images have UA intrinsic sizes and padding: checked only with resets and explicit sizes.
 export const controlTags = new Set(['button', 'input', 'select', 'textarea']), replacedTags = new Set(['img', 'input', 'select', 'textarea']);
-const ancestorTags=new Set([...boxTags].filter(tag=>!['button', 'img', 'input', 'select', 'textarea'].includes(tag)));
-const supportedOptions = new Set(['ua', 'knownFonts', 'scope', 'reportTextFonts', 'defaultFontSize', 'defaultColors', 'scrollIntent', 'name', 'css', 'cssFile', 'reset', 'ancestors', 'viewport', 'hostInset', 'hostBlockInset', 'block', 'boxes', 'scrollbars', 'integrity', 'accessibility', 'selectors', 'images', 'devicePixelRatios', '$devicePixelRatio', '$animationFrame', '$slideVariant', 'safeArea']);
+const ancestorTags=new Set([...boxTags].filter(tag=>!['button', 'img', 'input', 'select', 'textarea','noscript'].includes(tag)));
+const supportedOptions = new Set(['scripting', 'ua', 'knownFonts', 'scope', 'reportTextFonts', 'defaultFontSize', 'defaultColors', 'scrollIntent', 'name', 'css', 'cssFile', 'reset', 'ancestors', 'viewport', 'hostInset', 'hostBlockInset', 'block', 'boxes', 'scrollbars', 'integrity', 'accessibility', 'selectors', 'images', 'devicePixelRatios', '$devicePixelRatio', '$animationFrame', '$slideVariant', 'safeArea']);
 const supportedContract = new Set(['placeholderInlineSize', 'minInlineSize', 'maxInlineSize', 'minBlockSize', 'intrinsicBlockSize', 'wrap', 'overflow', 'overflowBlock', 'font', 'textMetrics', 'textRuns']);
 function finiteSize(value, name) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error(`Invalid layout ${name}`);
@@ -13,6 +13,7 @@ function finiteSize(value, name) {
 }
 export function validateOptions(options) {
   if (!options || Object.keys(options).some(key => !supportedOptions.has(key))) throw new Error('Invalid layout options');
+  if (options.scripting !== undefined && options.scripting !== 'enabled') throw new Error('Invalid scripting assumption: only enabled is modeled');
   if (typeof options.css !== 'string' || options.css.length > 1_000_000) throw new Error('Invalid layout CSS input');
   if (options.knownFonts !== undefined && (!Array.isArray(options.knownFonts) || options.knownFonts.length > 256 || options.knownFonts.some(f => typeof f !== 'string' || f.length > 256))) throw new Error('Invalid layout knownFonts: a list of font family names');
   if (options.scope !== undefined && (typeof options.scope !== 'object' || !['scoped', 'global'].includes(options.scope?.mode) || (options.scope.owned !== undefined && (!Array.isArray(options.scope.owned) || options.scope.owned.some(c => typeof c !== 'string'))) || (options.scope.firstLine !== undefined && !Number.isSafeInteger(options.scope.firstLine)) || (options.scope.ancestors !== undefined && options.scope.ancestors !== 'scoped'))) throw new Error("Invalid layout options: scope must be { mode: 'scoped' | 'global', owned?: string[], firstLine?: integer }");

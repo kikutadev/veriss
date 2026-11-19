@@ -25,3 +25,14 @@ test('generated HTML, minified lengths, link metadata and side borders match bro
     }
   }
 });
+
+test('scripting-enabled static snapshot excludes noscript fallback',async({page})=>{
+  const html='<!doctype html><html lang="en"><body><main><noscript><p>fallback</p></noscript><div class="item"></div></main></body></html>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}main{display:grid;grid-template-columns:minmax(0,1fr)}.item{width:80px;height:40px}@media (scripting: none){.item{width:500px}}@media (scripting: enabled){.item{width:100px}}';
+  const report=analyzeHTML(html,{css,scripting:'enabled',viewport:{min:320,max:1920,height:{min:480,max:1080}}});
+  expect(report.status,JSON.stringify(report.diagnostics)).toBe('verified');
+  await page.setContent(html.replace('<body>','<head><style>'+css+'</style></head><body>'));
+  expect(await page.locator('noscript').evaluate(el=>({children:el.children.length,boxes:el.getClientRects().length}))).toEqual({children:0,boxes:0});
+  expect(await page.evaluate(()=>matchMedia('(scripting: enabled)').matches)).toBe(true);
+  expect(await page.locator('.item').evaluate(el=>el.getBoundingClientRect().width)).toBe(Number(report.sizes.find(s=>s.box==='.item').inlineSize.constant));
+});
