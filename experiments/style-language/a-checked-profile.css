@@ -1,0 +1,4 @@
+/* 案 A: 検査済みの CSS サブセット(profile)。新しい構文なし。ADR-0015 案 A
+   profile: checked/portable — flex・block・px と %・状態は :hover / :focus-visible だけ */
+.card { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.card > .title { font: 600 16px/24px Inter, sans-serif; }

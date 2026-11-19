@@ -1,0 +1,8 @@
+案 E: 共有のレイアウト IR(表に出る言語ではない)。ADR-0015 案 E
+
+LayoutIR = {
+  nodes: [{ id, parent, role: block | flex | grid | text | replaced, style: PortableStyle, contract?: Contract }],
+  assumptions: { rootFontSize, lang, viewport: { min, max, height? } },
+  text: TextMeasureSpec   // フォント(ADR-0010)と、文字列の長さ・行数の契約
+}
+PortableStyle = 計算値(px と %、flex/grid のトラック、box-sizing、align …)。selector・cascade・継承は解決済み。

@@ -1,6 +1,7 @@
 # ADR-0015: 静的検査できるスタイル記述の案と、Web 以外でも動くレイアウトエンジン
 
 - 状態: Proposed(設計の比較。この文書の構文・型・API はどれも実装していない)
+- 構文の例と、今の veriss での扱い: [experiments/style-language/](../../experiments/style-language/README.md)
 - 日付: 2026-11-18
 - Issue: 未作成
 - 対応する提案: ユーザーの意見「表現力を損ねない範囲で、静的検査可能に記述できる CSS のサブセットまたはスーパーセット言語を考察したい。noshift のように HTML 側と一緒に書く前提をおいてもよい」「react-native のように、Web 以外の GUI 環境のためのレイアウトエンジンを、サブセットを満たす範囲で提供したい(mizchi/crater のブラウザー実装が似たことをしている)」「isle だけでなく、ほかの UI ライブラリと一緒に使う」

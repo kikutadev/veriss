@@ -1,0 +1,11 @@
+// 案 C: テンプレートと結び付いた component 言語。ADR-0014、ADR-0015 案 C
+component Card(open: bool, items: list<Item>) {
+  layout root: grid(columns: minmax(0, 1fr), row-gap: 8px) {
+    panel?:  when open  { block-size: 120px; }        // テンプレートの節点を名前で指す
+    empty?:  when !open { block-size: 40px; }
+    list:    grid(auto-rows: 32px) {
+      item*: in list    { background: #fff; }        // 子の役割は親の layout で型付けされる
+    }
+  }
+  contract noshift(panel, empty) over open;          // 既存の @noshift を言語の契約として持つ
+}

@@ -1,0 +1,8 @@
+/* 案 B: 契約を書ける CSS のスーパーセット(ブラウザーが読み飛ばす at-rule)。ADR-0015 案 B */
+@contract .card {
+  noshift: open;                 /* open が変わっても .card の外の箱は動かない(既存の data-noshift) */
+  text(.title): 1..40ch / 1 line; /* 動的な文字列の長さと行数 */
+  media(img): ratio 16 / 9;      /* 読み込む前の比 */
+}
+@assume root { font-size: 16px; lang: ja; }   /* component の外から来る値(S2)の前提 */
+@property --space { syntax: "<length>"; inherits: true; initial-value: 8px; }  /* 型付きの token(既存の @property 対応) */

@@ -1,6 +1,7 @@
 # ADR-0014: テンプレートと結び付いた component 向けのスタイル言語
 
 - 状態: Proposed(設計案。この文書の文法・型・API はどれも実装していない)
+- 構文の例と、今の veriss での扱い: [experiments/style-language/](../../experiments/style-language/README.md)
 - 日付: 2026-11-15
 - Issue: 未作成
 - 対応する提案: ユーザーの意見「`@noshift` だけでなく、CSS のスーパーセットか、HTML テンプレートと合わせた専用の拡張言語があるとよいかもしれない。cascading という仕様は component 記述と噛み合っていないように感じる」
