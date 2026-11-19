@@ -789,9 +789,9 @@ export function parseLayoutCSS(sheets, diagnostic) {
           const bad = values.find(v => /^\s*(?:\d*\.)?\d+\s*$/.test(v) && Number(v) !== 0 || /^\s*(?:\d*\.)?\d+\s+[a-z%]+\s*$/i.test(v));
           if (bad) { note('W_CSS_MEDIA_INVALID_LENGTH', { params: node.params.trim(), value: bad.trim(), file: filename, line: node.source.start.line }); continue; }
         }
-        // F87: "and(" (no space) is a function token, not the keyword and: the query is invalid and never matches (measured
+        // F87: "and(", "or(" or "not(" (no space) is a function token, not the keyword: the query is invalid and never matches (measured
         // in Chromium, Firefox and WebKit). In a list only that query fails, so only a single query is handled.
-        if (node.name.toLowerCase() === 'media' && /\band\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { note('W_CSS_MEDIA_AND_SPACE', { params: node.params.trim(), file: filename, line: node.source.start.line }); continue; }
+        if (node.name.toLowerCase() === 'media' && /(?<![\w:-])(?:and|or|not)\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { note('W_CSS_MEDIA_AND_SPACE', { params: node.params.trim(), written: /(?<![\w:-])(?:and|or|not)\(/i.exec(node.params)[0], file: filename, line: node.source.start.line }); continue; }
         if (node.name.toLowerCase() === 'media' && /var\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) {
           note('W_CSS_MEDIA_VAR', { params: node.params.trim(), file: filename, line: node.source.start.line });
           continue;

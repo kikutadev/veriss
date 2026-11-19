@@ -1193,3 +1193,13 @@ test('F110: "and(", "or(" or "not(" in @supports is a function token: the condit
   // not( inside a selector() argument is the :not() pseudo-class, not the keyword
   assert.equal(codes(run('@supports selector(:not(a)){.a{height:40px}}'), 'W_CSS_SUPPORTS_INVALID').length, 0);
 });
+
+test('F87 (or, not): "or(" and "not(" in a media query are function tokens too: the query never matches (it was Unknown)', () => {
+  for (const q of ['(min-width: 0px) or(max-width: 1px)', 'not(max-width: 1px)']) {
+    const r = run(`@media ${q}{.a{height:40px}}`);
+    assert.equal(r.status, 'verified', q);
+    assert.equal(r.sizes.find(s => s.box === '.a').rect.blockSize.constant, '20', q);
+    const [hit] = codes(r, 'W_CSS_MEDIA_AND_SPACE');
+    assert.ok(hit && /(or|not) \(/.test(hit.message), q);
+  }
+});

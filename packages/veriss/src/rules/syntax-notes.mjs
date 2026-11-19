@@ -23,7 +23,7 @@ const catalog = {
   W_CSS_IMPORTANT_TYPO: note => ({ code: 'W_CSS_IMPORTANT_TYPO', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { ${note.property}: ${note.value} }: ${note.word} is not !important, so the browser drops the whole declaration. Write !important (or remove it)` }),
   W_CSS_MEDIA_AND_SPACE: note => ({ code: 'W_CSS_MEDIA_AND_SPACE', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],
-    message: `@media ${note.params}: "and(" with no space is read as a function, so the query is invalid and its rules never apply. Write ${note.params.replace(/\band\(/gi, 'and (')}` }),
+    message: `@media ${note.params}: "${note.written ?? 'and('}" with no space is read as a function, so the query is invalid and its rules never apply. Write ${note.params.replace(/(?<![\w:-])(and|or|not)\(/gi, '$1 (')}` }),
   W_CSS_MEDIA_INVALID_LENGTH: note => ({ code: 'W_CSS_MEDIA_INVALID_LENGTH', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],
     message: `@media ${note.params}: ${note.value} is not a length (${/\s/.test(note.value) ? 'no space is allowed before the unit' : 'a number other than 0 needs a unit'}), so the query is invalid and its rules never apply. Write ${note.value.replace(/\s+/g, '').replace(/^((?:\d*\.)?\d+)$/, '$1px')}` }),
   W_CSS_MEDIA_VAR: note => ({ code: 'W_CSS_MEDIA_VAR', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }],

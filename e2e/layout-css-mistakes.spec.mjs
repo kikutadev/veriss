@@ -998,7 +998,7 @@ test('F86: a misspelled !important drops the declaration; !IMPORTANT and "! impo
 
 test('F87: "and(" in a media query never matches; "and (" does', async ({page}) => {
   const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}';
-  for (const [query, expected] of [['screen and(min-width:0px)', 20], ['screen and (min-width:0px)', 40]]) {
+  for (const [query, expected] of [['screen and(min-width:0px)', 20], ['screen and (min-width:0px)', 40], ['(min-width: 0px) or(max-width: 1px)', 20], ['not(max-width: 1px)', 20]]) {
     await page.setContent(`<!doctype html><html lang="en"><head><style>${css}@media ${query}{.a{height:40px}}</style></head><body><div class="a"></div></body></html>`);
     expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height), query).toBe(expected);
     const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `${css}@media ${query}{.a{height:40px}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
