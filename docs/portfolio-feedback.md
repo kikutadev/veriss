@@ -183,3 +183,6 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 未対応は明示基準位置の無い絶対配置、native control、aspect-ratio、内容依存または flex/grid 兄弟、min() と auto margin の組合せ、View Transition selector 等。全 CSS の自動分割・全状態のモデル化・実ゲームの配信変更は行っていない。ビルド毎に取得する入力が変わるため契約が verified でない場合も再現可能な結果として保持する。
 
 最終統合ゲート: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 351 E2E passed、supervisor exit=0、639 PID追跡・残留0。自動部分幾何単独の3 E2Eも成功。実入力 manifest による ui-check/lint の Unknown exit=2、証明済み6契約の exit=0、意図的な不成立契約の exit=1 と有理数 witness (1120,700) を確認。gate 起動後の差分は文書のみ。
+
+### 次の自動証明改善
+実入力の残りから、(1) overflow の数理反例があっても解決済み矩形を独立契約に渡せること、(2) block flow の明示的な min()/max()/clamp() 幅と auto margin を既存の厳密長さモデルで評価することを目標とする。検査の未完了を成功にせず、全体判定は維持する。反例・正常例・3ブラウザの境界比較・実ビルド再評価・gate を完了条件とする。
