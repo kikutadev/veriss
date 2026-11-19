@@ -386,6 +386,7 @@
 - [x] **F109. プロパティが受け付けないキーワード**(`W_CSS_KEYWORD_INVALID`、以前は多くが Unknown): `position: center`、`display: flexbox`、`text-align: middle`、`white-space: no-wrap`、`overflow: none`、`box-sizing: border`、`cursor: hand`、`letter-spacing: auto` などは宣言ごと捨てられ、前の値が残る(3 ブラウザで 25 通り実測)。キーワードの集合が閉じていて値が単純なとき(キーワード 1 つ、overflow は 2 つ、枠の線種は 4 つまで)だけ判定し、よくある書き間違いには直し方を添える。`-webkit-` の値、`var()`、数や長さは判定しない。`vertical-align: center` は Firefox が受けるので外す
 - [x] **F110. `@supports` の `and(` / `or(` / `not(`**(`W_CSS_SUPPORTS_INVALID`、**健全性の修正**: `supports.mjs` はキーワードの直後の `(` も受け付けていて、`(display: grid) and(gap:1px)` の規則を当てていた): 空白のないキーワードは関数トークンになり、条件全体が不正で、規則は決して当たらない(3 ブラウザで 25 通り実測)。大文字小文字は問わない(`NOT`、`AND` は有効)。`selector()` などの引数の中(`:not(`)は読まない
 - [x] **F111. 不正な `@property`**(`W_CSS_PROPERTY_INVALID`、**健全性の修正**: 引用符のない `syntax: <length>` を登録していて、`inherits: false` として子へ値が届かない計算をしていた): syntax が文字列でない、知らない構文名、inherits がないか true / false でない、`*` 以外で initial-value がない、`<length>` の initial-value が絶対長さでない(単位のない数、em、%)ときは規則ごと無視され、カスタムプロパティは登録されないまま継承する(3 ブラウザで実測)。ブラウザーと同じく無視する(以前は多くが Unknown)
+- [x] **F112. 層の順番だけで負ける宣言**(`W_CSS_LAYER_OVERRIDDEN`): 詳細度では勝つ宣言(`@layer base { #x.a {…} }`)が、後の層か層の外の宣言(`.a {…}`)に負ける。カスケードは層の順を詳細度より先に見る(CSS Cascade 5 §6.4、3 ブラウザで実測)。値が同じ組、同じ層の中、勝つ側の詳細度も高い組、!important と style 属性は報告しない。宣言の組ごとに一度
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

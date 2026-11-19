@@ -1231,6 +1231,21 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
       values[property] = best.value; priorities.set(property, best.rank); sources[property] = best.origin;
     }
   }
+  // F112: a declaration that has the higher specificity but loses because its cascade layer comes earlier (or the winner
+  // is unlayered, the implicit last layer): the layer order decides before specificity (CSS Cascade 5 §6.4). Kept for
+  // the rule that reports it; the cascade itself is unchanged. Only normal, selector-matched declarations of different
+  // values are compared.
+  const layerShadowed = [];
+  for (const [property, list] of Object.entries(candidates)) {
+    const win = priorities.get(property), winner = sources[property];
+    if (!win || win[0] || win[1] || !winner) continue;
+    for (const c of list) {
+      if (c.important || c.rank[1] || c.origin === winner || !(c.rank[2] < win[2])) continue;
+      const spec = c.rank.slice(3, 6), wspec = win.slice(3, 6);
+      const higher = spec[0] !== wspec[0] ? spec[0] > wspec[0] : spec[1] !== wspec[1] ? spec[1] > wspec[1] : spec[2] > wspec[2];
+      if (higher && String(c.value) !== String(values[property])) layerShadowed.push({ property, loser: c.origin, winner, value: c.value, winnerValue: values[property] });
+    }
+  }
   for (const [name, declaration] of custom) { const issue = registeredValueProblem(name, declaration.specified ?? declaration.value ?? ''); if (issue) throw Object.assign(new Error(issue), { code: 'U_LAYOUT_VARIABLE' }); }
   const environment=variableEnvironment(custom,inherited.$variables,box.documentRoot,spend,registeredProperties),expanded=new Map(),invalid=[];
   for (const property of Object.keys(values)) {
@@ -1386,6 +1401,7 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
     }
   }
   values.$sources = sources;
+  if (layerShadowed.length) values.$layerShadowed = layerShadowed;
   values.$dormant = dormant;
   values.$overridden = overridden;
   values.$invalid = invalid;

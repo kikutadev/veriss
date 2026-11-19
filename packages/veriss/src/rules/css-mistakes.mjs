@@ -111,6 +111,18 @@ export function createCssMistakes({ report, facts, tools }) {
   // F108: a table column (col, colgroup) is not an ancestor of the cells and has no box of its own to pad or size: only
   // width, background, visibility and (with border-collapse: collapse) border act on it (CSS 2.2 §17.3; measured in
   // Chromium, Firefox and WebKit). min-width is left out: Chromium and Firefox apply it, WebKit does not.
+  // F112: the higher-specificity declaration that its cascade layer makes lose (see css.mjs). Reported once per pair of
+  // declarations, on the first box where it happens.
+  function layerShadowed(box, style) {
+    for (const s of style.$layerShadowed ?? []) {
+      const at = o => `${o.file}:${o.line}`;
+      if (box.pseudo || layoutWarnings.some(w => w.code === 'W_CSS_LAYER_OVERRIDDEN' && w.loserAt === at(s.loser) && w.winnerAt === at(s.winner) && w.property === s.property)) continue;
+      const where = o => o.layer ? `@layer ${o.layer}` : 'no layer';
+      layoutWarnings.push({ code: 'W_CSS_LAYER_OVERRIDDEN', severity: 'warning', box: box.label, path: box.path, property: s.property, selector: s.loser.selector, winner: s.winner.selector, loserAt: at(s.loser), winnerAt: at(s.winner),
+        css: [{ property: s.property, file: s.loser.file, line: s.loser.line, selector: s.loser.selector }, { property: s.property, file: s.winner.file, line: s.winner.line, selector: s.winner.selector }],
+        message: `${box.label}: ${s.loser.selector} { ${s.property}: ${s.value} } (${where(s.loser)}) has the higher specificity but loses to ${s.winner.selector} { ${s.property}: ${s.winnerValue} } (${where(s.winner)}): a ${s.winner.layer ? 'later' : 'unlayered'} rule wins over an earlier layer whatever the specificity. Move the rule into the same layer, or reorder the layers` });
+    }
+  }
   function columnInert(box, style) {
     if (box.pseudo || !['col', 'colgroup'].includes(box.tag) || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path)) return;
     const idle = ['0', '0px', 'auto', 'none', 'visible', 'baseline', 'start', 'initial', 'unset', 'inherit', 'revert', 'revert-layer', 'ua'];
@@ -123,6 +135,7 @@ export function createCssMistakes({ report, facts, tools }) {
   }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    layerShadowed(box, style);
     columnInert(box, style);
     inlineAutoMargin(box, style, ancestors?.at(-1)?.style);
     if (droppedValue(style, 'float-absolute') && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))

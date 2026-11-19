@@ -1213,3 +1213,18 @@ test('F111: an invalid @property is ignored, so the custom property stays unregi
   // valid: registered, does not inherit, so the child gets the initial value
   assert.deepEqual(child("syntax: '<length>'; inherits: false; initial-value: 0px"), ['verified', '0', 0]);
 });
+
+test('F112: a declaration with the higher specificity that loses only because of its cascade layer is reported', () => {
+  const html = '<div class="a" id="x"></div>';
+  const hits = css => codes(run(css, html), 'W_CSS_LAYER_OVERRIDDEN').map(w => `${w.selector} < ${w.winner}`);
+  // an unlayered rule beats every layered one, whatever the specificity
+  assert.deepEqual(hits('@layer base{#x.a{width:40px}}.a{width:20px}'), ['#x.a < .a']);
+  // a later layer beats an earlier one
+  assert.deepEqual(hits('@layer a, b; @layer b{.a{width:40px}} @layer a{#x.a{width:60px}}'), ['#x.a < .a']);
+  // not reported: the winner also has the higher specificity, the values are equal, or the same layer
+  assert.deepEqual(hits('@layer base{.a{width:40px}}#x.a{width:20px}'), []);
+  assert.deepEqual(hits('@layer base{#x.a{width:20px}}.a{width:20px}'), []);
+  assert.deepEqual(hits('@layer base{#x.a{width:40px} .a{width:20px}}'), []);
+  // the analysis itself is the browser's: the unlayered 20px wins
+  assert.equal(run('@layer base{#x.a{width:40px}}.a{width:20px}', html).sizes.find(s => s.box === '#x').rect.inlineSize.constant, '20');
+});

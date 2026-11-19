@@ -1287,3 +1287,15 @@ test('F111: an invalid @property is ignored by the browser (the property stays u
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_PROPERTY_INVALID'), rule).toBe(ignored);
   }
 });
+
+test('F112: a higher-specificity declaration in an earlier (or any) layer loses to a later or unlayered one', async ({page}) => {
+  const base = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}';
+  for (const [css, width, reported] of [['@layer base{#x.a{width:40px}}.a{width:20px}', 20, true], ['@layer a, b; @layer b{.a{width:40px}} @layer a{#x.a{width:60px}}', 40, true],
+    ['@layer base{.a{width:40px}}#x.a{width:20px}', 20, false], ['@layer base{#x.a{width:40px} .a{width:20px}}', 40, false]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${base}${css}</style></head><body><div class="a" id="x"></div></body></html>`);
+    expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().width), css).toBe(width);
+    const r = analyzeHTML('<html lang="en"><body><div class="a" id="x"></div></body></html>', {name: 'P', css: `${base}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.sizes.find(s => s.box === '#x').rect.inlineSize.constant, css).toBe(String(width));
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_LAYER_OVERRIDDEN'), css).toBe(reported);
+  }
+});
