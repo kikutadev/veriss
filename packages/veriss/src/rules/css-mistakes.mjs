@@ -155,8 +155,21 @@ export function createCssMistakes({ report, facts, tools }) {
       message: by ? `${box.label}: transform-style: preserve-3d is flattened by ${by.join(', ')} on the same element: its children's 3D transforms are painted into its plane, as with flat. Move ${by.length === 1 ? 'that property' : 'those properties'} to a wrapper or to the children`
         : `${box.label}: transform-style: preserve-3d has no effect on a display: inline box (it is not transformable). Make it inline-block or block` });
   }
+  // F118: an absolutely positioned (or fixed) box is not a flex item: flex-grow, flex-shrink, flex-basis (and flex) and
+  // order do not size or move it, in a flex, grid or block parent alike (measured in Chromium, Firefox and WebKit:
+  // align-self does move it in flex and grid, and grid placement in a grid, so those are not reported).
+  function outOfFlowFlexInert(box, style) {
+    if (box.pseudo || !['absolute', 'fixed'].includes(String(style.position)) && !style.$fixed) return;
+    const idle = { 'flex-grow': ['0'], 'flex-shrink': ['1'], 'flex-basis': ['auto'], order: ['0'] };
+    const found = Object.keys(idle).filter(key => style.$sources?.[key] && !idle[key].includes(String(style[key])) && !['initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(style[key])));
+    if (!found.length || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(found[0]))) return;
+    const position = style.$fixed ? 'fixed' : style.position;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found, css: found.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+      message: `${box.label}: ${found.map(key => `${key}: ${style[key]}`).join(', ')} ${found.length === 1 ? 'has' : 'have'} no effect: it is position: ${position}, so it is not a flex item and is placed by its insets (top / left / right / bottom), width and height. Size it with width, or take position: ${position} off to make it an item` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    outOfFlowFlexInert(box, style);
     preserve3dInert(box, style, ancestors?.at(-1)?.style);
     layerShadowed(box, style);
     columnInert(box, style);
@@ -618,5 +631,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

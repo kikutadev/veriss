@@ -1293,3 +1293,16 @@ test('F117: transform-style: preserve-3d contains fixed children (it was Unknown
   assert.equal(inert(run('.a{height:auto}.p{display:inline-block;transform-style:preserve-3d}', '<div class="a"><span class="p"></span></div>')).length, 0);
   assert.equal(run('.a{backface-visibility:hidden;transform-style:flat}').status, 'verified');
 });
+
+test('F118: flex factors and order on an absolute or fixed box do nothing, whatever its parent (align-self is not reported)', () => {
+  const html = '<div class="p"><div class="s"></div><div class="x"></div></div>';
+  const inert = (parent, e) => codes(run(`.p{${parent};position:relative;width:300px;height:200px}.s{width:50px;height:50px}.x{position:absolute;top:0;left:0;width:20px;height:20px;${e}}`, html), 'W_LAYOUT_DECLARATION_INERT').filter(w => w.box === '.x').flatMap(w => w.properties);
+  for (const parent of ['display:flex', 'display:grid;grid-template-columns:100px 100px', 'display:block']) {
+    assert.deepEqual(inert(parent, 'flex-grow:1'), ['flex-grow'], parent);
+    assert.deepEqual(inert(parent, 'flex:1'), ['flex-grow', 'flex-basis'], parent);
+    assert.deepEqual(inert(parent, 'order:-1'), ['order'], parent);
+    assert.deepEqual(inert(parent, 'align-self:center'), [], parent);
+    assert.deepEqual(inert(parent, 'flex-grow:0;order:0'), [], parent);
+  }
+  assert.match(codes(run('.x{position:fixed;top:0;left:0;width:20px;height:20px;flex-basis:100px}', '<div class="x"></div>'), 'W_LAYOUT_DECLARATION_INERT')[0]?.message ?? '', /position: fixed, so it is not a flex item/);
+});

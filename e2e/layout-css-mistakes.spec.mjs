@@ -1375,3 +1375,22 @@ test('F117: transform-style: preserve-3d contains fixed children and makes a sta
   const r = analyzeHTML('<html lang="en"><body><div class="a"><span class="p"></span></div></body></html>', {name: 'P', css: `${base}.a{height:auto}.p{transform-style:preserve-3d}`, viewport: view});
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && /display: inline/.test(w.message))).toBe(true);
 });
+
+test('F118: flex factors and order do not move or size an absolute child (flex, grid or block parent); align-self does', async ({page}) => {
+  const view = {min: 320, max: 1200, height: {min: 300, max: 900}};
+  for (const parent of ['display:flex', 'display:grid;grid-template-columns:100px 100px', 'display:block']) {
+    const css = e => `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{${parent};position:relative;width:300px;height:200px}.s{width:50px;height:50px}.x{position:absolute;top:0;left:0;width:20px;height:20px;${e}}`;
+    const rect = async e => { await page.setContent(`<!doctype html><style>${css(e)}</style><div class="p"><div class="s"></div><div class="x"></div></div>`); return page.evaluate(() => { const r = document.querySelector('.x').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }); };
+    const plain = await rect('');
+    for (const e of ['flex-grow:1', 'flex:1', 'flex-shrink:5', 'flex-basis:100px', 'order:-1']) {
+      expect(await rect(e), `${parent} ${e}`).toEqual(plain);
+      const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="s"></div><div class="x"></div></div></body></html>', {name: 'P', css: css(e), viewport: view});
+      expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.x'), `${parent} ${e}`).toBe(true);
+    }
+    // Without top / bottom, align-self moves it in flex and grid (so it is not reported anywhere).
+    const free = async e => { await page.setContent(`<!doctype html><style>${css(e).replace('top:0;', '')}</style><div class="p"><div class="s"></div><div class="x"></div></div>`); return page.evaluate(() => document.querySelector('.x').getBoundingClientRect().top); };
+    if (parent !== 'display:block') expect(await free('align-self:end'), parent).toBe(180);
+    const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="s"></div><div class="x"></div></div></body></html>', {name: 'P', css: css('align-self:end'), viewport: view});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.x')).toBe(false);
+  }
+});

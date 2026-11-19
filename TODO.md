@@ -18,7 +18,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 |---|---|---|
 | 1. 宣言ごと捨てられる値(構文) | 11 / 11 | 済 |
 | 2. at-rule(`@media` ほか) | 8 / 8 | 済 |
-| 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 9 / 10 | ほぼ済 |
+| 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 10 / 10 | 済 |
 | 4. 表 | 9 / 9 | 済 |
 | 5. テキストと折り返し | 8 / 9 | ほぼ済 |
 | 6. リスト・マーカー・カウンター | 4 / 5 | ほぼ済(1 つ保留) |
@@ -26,7 +26,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 8. フォーム部品・置換要素 | 4 / 8 | 進行中 |
 | 9. セレクタ × DOM(状態・構造) | 8 / 8 | 済 |
 | 10. ブラウザで結果が違うもの | 1 / 5 | 着手 |
-| 合計 | 67 / 79(85%) | |
+| 合計 | 68 / 79(86%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -66,7 +66,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] absolute の `float`、`margin: auto`(F77、F38)
 - [x] `columns` を flex / grid に、段組の外の `column-span`(F34、F81)
 - [x] `aspect-ratio` を表と inline に(F98)
-- [ ] absolute / fixed の子の flex 項目プロパティ(`order`、`flex-grow`)。現状は解析が Unknown
+- [x] absolute / fixed の子の flex 項目プロパティ(`order`、`flex-grow`)(F118)。flex の中の absolute の子の配置そのものは Unknown のまま(flex の経路で containing block の大きさが最後に決まるため。insets が両軸で決まる子から対応する余地あり)
 
 ### 4. 表
 
@@ -201,6 +201,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F118. absolute / fixed の箱の flex 項目プロパティ
 - F117. `transform-style: preserve-3d` の平坦化と fixed の閉じ込め
 - F116. 不正な `will-change`
 - F115. 不正な `background` ショートハンド
