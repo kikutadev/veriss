@@ -81,6 +81,8 @@ export const noPseudoHost = box => ['img', 'select', 'textarea', 'iframe', 'vide
 const geometry = new Set(['aspect-ratio', 'display', 'appearance', 'box-sizing', 'inline-size', 'min-inline-size', 'max-inline-size', 'column-gap', 'grid-template-columns', 'grid-template-areas', 'grid-column', 'grid-row', 'overflow-x', 'overflow-y', 'scrollbar-gutter', 'scrollbar-width', 'white-space', 'overflow-wrap', 'float', 'position', 'writing-mode', 'direction', 'block-size', 'min-block-size', 'max-block-size', 'row-gap', 'grid-template-rows', 'grid-auto-rows', 'grid-auto-flow', 'container-type', 'container-name', 'align-items', 'align-self', 'align-content', 'flex-direction', 'flex-wrap', 'flex-grow', 'flex-shrink', 'flex-basis', 'justify-content', 'order']);
 // Text/font metrics come from trusted caller contracts. Paint is not validated.
 // revert-layer (checklist C4) passes through every property like the other CSS-wide keywords; the cascade resolves it.
+// Properties that take only a length (or a keyword / percentage), never a bare number (F93).
+const lengthOnly = /^(?:(?:min-|max-)?(?:width|height|inline-size|block-size)|margin(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|padding(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|top|right|bottom|left|inset(?:-(?:inline|block)(?:-(?:start|end))?)?|gap|row-gap|column-gap|font-size|border-(?:top-|bottom-)?(?:left-|right-)?radius|border-(?:top|right|bottom|left)-width|border-width|outline-width|outline-offset|letter-spacing|word-spacing|text-indent|flex-basis)$/;
 const wide = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
 const decoration = /^(?:background-(?:position|size|repeat|clip|origin|attachment)|border-radius|text-shadow|text-decoration-(?:color|style|thickness)|text-underline-offset|transition-behavior|list-style-(?:position|image))$/;
 // Properties a :hover/:focus rule may set: they repaint (or restack) without changing geometry.
@@ -629,7 +631,7 @@ function flexShorthand(value) {
 }
 
 export function parseLayoutCSS(sheets, diagnostic) {
-  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], unitlessLength = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
@@ -931,6 +933,14 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // (measured in Chromium, Firefox and WebKit). PostCSS keeps it in the value; it is dropped here and reported.
         { const bang = !declaration.prop.startsWith('--') && !declaration.important && /!\s*([a-z][\w-]*)\s*$/i.exec(declaration.value);
           if (bang && bang[1].toLowerCase() !== 'important') { importantTypo.push({ property: declaration.prop.toLowerCase(), value: declaration.value.trim(), word: bang[0].replace(/\s+/g, ''), selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F93: a bare number other than 0 where only a length is allowed (width: 100) is invalid in standards mode — the
+        // mode analysed here — so the browser drops the declaration (measured in Chromium, Firefox and WebKit; only quirks
+        // mode, in WebKit, takes it as px).
+        { const prop = declaration.prop.toLowerCase(), value = declaration.value.trim();
+          if (lengthOnly.test(prop) && !/[(]/.test(value)) {
+            const bare = value.split(/[\s/]+/).find(t => /^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(t) && Number(t) !== 0);
+            if (bare) { unitlessLength.push({ property: prop, value, bare, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; }
+          } }
         // F89: + or - without white space on both sides in calc() / min() / max() / clamp() makes the value invalid: the
         // browser drops the declaration (measured in Chromium, Firefox and WebKit), so it is dropped here too.
         { const bad = !declaration.prop.startsWith('--') && calcOperatorProblem(declaration.value);
@@ -963,7 +973,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
     if (!missingKeyframes.some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) missingKeyframes.push({ name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
+  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, unitlessLength, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
 }
 
 // The UA default family and the user's default font size are not author

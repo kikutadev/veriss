@@ -1022,3 +1022,29 @@ test('F89: + and - in calc() need spaces on both sides; without them the declara
     expect((r.layoutWarnings ?? []).some(x => x.code === 'W_CSS_CALC_OPERATOR_SPACE'), value).toBe(expected === 800);
   }
 });
+
+test('F92: gap on a block container does nothing, with or without children', async ({page}) => {
+  for (const html of ['<div class="a"><div class="c"></div><div class="c"></div></div>', '<div class="a"></div>']) {
+    const base = '.a{width:100px;min-height:5px}.c{height:10px}';
+    expect(await pixelsAndBoxes(page, `${base}.a{gap:20px}`, html), html).toEqual(await pixelsAndBoxes(page, base, html));
+    expect(await pixelsAndBoxes(page, `${base}.a{display:inline-block;gap:20px}`, html), html).toEqual(await pixelsAndBoxes(page, `${base}.a{display:inline-block}`, html));
+  }
+  // with display: flex the gap spaces the items (so the check above is not vacuous)
+  const flex = '.a{display:flex;flex-direction:column;width:100px}.c{height:10px}', two = '<div class="a"><div class="c"></div><div class="c"></div></div>';
+  expect(await pixelsAndBoxes(page, `${flex}.a{gap:20px}`, two)).not.toEqual(await pixelsAndBoxes(page, flex, two));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;gap:20px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('row-gap'))).toBe(true);
+});
+
+test('F93: a unitless length other than 0 drops the declaration in standards mode', async ({page}) => {
+  const base = '.a{width:200px;height:20px}';
+  for (const decl of ['width:100', 'height:40', 'margin-top:10', 'padding:5', 'margin:0 10', 'border-radius:4', 'font-size:30', 'letter-spacing:2', 'inset:5;position:relative']) {
+    expect(await pixelsAndBoxes(page, `${base}.a{${decl}}`, '<div class="a">ab</div>'), decl).toEqual(await pixelsAndBoxes(page, base, '<div class="a">ab</div>'));
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}.a{${decl}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_UNITLESS_LENGTH'), decl).toBe(true);
+  }
+  // 0 needs no unit, and with px the declaration applies (so the check above is not vacuous)
+  expect(await pixelsAndBoxes(page, `${base}.a{width:100px}`, '<div class="a">ab</div>')).not.toEqual(await pixelsAndBoxes(page, base, '<div class="a">ab</div>'));
+  expect(await pixelsAndBoxes(page, `${base}.a{width:0}`, '<div class="a">ab</div>')).not.toEqual(await pixelsAndBoxes(page, base, '<div class="a">ab</div>'));
+});

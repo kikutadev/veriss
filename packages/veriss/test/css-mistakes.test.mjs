@@ -970,3 +970,29 @@ test('F89: calc(100%-10px) is invalid: the declaration is dropped (it was comput
   assert.equal(ok.sizes.find(s => s.box === '.a').rect.inlineSize.constant, '-10');
   assert.equal(codes(ok, 'W_CSS_CALC_OPERATOR_SPACE').length, 0);
 });
+
+test('F92: gap on a block container (not flex, grid or multi-column) does nothing', () => {
+  const html = '<div class="a"><div class="c"></div><div class="c"></div></div>';
+  const r = css => run(`.a{height:auto}.c{height:10px}${css}`, html);
+  const inert = css => codes(r(css), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.some(p => /gap$/.test(p)));
+  const block = r('.a{gap:20px}');
+  assert.equal(block.status, 'verified');
+  assert.equal(Number(block.sizes.find(s => s.box === '.a').rect.blockSize.constant), 20);
+  assert.ok(inert('.a{gap:20px}'));
+  assert.ok(codes(run('.a{gap:20px}'), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('row-gap')), 'a block with nothing inside');
+  assert.ok(codes(run('.a{display:inline-block;row-gap:20px}'), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('row-gap')), 'inline-block');
+  assert.ok(!inert('.a{display:flex;gap:20px}'));
+  assert.ok(!inert('.a{display:grid;gap:20px}'));
+  assert.ok(!inert('.a{gap:normal}'));
+});
+
+test('F93: a unitless length other than 0 is invalid in standards mode: the declaration is dropped', () => {
+  for (const decl of ['width:100', 'height:40', 'margin-top:10', 'padding:5', 'margin:0 10']) {
+    const r = run(`.a{${decl}}`);
+    assert.equal(r.status, 'verified', decl);
+    assert.equal(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), 20, decl);
+    assert.equal(codes(r, 'W_CSS_UNITLESS_LENGTH').length, 1, decl);
+  }
+  for (const decl of ['width:0', 'margin:0 auto', 'line-height:1.5', 'opacity:.5', 'flex:1', 'z-index:2', 'width:calc(100px * 2)'])
+    assert.equal(codes(run(`.a{${decl}}`), 'W_CSS_UNITLESS_LENGTH').length, 0, decl);
+});
