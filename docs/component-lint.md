@@ -215,3 +215,14 @@ script/style/link が配置に影響しないという明示的な前提の下�
 CSS の取得・順序・動的な DOM プロパティは呼び出し元で確認する。
 
 API: `analyzeSnapshots({states: [{html, choices}], css, contracts}, options)` (adapter-core)。
+
+例えば最大10桁のスコア表示を検査する場合、manifest に次の boxes を追加する
+（CSS のフォント設定と一致する必要がある）。
+
+```json
+{"boxes":{"#gold":{"text":{"font":{"family":"Roboto","size":16,"lineHeight":24,"weight":400},
+                         "characters":"0123456789","maxLength":10},"wrap":"nowrap"}}}
+```
+
+`--font Roboto=Roboto.ttf` を指定する。Roboto fixture で幅180pxの領域は通過し、
+20pxの領域では必要幅89.94pxの E_LAYOUT_CONTENT を検出することを CLI で確認済み。
