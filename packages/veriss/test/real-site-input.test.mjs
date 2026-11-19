@@ -206,3 +206,19 @@ test('viewport-dependent padding and gaps compose inside a block and responsive 
   assert.equal(bad.status,'violated');
   assert.ok(bad.diagnostics.some(d=>d.code==='E_LAYOUT_TRACKS'&&d.witness));
 });
+
+test('block-flow auto margins use the same exact used width as responsive width constraints',()=>{
+ const html='<!doctype html><html lang="en"><head><title>T</title></head><body><main id="x"></main></body></html>';
+ const opts={viewport:{min:320,max:1000,height:{min:400,max:900}},scrollbars:[{name:'overlay',inlineSize:0,blockSize:0}]};
+ const r=analyzeHTML(html,{...opts,css:'*{box-sizing:border-box;margin:0}#x{width:min(100%,520px);height:100px;margin:0 auto;border-inline:2px solid #123456}'});
+ assert.equal(r.status,'verified',JSON.stringify(r.diagnostics));
+ const rows=r.sizes.filter(s=>s.box==='#x');
+ assert.ok(rows.length>=2);
+ const wide=rows.find(s=>s.range.max===1000);
+ assert.equal(wide.rect.inlineStart.coefficient,'1/2');
+ assert.equal(wide.rect.inlineStart.constant,'-260');
+ assert.equal(wide.rect.inlineSize.constant,'520');
+ const narrow=rows.find(s=>s.range.min===320);
+ assert.equal(narrow.rect.inlineStart.constant,'0');
+ assert.equal(narrow.rect.inlineSize.coefficient,'1');
+});
