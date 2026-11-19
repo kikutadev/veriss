@@ -826,3 +826,11 @@ test('F74: a relative box with both left and right (or top and bottom) ignores o
   assert.equal(w('right:30px').length, 0);
   assert.equal(codes(run('.x{position:sticky;top:0;bottom:0}'), 'W_LAYOUT_DECLARATION_INERT').filter(x => x.properties.includes('bottom')).length, 0);
 });
+
+test('F75: line-height on a select drawn by the browser does nothing', () => {
+  const w = css => codes(run(`.x{${css}}`, '<select class="x" aria-label="q"><option>a</option></select>'), 'W_LAYOUT_DECLARATION_INERT').filter(x => x.properties.includes('line-height'));
+  const [hit] = w('line-height:50px');
+  assert.ok(hit && /appearance: none/.test(hit.message));
+  assert.equal(w('appearance:none;line-height:50px').length, 0);
+  assert.equal(codes(run('.x{line-height:50px}', '<input class="x" aria-label="q">'), 'W_LAYOUT_DECLARATION_INERT').filter(x => x.properties.includes('line-height')).length, 0);
+});

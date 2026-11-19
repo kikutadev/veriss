@@ -851,3 +851,13 @@ test('F74: a relative box with both insets on an axis ignores one', async ({page
     expect((r.layoutWarnings ?? []).find(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && ['left', 'right', 'top', 'bottom'].includes(w.properties[0]))?.properties, `${dir} ${c}`).toEqual([ignored]);
   }
 });
+
+test('F75: line-height on a select of appearance auto changes nothing', async ({page}) => {
+  for (const [extra, inert] of [['', true], ['appearance:none;', false]]) {
+    const html = '<select class="x" aria-label="q"><option>a</option></select>';
+    const m = async css => { await page.setContent(`<!doctype html><html lang="en"><head><style>.x{${extra}${css}}</style></head><body>${html}</body></html>`); await page.waitForTimeout(30); return (await page.screenshot()).toString('base64') + await page.evaluate(() => document.querySelector('.x').getBoundingClientRect().height); };
+    expect(await m('') === await m('line-height:50px'), extra || 'auto').toBe(inert);
+    const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `.x{${extra}line-height:50px}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('line-height')), extra || 'auto').toBe(inert);
+  }
+});

@@ -348,6 +348,9 @@
 - [x] **F74. 両側の inset を書いた relative**(`W_LAYOUT_DECLARATION_INERT`): position: relative の箱は、left と right の両方が
   あると left(rtl では right)だけ、top と bottom の両方があると top だけで動く(CSS 2.2 §9.4.3。3 つのブラウザーで、使われない側を
   変えても位置が同じ)。使われない側を報告する。sticky は両側が意味を持つので除く。
+- [x] **F75. ブラウザーが描く select の `line-height`**(`W_LAYOUT_DECLARATION_INERT`): appearance: auto の select は自分の高さで
+  描かれ、line-height で大きさも画素も変わらない(3 つのブラウザーで測った。文字の input・button では高さが変わり、select も
+  appearance: none なら変わる)。height・padding か appearance: none を勧める。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
   (消えない)ので報告しない。
 

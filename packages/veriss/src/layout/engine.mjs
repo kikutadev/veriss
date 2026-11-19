@@ -544,6 +544,11 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    // F75: a select of appearance auto is drawn by the browser at its own height: line-height changes neither its size nor
+    // its pixels (measured in Chromium, Firefox and WebKit; with appearance: none it does).
+    if (!box.pseudo && box.tag === 'select' && style.appearance === 'auto' && style.$sources?.['line-height'] && !['normal', 'initial', 'inherit', 'unset'].includes(String(style.$sources['line-height'].specified ?? style['line-height'])) && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('line-height')))
+      layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['line-height'], css: [{ property: 'line-height', file: style.$sources['line-height'].file, line: style.$sources['line-height'].line, selector: style.$sources['line-height'].selector }],
+        message: `${box.label}: line-height has no effect on a select drawn by the browser (appearance: auto keeps its own height). Use height or padding, or appearance: none to draw it yourself` });
     // F74: a relative box with both insets on an axis uses one: left (right in rtl) and top; the other does nothing
     // (CSS 2.2 §9.4.3; measured in Chromium, Firefox and WebKit).
     if (!box.pseudo && style.position === 'relative' && !style.$sticky) {
