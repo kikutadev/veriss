@@ -127,3 +127,29 @@ test('viewport-fixed horizontal translation checks painted fit, not the pre-tran
   assert.equal(right.status,'violated');
   assert.ok(right.diagnostics.some(d=>d.code==='E_LAYOUT_ABSOLUTE_END'));
 });
+
+test('minified unitless zero rotation is identical to zero degrees',()=>{
+  const html='<main><div class="item"></div></main>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}.item{width:100px;height:40px;transform:rotate(0deg)}';
+  const options={viewport:{min:320,max:1920,height:{min:320,max:1080}},integrity:true};
+  const ref=analyzeHTML(html,{...options,css});
+  assert.equal(ref.status,'verified');
+  const actual=analyzeHTML(html,{...options,css:css.replace('0deg','0')});
+  assert.equal(actual.status,'verified');
+  assert.deepEqual(actual.sizes,ref.sizes);
+  assert.equal(analyzeHTML(html,{...options,css:css.replace('0deg','1')}).status,'unknown');
+});
+
+test('viewport flex basis variants use the same fixed viewport profile',()=>{
+  const html='<main><div class="item"></div></main>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}main{display:flex;height:300px}.item{flex:0 0 38vh;min-width:0;min-height:0}';
+  const options={viewport:{min:320,max:1920,height:{min:320,max:600}}};
+  const ref=analyzeHTML(html,{...options,css});
+  assert.equal(ref.status,'verified');
+  for(const unit of ['dvh','svh','lvh']){
+    const report=analyzeHTML(html,{...options,css:css.replace('38vh','38'+unit)});
+    assert.equal(report.status,'verified',JSON.stringify(report.diagnostics));
+    assert.deepEqual(report.sizes,ref.sizes);
+  }
+  assert.equal(analyzeHTML(html,{...options,css:css.replace('display:flex','display:flex;flex-direction:column').replace('38vh','38dvh')}).status,'unknown');
+});

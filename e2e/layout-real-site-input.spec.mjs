@@ -149,3 +149,18 @@ test('fixed translation fit follows the rendered box at responsive boundaries',a
     expect(outside).toBe(!expected);
   }
 });
+
+test('minified rotation and dynamic viewport flex lengths match in a fixed viewport',async({page})=>{
+  const html='<!doctype html><html lang="en"><body><main><div class="item"></div></main></body></html>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}main{display:flex;height:300px}.item{flex:0 0 38dvh;min-width:0;min-height:0;transform:rotate(0)}';
+  const report=analyzeHTML(html,{css,viewport:{min:320,max:1920,height:{min:320,max:600}},integrity:true});
+  expect(report.status,JSON.stringify(report.diagnostics)).toBe('verified');
+  await page.setContent(html.replace('<body>','<head><style>'+css+'</style></head><body>'));
+  for(const [width,height] of [[320,320],[650,510],[1920,600]]){
+    await page.setViewportSize({width,height});
+    const actual=await page.locator('.item').evaluate(n=>({width:n.getBoundingClientRect().width,transform:getComputedStyle(n).transform}));
+    const a=report.sizes.find(s=>s.box==='.item').rect.inlineSize;
+    expect(actual.width).toBeCloseTo(Number(a.heightCoefficient.split('/')[0])/Number(a.heightCoefficient.split('/')[1])*height,1);
+    expect(actual.transform).toBe('matrix(1, 0, 0, 1, 0, 0)');
+  }
+});

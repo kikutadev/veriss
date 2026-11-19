@@ -498,7 +498,7 @@ function expand(property, value) {
         const [sx, sy] = name === 'scalex' ? [factor(parts[0]), q(1)] : name === 'scaley' ? [q(1), factor(parts[0])] : [factor(parts[0]), factor(parts[1] ?? parts[0])];
         A = times(A, [sx, q(0), q(0), sy]);
       } else if (name === 'rotate') {
-        const m = /^\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))(deg|turn|grad|rad)\s*$/.exec(args); if (!m) fail();
+        const m = /^\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))(deg|turn|grad|rad)\s*$/.exec(args) ?? (/^\s*[-+]?0+(?:\.0+)?\s*$/.test(args) ? [args, '0', 'deg'] : null); if (!m) fail();
         // In rad only 0 is a whole number of quarter turns (π is irrational): any other angle is an arbitrary rotation.
         const quarters = m[2] === 'rad' ? (Number(m[1]) === 0 ? 0 : 0.5) : Number(m[1]) * (m[2] === 'turn' ? 4 : m[2] === 'grad' ? 1 / 100 : 1 / 90);
         if (Math.abs(quarters - Math.round(quarters)) > 1e-9) {
@@ -660,7 +660,7 @@ function expand(property, value) {
 // zero is a flex factor unless two factors already precede it.
 const flexNumber = /^\d+(?:\.\d+)?$/;
 // (calc() and vw / vh bases too, checklist D2: flexItem decides whether they are modeled.)
-const flexBasis = value => value === 'auto' || value === 'content' || /^\d+(?:\.\d+)?(?:px|%|vw|vh)$/.test(value) || /^(?:calc|min|max|clamp)\(.*\)$/.test(value);
+const flexBasis = value => value === 'auto' || value === 'content' || /^\d+(?:\.\d+)?(?:px|%|[sld]?(?:vw|vh))$/.test(value) || /^(?:calc|min|max|clamp)\(.*\)$/.test(value);
 function flexShorthand(value) {
   if (wide.has(value)) return ['flex-grow', 'flex-shrink', 'flex-basis'].map(key => [key, value]);
   if (value === 'none') return [['flex-grow', '0'], ['flex-shrink', '0'], ['flex-basis', 'auto']];
