@@ -1306,3 +1306,13 @@ test('F118: flex factors and order on an absolute or fixed box do nothing, whate
   }
   assert.match(codes(run('.x{position:fixed;top:0;left:0;width:20px;height:20px;flex-basis:100px}', '<div class="x"></div>'), 'W_LAYOUT_DECLARATION_INERT')[0]?.message ?? '', /position: fixed, so it is not a flex item/);
 });
+
+test('F119: text-wrap: balance / pretty / stable after white-space: nowrap on the same element turns wrapping back on (pretty: not in Firefox)', () => {
+  const html = '<div class="p"><div class="x">aaa bbb</div></div>', hit = css => codes(run(`.x{width:100px}${css}`, html), 'W_CSS_WRAP_RESTORED');
+  for (const css of ['.x{white-space:nowrap;text-wrap:balance}', '.x{white-space:pre}.x{text-wrap:stable}', '.x{white-space:nowrap}.x{text-wrap:pretty}']) assert.equal(hit(css).length, 1, css);
+  assert.deepEqual(hit('.x{white-space:nowrap;text-wrap:pretty}')[0].browsers, { wraps: ['chromium', 'webkit'], oneLine: ['firefox'] });
+  assert.equal(hit('.x{white-space:nowrap;text-wrap:balance}')[0].browsers, undefined);
+  // the white-space wins, the style longhand, the mode said outright, or white-space from the parent: not reported
+  for (const css of ['.x{text-wrap:balance;white-space:nowrap}', '.x{white-space:nowrap;text-wrap-style:balance}', '.x{white-space:nowrap;text-wrap:wrap}', '.x{white-space:nowrap;text-wrap-mode:wrap}', '.p{white-space:nowrap}.x{text-wrap:balance}'])
+    assert.equal(hit(css).length, 0, css);
+});

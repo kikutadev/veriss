@@ -167,8 +167,21 @@ export function createCssMistakes({ report, facts, tools }) {
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found, css: found.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
       message: `${box.label}: ${found.map(key => `${key}: ${style[key]}`).join(', ')} ${found.length === 1 ? 'has' : 'have'} no effect: it is position: ${position}, so it is not a flex item and is placed by its insets (top / left / right / bottom), width and height. Size it with width, or take position: ${position} off to make it an item` });
   }
+  // F119: text-wrap: balance / pretty / stable after white-space: nowrap / pre on the same element turns wrapping back on:
+  // the shorthand also sets text-wrap-mode: wrap (measured in Chromium, Firefox and WebKit). The author meant the style
+  // of wrapping, not the mode (text-wrap: wrap or text-wrap-mode: wrap mean it and are not reported). Firefox (measured
+  // with 157) does not take text-wrap: pretty and drops it, so there the text stays on one line.
+  function wrapRestored(box, style) {
+    const w = style.$wrapRestored, by = String(w?.by.wrapShorthand ?? '').toLowerCase();
+    if (box.pseudo || !['balance', 'pretty', 'stable'].includes(by) || layoutWarnings.some(x => x.code === 'W_CSS_WRAP_RESTORED' && x.path === box.path)) return;
+    const pretty = by === 'pretty';
+    layoutWarnings.push({ code: 'W_CSS_WRAP_RESTORED', severity: 'warning', box: box.label, path: box.path, ...(pretty ? { browsers: { wraps: ['chromium', 'webkit'], oneLine: ['firefox'] } } : {}),
+      css: [{ property: 'white-space', file: w.from.file, line: w.from.line, selector: w.from.selector }, { property: 'text-wrap', file: w.by.file, line: w.by.line, selector: w.by.selector }],
+      message: `${box.label}: text-wrap: ${by} (${w.by.selector}) also sets text-wrap-mode: wrap, so it undoes white-space: ${w.whiteSpace} (${w.from.selector}) and the text wraps again.${pretty ? ' Firefox does not take text-wrap: pretty and drops it, so there the text stays on one line: the page differs by browser.' : ''} Write text-wrap-style: ${by} to change only how wrapping text breaks, or drop it to keep one line` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    wrapRestored(box, style);
     outOfFlowFlexInert(box, style);
     preserve3dInert(box, style, ancestors?.at(-1)?.style);
     layerShadowed(box, style);
@@ -631,5 +644,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

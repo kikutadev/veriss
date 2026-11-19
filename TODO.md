@@ -20,13 +20,13 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 2. at-rule(`@media` ほか) | 8 / 8 | 済 |
 | 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 10 / 10 | 済 |
 | 4. 表 | 9 / 9 | 済 |
-| 5. テキストと折り返し | 8 / 9 | ほぼ済 |
+| 5. テキストと折り返し | 9 / 9 | 済 |
 | 6. リスト・マーカー・カウンター | 4 / 5 | ほぼ済(1 つ保留) |
 | 7. transform・重なり・描画 | 5 / 6 | ほぼ済 |
 | 8. フォーム部品・置換要素 | 4 / 8 | 進行中 |
 | 9. セレクタ × DOM(状態・構造) | 8 / 8 | 済 |
 | 10. ブラウザで結果が違うもの | 1 / 5 | 着手 |
-| 合計 | 68 / 79(86%) | |
+| 合計 | 69 / 79(87%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -90,7 +90,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] `text-decoration: none` で祖先の線は消えない(F58)
 - [x] `letter-spacing` / `word-spacing` の不正: 3 ブラウザで `%` は有効、単位のない数は F93 で報告済み、と確かめた
 - [x] `letter-spacing` / `word-spacing` の `auto`(F109 で報告)
-- [ ] `text-wrap: balance` が `white-space: nowrap` を打ち消す(折り返しが戻る)ことの知らせ
+- [x] `text-wrap: balance` が `white-space: nowrap` を打ち消す(折り返しが戻る)ことの知らせ(F119。`text-wrap: pretty` は Firefox で捨てられる)
 
 ### 6. リスト・マーカー・カウンター
 
@@ -201,6 +201,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F119. `white-space: nowrap` の後の `text-wrap: balance`
 - F118. absolute / fixed の箱の flex 項目プロパティ
 - F117. `transform-style: preserve-3d` の平坦化と fixed の閉じ込め
 - F116. 不正な `will-change`

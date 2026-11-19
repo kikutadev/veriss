@@ -1394,3 +1394,13 @@ test('F118: flex factors and order do not move or size an absolute child (flex, 
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.x')).toBe(false);
   }
 });
+
+test('F119: text-wrap: balance after white-space: nowrap wraps again; text-wrap: pretty is dropped by Firefox', async ({page, browserName}) => {
+  for (const [css, wraps, reported] of [['white-space:nowrap;text-wrap:balance', true, true], ['white-space:pre;text-wrap:stable', true, true], ['white-space:nowrap;text-wrap:pretty', browserName !== 'firefox', true],
+    ['text-wrap:balance;white-space:nowrap', false, false], ['white-space:nowrap;text-wrap-style:balance', false, false], ['white-space:nowrap;text-wrap:wrap', true, false]]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.x{width:100px;font:16px/20px monospace;${css}}</style><div class="x">aaa bbb ccc ddd eee fff</div>`);
+    expect(await page.evaluate(() => document.querySelector('.x').getBoundingClientRect().height), css).toBe(wraps ? 60 : 20);
+    const r = analyzeHTML('<html lang="en"><body><div class="x">aaa bbb</div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.x{width:100px;${css}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_WRAP_RESTORED'), css).toBe(reported);
+  }
+});

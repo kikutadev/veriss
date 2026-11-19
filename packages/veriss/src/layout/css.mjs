@@ -1042,7 +1042,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
             // A logical inline side (padding-inline-start, margin-inline, inset-inline-end, …) is stored as its ltr
             // physical side; `flip` is the side it means in an rtl box (computeStyle picks it once the direction is known).
             const flip = /-inline(?:-start|-end)?$/.test(property) && /(?:^|-)(?:left|right)$/.test(name) ? name.replace(/(left|right)$/, side => side === 'left' ? 'right' : 'left') : undefined;
-            declarations.push({ property:name, value, ...(flip ? {flip} : {}), ...(custom ? {expression} : {}), ...(pending ? {pending,specified:declaration.value} : {}), important: declaration.important ? 1 : 0, line: declaration.source.start.line, file: filename });
+            declarations.push({ property:name, value, ...(flip ? {flip} : {}), ...(custom ? {expression} : {}), ...(pending ? {pending,specified:declaration.value} : {}), ...(declaration.prop.toLowerCase() === 'text-wrap' ? { wrapShorthand: declaration.value.trim() } : {}), important: declaration.important ? 1 : 0, line: declaration.source.start.line, file: filename });
           }
         } catch (error) { problem(error.code ?? 'U_LAYOUT_CSS', error.message, declaration.source.start.line); }
       }
@@ -1224,7 +1224,7 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
         // The style attribute (element-attached) wins over every selector and layer, below only importance (Cascade 5).
         // Scope proximity (Cascade 6 §6.6): after specificity, the nearer scope root wins; unscoped is farthest.
         const rank = [declaration.important, rule.attached ? 1 : 0, layer, ...selector.specificity, selector.scope ? -scopeProximity(selector, box, state) : -Infinity];
-        const origin = { file: declaration.file, line: declaration.line, selector: selector.source, layer: rule.layerName, specified: declaration.specified ?? declaration.value, ...conditions(rule), ...(declaration.flip ? { logical: true } : {}) };
+        const origin = { file: declaration.file, line: declaration.line, selector: selector.source, layer: rule.layerName, specified: declaration.specified ?? declaration.value, ...(declaration.wrapShorthand ? { wrapShorthand: declaration.wrapShorthand } : {}), ...conditions(rule), ...(declaration.flip ? { logical: true } : {}) };
         // A logical side resolves by the box's direction (an rtl pass when the first one finds rtl; CSS Logical 1).
         if (declaration.flip) flipped = true;
         const property = rtl && declaration.flip ? declaration.flip : declaration.property;
@@ -1340,7 +1340,12 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   // have no nowrap keyword, so that combination is left for the engine to reject.
   const wrapMode = values['text-wrap-mode'], ws = values['white-space'];
   if (wrapMode === 'nowrap') values['white-space'] = ({ normal: 'nowrap', 'pre-wrap': 'pre', nowrap: 'nowrap', pre: 'pre' })[ws] ?? `${ws}+nowrap`;
-  else if (wrapMode === 'wrap') values['white-space'] = ({ nowrap: 'normal', pre: 'pre-wrap' })[ws] ?? ws;
+  // F119: a text-wrap (or text-wrap-mode) that wins over the element's own white-space: nowrap / pre turns wrapping back
+  // on (measured in Chromium, Firefox and WebKit); kept for the warning, with the two declarations.
+  else if (wrapMode === 'wrap') {
+    if (['nowrap', 'pre'].includes(String(ws)) && sources['white-space'] && sources['text-wrap-mode']) values.$wrapRestored = { whiteSpace: ws, by: sources['text-wrap-mode'], from: sources['white-space'] };
+    values['white-space'] = ({ nowrap: 'normal', pre: 'pre-wrap' })[ws] ?? ws;
+  }
   // letter-spacing in em computes to px against the element's own font-size (then inherits as px).
   const em = /^(-?\d+(?:\.\d{1,6})?)em$/.exec(String(values['letter-spacing'] ?? ''));
   if (em) values['letter-spacing'] = /^\d+(?:\.\d{1,6})?px$/.test(values['font-size']) ? `${+(Number(em[1]) * Number(values['font-size'].slice(0, -2))).toFixed(6)}px` : 'em-unresolved';
