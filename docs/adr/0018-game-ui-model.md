@@ -1,6 +1,6 @@
 # ADR-0018: ゲーム UI の契約と観測の分離
 
-Status: Accepted (fork)
+Status: Superseded by ADR-0019 (fork)
 
 ## 背景
 ページ単位の CSS モデルが Unknown になると、無関係な HUD の契約まで検査できない。

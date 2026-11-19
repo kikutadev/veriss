@@ -92,3 +92,13 @@ Worker では `verifyObligationIR(obligations, z3API)` を使います。Node ad
 just layout-contract-check
 ```
 
+
+## relational/1 の設計・実装計画 (fork)
+
+ゴール: UI の種類に依存しない関係述語の契約を既存の ContractIR / LayoutIR /
+ObligationIR の体系に統合する。StateIR、EnvironmentIR、EvidenceIR の境界を明示する。
+既存 profile の保証を維持し、ゲーム専用実装を共通コアの呼び出しに置き換える。
+完了条件: 公開 API と型、合成可能な述語 AST、coverage と counterexample の分離、
+HTML adapter / CLI / lint 統合、通常の Web UI での正常・違反・Unknown の検証、
+3ブラウザー照合、全ゲート、fork main 統合。
+設計判断は [ADR-0019](adr/0019-relational-ui-contracts.md)。
