@@ -4,7 +4,23 @@
   "private": true,
   "type": "module",
   "description": "Svelte 5 component adapter for @mizchi/veriss: template branches as states, scoped styles, selector usage.",
-  "exports": {".": {"import": "./src/index.mjs"}},
-  "dependencies": {"@mizchi/veriss": "workspace:*", "@mizchi/veriss-adapter-core": "workspace:*", "svelte": "5.57.2"},
-  "scripts": {"test": "node --test test/*.test.mjs"}
+  "exports": {
+    ".": {
+      "import": "./src/index.mjs"
+    }
+  },
+  "dependencies": {
+    "svelte": "5.57.2"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "@mizchi/veriss": "*",
+    "@mizchi/veriss-adapter-core": "*"
+  },
+  "devDependencies": {
+    "@mizchi/veriss": "workspace:*",
+    "@mizchi/veriss-adapter-core": "workspace:*"
+  }
 }

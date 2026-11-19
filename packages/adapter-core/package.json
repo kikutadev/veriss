@@ -4,7 +4,21 @@
   "private": true,
   "type": "module",
   "description": "Shared part of the component adapters: template states as choices, analysing every state, and the findings per state.",
-  "exports": {".": {"import": "./src/index.mjs"}},
-  "dependencies": {"@mizchi/veriss": "workspace:*", "parse5": "8.0.1"},
-  "scripts": {"test": "node --test test/*.test.mjs"}
+  "exports": {
+    ".": {
+      "import": "./src/index.mjs"
+    }
+  },
+  "dependencies": {
+    "parse5": "8.0.1"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "@mizchi/veriss": "*"
+  },
+  "devDependencies": {
+    "@mizchi/veriss": "workspace:*"
+  }
 }
