@@ -390,6 +390,7 @@
 - [x] **F113. 不正な `@font-face`**(`W_CSS_FONT_FACE_INVALID`): font-family がない、名前が不正(`3D Font`)、src がない、src の項目が url() でも local() でもない(`src: Arial`)ときは規則ごと無視され、フォントは読み込まれない(3 ブラウザで `document.fonts` を実測)。以前はこれを字形の入れ替え(CLS)の判定に使っていた(font-family がないものは Unknown)。不正な font-display は記述だけが捨てられ auto になる
 - [x] **F114. 不正な `transition` / `animation`**(`W_CSS_TIMING_INVALID`): 単位のない時間(`transition: opacity 300`、`transition-duration: 300`、`animation-duration: 2`)、1 項目に 3 つの時間、知らないイージング名(`easeInOut` は 2 つ目のプロパティ名として読まれる)、4 つの数でない `cubic-bezier()`、ほかと並べた `none`、空の項目は宣言ごと捨てられる(3 ブラウザで 16 通り実測)。以前は `transition: opacity 300` を「時間のないトランジション」(F12)と誤って説明していた。捨てられた `transition-duration` の後に残る 0s のトランジションは F12 のまま報告する
 - [x] **F115. 不正な `background` ショートハンド**(`W_CSS_BACKGROUND_INVALID`、以前はコントラストが Unknown): 最後の層以外の色(`red url(x.png), blue`)、引用符のない空白入りの url()、位置のない `/`(`url(x.png) / cover center`)、`/` のない cover / contain は宣言ごと捨てられ、画像も色も付かない(3 ブラウザで 11 通り実測)。捨てることで、文字の下の背景がブラウザーと同じになる
+- [x] **F116. 不正な `will-change`**(`W_CSS_KEYWORD_INVALID`、以前は宣言を適用して fixed の子を閉じ込めたと判定): `auto`・`none`・`all`・`will-change`・CSS 全体のキーワードをリストに入れる、名前をカンマなしで並べる(`transform opacity`)、空の項目。ブラウザーは宣言ごと捨て、前の値が残る(Chromium・Firefox・WebKit で実測)。知らない名前(`transfrom`)は有効な値で、効かないだけなので判定しない
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

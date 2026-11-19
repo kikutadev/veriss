@@ -41,8 +41,9 @@ const wide = /^(?:inherit|initial|unset|revert|revert-layer)$/i;
 /** { keyword, allowed, suggest? } when the value has a keyword the property does not take, else null. */
 export function keywordProblem(property, value) {
   const prop = String(property).toLowerCase(), allowed = sets[prop];
-  if (!allowed) return null;
   const text = String(value).trim().toLowerCase();
+  if (prop === 'will-change') return willChangeProblem(text);
+  if (!allowed) return null;
   if (!text || wide.test(text) || /[(),"']/.test(text)) return null;
   const words = text.split(/\s+/);
   if (words.length > (most[prop] ?? 1)) return null;
@@ -53,4 +54,20 @@ export function keywordProblem(property, value) {
   if (bad === undefined) return null;
   const suggest = bySet[prop]?.[bad] ?? suggestions[bad];
   return { keyword: bad, allowed: allowed.length > 12 ? `one of its ${allowed.length} keywords` : allowed.join(', '), ...(suggest && (allowed.includes(suggest) || /^\d+$/.test(suggest)) ? { suggest } : {}) };
+}
+
+// F116: will-change is auto alone, or a comma list of property names, scroll-position and contents (CSS Will Change 1
+// §2.1). auto, none, all, will-change and the CSS-wide keywords cannot be items, and two words need a comma; such a
+// value is invalid and the browser keeps the earlier will-change (measured in Chromium, Firefox and WebKit). An
+// unknown name (will-change: transfrom) is valid and only does nothing; it is not judged here.
+const notItems = new Set(['auto', 'none', 'all', 'will-change', 'inherit', 'initial', 'unset', 'revert', 'revert-layer', 'default']);
+function willChangeProblem(text) {
+  if (!text || wide.test(text) || text === 'auto' || /[()"']/.test(text)) return null;
+  const items = text.split(',').map(item => item.trim());
+  const allowed = 'auto alone, or property names, scroll-position and contents separated by commas';
+  if (items.some(item => !item)) return { keyword: ',', allowed };
+  const spaced = items.find(item => /\s/.test(item));
+  if (spaced) return { keyword: spaced, allowed, suggest: spaced.split(/\s+/).join(', ') };
+  const bad = items.find(item => notItems.has(item));
+  return bad === undefined ? null : { keyword: bad, allowed };
 }

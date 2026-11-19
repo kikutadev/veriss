@@ -1267,3 +1267,14 @@ test('F115: an invalid background shorthand is dropped, so the backdrop of the t
   }
   assert.ok(page('white').diagnostics.some(d => d.code === 'E_A11Y_CONTRAST'));
 });
+
+test('F116: an invalid will-change is dropped, so it does not trap a fixed child (it did)', () => {
+  const html = '<div class="p"><div class="f"></div></div>', css = wc => `.p{height:100px;will-change:${wc}}.f{position:fixed;top:0;left:0;width:10px;height:10px}`;
+  assert.equal(codes(run(css('transform'), html), 'W_LAYOUT_FIXED_TRAPPED').length, 1);
+  for (const wc of ['auto, transform', 'transform opacity', 'none']) {
+    const r = run(css(wc), html);
+    assert.equal(codes(r, 'W_LAYOUT_FIXED_TRAPPED').length, 0, wc);
+    assert.equal(codes(r, 'W_CSS_KEYWORD_INVALID').length, 1, wc);
+  }
+  assert.match(codes(run(css('transform opacity'), html), 'W_CSS_KEYWORD_INVALID')[0].message, /needs commas.*transform, opacity\?/);
+});

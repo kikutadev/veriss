@@ -1335,3 +1335,19 @@ test('F115: an invalid background shorthand is dropped by the browser, and repor
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BACKGROUND_INVALID'), value).toBe(dropped);
   }
 });
+
+test('F116: an invalid will-change is dropped (the earlier value stays, a fixed child is not trapped); an unknown name is kept', async ({page}) => {
+  const base = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{margin-top:50px;height:100px}.f{position:fixed;top:0;left:0;width:10px;height:10px}';
+  for (const [value, dropped] of [['auto, transform', true], ['transform, all', true], ['none', true], ['will-change', true], ['transform opacity', true], ['transform,', true], ['transform, default', true],
+    ['transform', false], ['transform, opacity', false], ['transfrom', false], ['left, contents', false]]) {
+    const html = '<html lang="en"><body><div class="p"><div class="f"></div></div></body></html>', css = `${base}.p{will-change:${value}}`;
+    await page.setContent(`<!doctype html><head><style>${base}.p{will-change:scroll-position}.p{will-change:${value}}</style></head><body><div class="p"><div class="f"></div></div></body>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.p')).willChange), value).toBe(dropped ? 'scroll-position' : value.replace(/,$/, ''));
+    await page.setContent(`<!doctype html><head><style>${css}</style></head><body><div class="p"><div class="f"></div></div></body>`);
+    const top = await page.evaluate(() => document.querySelector('.f').getBoundingClientRect().top);
+    if (dropped) expect(top, value).toBe(0);
+    const r = analyzeHTML(html, {name: 'P', css, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_KEYWORD_INVALID'), value).toBe(dropped);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_FIXED_TRAPPED'), value).toBe(top === 50);
+  }
+});

@@ -20,3 +20,9 @@ test('valid values, vendor keywords, var() and what is not judged are not report
     ['font-weight', '650'], ['cursor', 'url(x.png), pointer'], ['display', 'var(--d)'], ['position', 'inherit'], ['vertical-align', 'center'], ['color', 'middle'], ['letter-spacing', '1px'], ['word-spacing', '-0.5em'], ['letter-spacing', '10%']])
     assert.equal(keywordProblem(prop, value), null, `${prop}: ${value}`);
 });
+
+test('F116: will-change with auto, none, all or will-change in a list, two names without a comma, or an empty item is found', () => {
+  for (const v of ['auto, transform', 'transform, all', 'none', 'will-change', 'transform, inherit', 'transform,']) assert.ok(keywordProblem('will-change', v), v);
+  assert.equal(keywordProblem('will-change', 'transform opacity').suggest, 'transform, opacity');
+  for (const v of ['auto', 'transform', 'transform, opacity', 'scroll-position', 'left, contents', '--x', 'transfrom', 'inherit', 'var(--w)']) assert.equal(keywordProblem('will-change', v), null, v);
+});
