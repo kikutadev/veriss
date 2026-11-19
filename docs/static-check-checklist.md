@@ -403,6 +403,7 @@
 - [x] **F126. 片方の軸だけの `overflow: hidden`**(`W_CSS_OVERFLOW_PROMOTED`): もう片方の軸に書いた `visible` は `auto` に、`clip` は `hidden` になり、両方の軸でスクロール(切り取り)する(Chromium・Firefox・WebKit で実測)。片方だけ切るなら `clip`。著者が書いた軸だけ報告する(`overflow-x: hidden` だけのときは報告しない)
 - [x] **F127. html や body だけの `box-sizing: border-box`**(`W_CSS_BOX_SIZING_NOT_INHERITED`): `box-sizing` は継承されないので、ほかの要素は content-box のまま(Chromium・Firefox・WebKit で実測: 幅 100px と padding 10px で 120px)。ほかの要素に `box-sizing` を書く規則がなく、大きさと padding か border を書いた規則があるときだけ報告する
 - [x] **F128. 縦の `margin` の %**(`W_CSS_MARGIN_PERCENT_WIDTH`、解析は % の margin で Unknown のまま): 包含ブロックの幅に対する割合で、高さではない(Chromium・Firefox・WebKit で実測: 400×100 で 10% は 40px)。縦の `padding` の % は縦横比の定番の書き方なので報告しない
+- [x] **F129. リセット CSS で中央に来なくなる `<dialog>`**(`W_CSS_DIALOG_NOT_CENTRED`): dialog は UA の `margin: auto`(モーダルでは inset 0 も)で中央に置かれる。`* { margin: 0 }` のようなリセットが届くと左上に出る(Chromium・Firefox・WebKit で実測、`open` でも `showModal()` でも)。dialog の要素名・class・id を書いた規則は意図した配置なので報告しない。閉じた dialog も、スクリプトで開くので対象
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

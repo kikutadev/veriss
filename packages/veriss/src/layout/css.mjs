@@ -1251,7 +1251,8 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   // A closed dialog: dialog:not([open]) { display: none } (UA). An open one is placed by the UA (position: absolute,
   // centred, fit-content), which is not modeled.
   if(box.tag==='dialog' && box.dialogOpen===false) values.display='none';
-  if(box.tag==='dialog' && box.dialogOpen!==false) throw Object.assign(new Error(box.dialogOpen==='dynamic' ? 'A dynamic open attribute decides whether the dialog renders' : 'An open dialog is placed by the UA (position: absolute, centred, fit-content), which is not modeled'),{code:'U_LAYOUT_ELEMENT'});
+  // Thrown once the cascade has run, so the error carries the dialog's declarations (F129 reads its margins).
+  const openDialog = box.tag==='dialog' && box.dialogOpen!==false ? Object.assign(new Error(box.dialogOpen==='dynamic' ? 'A dynamic open attribute decides whether the dialog renders' : 'An open dialog is placed by the UA (position: absolute, centred, fit-content), which is not modeled'),{code:'U_LAYOUT_ELEMENT'}) : null;
   // [dir=ltr|rtl] { direction } (UA, inherited): author CSS may override; dir=auto depends on the text.
   if(box.dirAttr==='ltr' || box.dirAttr==='rtl') values.direction=box.dirAttr;
   else if(box.dirAttr!==undefined) throw Object.assign(new Error(box.dirAttr==='auto' ? 'dir=auto: own text and children both have strong characters, whose order is not known' : `dir=${box.dirAttr} is not a direction`),{code:'U_LAYOUT_ELEMENT'});
@@ -1486,6 +1487,7 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
     }
   }
   values.$sources = sources;
+  if (openDialog) throw Object.assign(openDialog, { $sources: { ...sources } });
   if (layerShadowed.length) values.$layerShadowed = layerShadowed;
   values.$dormant = dormant;
   values.$overridden = overridden;

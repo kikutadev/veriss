@@ -242,8 +242,22 @@ export function createCssMistakes({ report, facts, tools }) {
         message: `${box.label}: overflow-${axis}: ${p.written} computes to ${becomes} because overflow-${otherAxis} is ${p.other}: a box cannot scroll or clip on one axis and stay ${p.written} on the other, so it ${becomes === 'auto' ? `scrolls (or clips) its overflow on the ${axis} axis too` : `clips on the ${axis} axis too`}. To cut only the ${otherAxis} axis, write overflow-${otherAxis}: clip` });
     }
   }
+  // F129: a <dialog> is centred by the UA's margin: auto (with inset 0 for a modal); a reset such as * { margin: 0 }
+  // that reaches it puts it at the top-left corner (measured in Chromium, Firefox and WebKit, open and showModal()).
+  // Reported when an author rule sets a horizontal or vertical margin other than auto on a dialog and none sets it back.
+  function dialogMarginReset(box, style) {
+    if (box.tag !== 'dialog' || box.pseudo || layoutWarnings.some(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED' && w.path === box.path)) return;
+    // A rule that names the dialog (its tag, class or id) places it on purpose; only a reset that reaches it is reported.
+    const aimed = sel => /dialog/i.test(sel) || (box.classes ?? []).some(c => sel.includes(`.${c}`)) || (box.id && sel.includes(`#${box.id}`));
+    const keys = ['margin-left', 'margin-right', 'margin-top', 'margin-bottom'].filter(key => style.$sources?.[key] && !aimed(String(style.$sources[key].selector ?? '')) && !/\bauto\b/i.test(String(style.$sources[key].specified ?? '')));
+    if (!keys.length) return;
+    const src = style.$sources[keys[0]];
+    layoutWarnings.push({ code: 'W_CSS_DIALOG_NOT_CENTRED', severity: 'warning', box: box.label, path: box.path, properties: keys, css: [{ property: 'margin', file: src.file, line: src.line, selector: src.selector }],
+      message: `${box.label}: ${src.selector} sets ${keys.map(key => `${key}: ${style.$sources[key].specified}`).join(', ')} on this <dialog>, which takes away the margin: auto the browser centres it with: it opens at the top-left corner. Add dialog { margin: auto } after the reset` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    dialogMarginReset(box, style);
     overflowPromoted(box, style);
     selectIndent(box, style, ancestors);
     optionInert(box, style, ancestors);
@@ -711,5 +725,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, overflowPromoted, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, dialogMarginReset, overflowPromoted, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

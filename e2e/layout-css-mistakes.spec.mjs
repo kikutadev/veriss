@@ -1503,3 +1503,14 @@ test('F127: box-sizing on html is not inherited; F128: margin-top % is a share o
   const r = analyzeHTML('<html lang="en"><body><div class="c"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{margin-top:10%;height:10px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MARGIN_PERCENT_WIDTH')).toBe(true);
 });
+
+test('F129: * { margin: 0 } puts an open or modal dialog at the top-left; dialog { margin: auto } centres it again', async ({page}) => {
+  await page.setViewportSize({ width: 800, height: 600 });
+  for (const [css, centred] of [['', true], ['*{margin:0}', false], ['*{margin:0}dialog{margin:auto}', true]]) for (const modal of [false, true]) {
+    await page.setContent(`<!doctype html><style>${css}</style><dialog ${modal ? '' : 'open'}>d</dialog>`);
+    const left = await page.evaluate(m => { const d = document.querySelector('dialog'); if (m) d.showModal(); return d.getBoundingClientRect().left; }, modal);
+    expect(left > 100, `${css} ${modal}`).toBe(centred);
+    const r = analyzeHTML(`<html lang="en"><body><dialog ${modal ? '' : 'open'}><p>d</p></dialog></body></html>`, {name: 'P', css: `html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED'), `${css} ${modal}`).toBe(!centred);
+  }
+});

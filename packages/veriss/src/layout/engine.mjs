@@ -453,7 +453,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // walk where the layout did not run, so they are reported whether or not the layout is decided).
   // F9: a ::before or ::after styled but with no content is never generated.
   // CSS mistakes found on one box's computed style (rules/css-mistakes.mjs, ADR-0016 M5).
-  const { firstInert, firstPseudoInert, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
+  const { firstInert, firstPseudoInert, dialogMarginReset, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
     report: { warnings: layoutWarnings, unknown, diagnostics, ranges },
     facts: { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles },
     tools: { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: box => focusableBox(box) },
@@ -681,6 +681,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       if (style.$hiddenInputDisplay && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('display')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['display'], ...(style.$sources?.display ? { css: [{ property: 'display', file: style.$sources.display.file, line: style.$sources.display.line, selector: style.$sources.display.selector }] } : {}),
         message: `${box.label}: display: ${style.$hiddenInputDisplay} has no effect on an input type=hidden (the browser's display: none !important always wins). Use another input type to show a field` });
+      // F129 (emitted with or without emit, as F30: a closed dialog is display: none and never laid out).
+      if (box.tag === 'dialog') dialogMarginReset(box, style);
       if (emit) cssMistakes(box, style, ancestors, inherited, gridItem, r, state);
       if (emit) for (const entry of style.$invalid) invalidSubstitutions.push({ box: box.label, path: box.path, property: entry.property, longhands: entry.longhands, css: { file: entry.file, line: entry.line }, reason: entry.code === 'U_LAYOUT_VARIABLE_CYCLE' ? 'cycle' : 'guaranteed-invalid', message: entry.message, resolution: 'unset', ...ranges(r) });
       if (emit) for (const [condition, compiled] of contexts) if (condition.kind === 'container') {
@@ -3610,7 +3612,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // the CSS are reported whatever is Unknown. (Each warning is reported once per box.)
   if (diagnostics.some(d => d.severity === 'unknown') && hovered === undefined && !options.$animationFrame && !options.$slideVariant && !untransformed) {
     const walkStyles = (box, ancestors, inherited) => {
-      let state; try { [state] = styles(box, initial, ancestors, inherited, false); } catch { return; }
+      // An open dialog's style is not computed (the UA places it); its declarations still tell a margin reset (F129).
+      let state; try { [state] = styles(box, initial, ancestors, inherited, false); } catch (error) { if (box.tag === 'dialog' && error?.$sources) try { dialogMarginReset(box, { $sources: error.$sources }); } catch { /* best effort */ } return; }
       if (!state) return;
       try { cssMistakes(box, state.style, ancestors, inherited, true, state.region, undefined); } catch { /* the rest still runs */ }
       for (const kind of ['before', 'after']) try {

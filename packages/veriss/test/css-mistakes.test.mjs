@@ -1387,3 +1387,10 @@ test('F128: a vertical margin in % is a share of the width', () => {
   for (const css of ['.a{margin-top:10%}', '.a{margin:5% 0}', '.a{margin-bottom:2.5%}']) assert.equal(hit(css).length, 1, css);
   for (const css of ['.a{margin:0 5%}', '.a{padding-top:56.25%}', '.a{margin-left:10%}', '.a{margin-top:0%}', '.a{margin-top:10px}']) assert.equal(hit(css).length, 0, css);
 });
+
+test('F129: a margin reset that reaches a dialog takes away its centring (open and closed dialogs; a rule for the dialog is not reported)', () => {
+  const hit = css => (analyzeHTML('<html lang="en"><body><dialog open><p>d</p></dialog><dialog id="m" class="modal"><p>m</p></dialog></body></html>', {name: 'P', css: `html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}}).layoutWarnings ?? []).filter(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED');
+  assert.deepEqual(hit('*{margin:0}').map(w => w.box), ['dialog@P/0/0', '#m']);
+  assert.match(hit('body *{margin:0}')[0].message, /Add dialog \{ margin: auto \}/);
+  for (const css of ['*{margin:0}dialog{margin:auto}', 'dialog{margin:10px auto}', '.modal{margin:0}', '#m{margin:0}', '']) assert.equal(hit(css).filter(w => w.box === '#m').length, 0, css);
+});
