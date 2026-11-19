@@ -218,8 +218,22 @@ export function createCssMistakes({ report, facts, tools }) {
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, select: select.box.label, properties: found.map(name), css: found.map(key => ({ property: name(key), file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
       message: `${box.label}: ${found.map(key => `${name(key)}: ${style.$sources[key].specified ?? style[key]}`).join(', ')} ${found.length === 1 ? 'does' : 'do'} not change the size of ${select.box.label}: it is a drop-down, and its open menu is drawn by the browser, which takes few of these (differently in each browser). Size and pad the select itself` });
   }
+  // F124: text-indent on a <select> indents the shown option twice in Firefox, once in Chromium and Safari (measured:
+  // 10px gives 22 / 16 / 17, appearance: none too; the control's size does not change); an <input> agrees. Judged on
+  // the select's own computed value (an ancestor's text-indent keeps that ancestor's layout Unknown before it).
+  function selectIndent(box, style, ancestors) {
+    if (box.tag !== 'select' || box.pseudo || layoutWarnings.some(w => w.code === 'W_LAYOUT_SELECT_INDENT' && w.path === box.path)) return;
+    const value = String(style.$selectIndent ?? '0');
+    if (/^-?(?:0|0px|0%|0em|0rem)$/.test(value) || !/\d/.test(value)) return;
+    const own = style.$sources?.['text-indent'], from = own ? null : (ancestors ?? []).findLast(a => a.style?.$sources?.['text-indent']);
+    const src = own ?? from?.style.$sources['text-indent'];
+    layoutWarnings.push({ code: 'W_LAYOUT_SELECT_INDENT', severity: 'warning', box: box.label, path: box.path, browsers: { once: ['chromium', 'webkit'], twice: ['firefox'] },
+      ...(src ? { css: [{ property: 'text-indent', file: src.file, line: src.line, selector: src.selector }] } : {}),
+      message: `${box.label}: text-indent: ${value}${from ? ` (inherited from ${from.box.label})` : ''} indents the selected option twice in Firefox and once in Chrome and Safari, so the text sits in a different place. Use padding-inline-start on the select${from ? `, and text-indent: 0 on it` : ' instead'}` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    selectIndent(box, style, ancestors);
     optionInert(box, style, ancestors);
     brStyled(box, style);
     wrapRestored(box, style);
@@ -685,5 +699,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

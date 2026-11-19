@@ -1349,3 +1349,11 @@ test('F123: isolation: isolate beside mix-blend-mode on the same element does no
   assert.match(hit('.a{mix-blend-mode:difference;isolation:isolate}')[0]?.message ?? '', /Put isolation: isolate on the parent/);
   for (const css of ['.a{mix-blend-mode:normal;isolation:isolate}', '.a{isolation:isolate}', '.a{mix-blend-mode:multiply}', '.a{mix-blend-mode:var(--m);isolation:isolate}', '.a{mix-blend-mode:multiply;isolation:auto}']) assert.equal(hit(css).length, 0, css);
 });
+
+test('F124: text-indent on a select is indented twice by Firefox; it no longer makes the select Unknown', () => {
+  const hit = css => codes(run(css, '<select class="s" aria-label="x"><option>x</option></select>'), 'W_LAYOUT_SELECT_INDENT');
+  const [w] = hit('.s{text-indent:10px}');
+  assert.deepEqual(w.browsers, { once: ['chromium', 'webkit'], twice: ['firefox'] });
+  assert.match(w.message, /padding-inline-start/);
+  for (const css of ['.s{text-indent:0}', '.s{color:red}', '']) assert.equal(hit(css).length, 0, css);
+});

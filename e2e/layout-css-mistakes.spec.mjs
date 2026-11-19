@@ -1450,3 +1450,21 @@ test('F123: isolation: isolate on the blended element itself does not stop the b
   const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="c"></div></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{height:20px;mix-blend-mode:difference;isolation:isolate}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_ISOLATION_SELF')).toBe(true);
 });
+
+test('F124: Firefox indents the shown option of a select twice; the select size does not change; an input agrees', async ({page, browserName}) => {
+  const { PNG } = await import('pngjs');
+  await page.setViewportSize({ width: 300, height: 100 });
+  const left = async (tag, indent) => {
+    await page.setContent(`<!doctype html><style>*{margin:0}select,input{width:200px;height:40px;font:20px monospace;color:#000;background:#fff;border:0;padding-left:0;text-indent:${indent}px}</style>${tag === 'select' ? '<select><option>ii</option></select>' : '<input value="ii">'}`);
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: 0, y: 0, width: 200, height: 40 } }));
+    for (let x = 0; x < 200; x++) for (let y = 5; y < 35; y++) { const i = (y * 200 + x) * 4; if (png.data[i] < 100 && png.data[i + 1] < 100 && png.data[i + 2] < 100) return x; }
+    return -1;
+  };
+  const moved = async tag => (await left(tag, 40)) - (await left(tag, 0));
+  expect(Math.abs((await moved('select')) - (browserName === 'firefox' ? 80 : 40)), 'select').toBeLessThanOrEqual(2);
+  expect(Math.abs((await moved('input')) - 40), 'input').toBeLessThanOrEqual(2);
+  const size = async css => { await page.setContent(`<!doctype html><style>*{margin:0}${css}</style><select><option>xxxx</option></select>`); return page.evaluate(() => { const r = document.querySelector('select').getBoundingClientRect(); return [r.width, r.height]; }); };
+  expect(await size('select{text-indent:40px}')).toEqual(await size(''));
+  const r = analyzeHTML('<html lang="en"><body><select class="s" aria-label="x"><option>x</option></select></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.s{text-indent:10px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_SELECT_INDENT')).toBe(true);
+});

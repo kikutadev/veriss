@@ -1498,6 +1498,9 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   for (const [key, idle] of [['text-indent', ['0', '0px', 'initial', 'unset', 'revert', 'revert-layer']], ['text-align-last', ['auto', 'initial', 'unset', 'revert', 'revert-layer']]]) {
     if (values[key] === undefined || idle.includes(String(values[key]))) continue;
     if (!box.pseudo && values.display === 'inline' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { drop(values, 'inline-text', key, values[key]); delete values[key]; }
+    // F124: on a <select> text-indent moves only the shown option's text (twice in Firefox), never the control's size
+    // (measured in Chromium, Firefox and WebKit); kept for the warning.
+    else if (!box.pseudo && box.tag === 'select' && key === 'text-indent') { values.$selectIndent = values[key]; delete values[key]; }
     else throw new Error(`Unsupported ${key}: ${values[key]} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
   }
   // F54: clear moves a block below earlier floats; a flex or grid item has none to clear (measured in Chromium, Firefox
