@@ -1,7 +1,8 @@
 import postcss from 'postcss';
 import { calcOperatorProblem } from './calc-syntax.mjs';
 import { drop } from './dropped.mjs';
-import { colorSyntaxProblem } from '../color/index.mjs';
+import { colorSyntaxProblem, parseColor } from '../color/index.mjs';
+import { backgroundProblem } from './background-syntax.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import { keywordProblem } from './keyword-syntax.mjs';
@@ -992,6 +993,10 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
         { const prop = declaration.prop.toLowerCase(), problem = /^grid-template-(?:columns|rows)$/.test(prop) && gridTrackProblem(declaration.value);
           if (problem) { note('W_CSS_GRID_TRACKS_INVALID', { property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F115: a background shorthand the browser drops (a color before the last layer, an unquoted url() with spaces,
+        // "/" without a position, cover / contain without "/"; measured in Chromium, Firefox and WebKit).
+        { const problem = declaration.prop.toLowerCase() === 'background' && backgroundProblem(declaration.value, t => parseColor(t) !== null || /^currentcolor$/i.test(t));
+          if (problem) { note('W_CSS_BACKGROUND_INVALID', { value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F114: a transition / animation value the browser drops (a bare number for a time, three times, an unknown
         // easing word, …; measured in Chromium, Firefox and WebKit): dropped here too and reported.
         { const problem = timingProblem(declaration.prop, declaration.value);

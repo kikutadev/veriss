@@ -1255,3 +1255,15 @@ test('F114: an invalid transition / animation value drops the declaration (and i
   assert.equal(codes(longhand, 'W_CSS_TRANSITION_NO_DURATION').length, 1);
   assert.equal(codes(run('.a{transition:opacity .3s ease-in-out}'), 'W_CSS_TIMING_INVALID').length, 0);
 });
+
+test('F115: an invalid background shorthand is dropped, so the backdrop of the text is the one the browser shows', () => {
+  const page = bg => analyzeHTML('<html lang="en"><body><p class="t">text</p></body></html>', {name: 'P', accessibility: true, boxes: {'.t': {overflow: 'clip', overflowBlock: 'clip'}},
+    css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}body{background:#000}.t{height:20px;overflow:hidden;font:16px sans-serif;color:#fff}.t{background:${bg}}`, viewport: {min: 320, max: 800, height: {min: 300, max: 600}}});
+  for (const bg of ['red url(x.png), white', 'url(a b.png) white', 'url(x.png) / cover white', 'url(x.png) cover white']) {
+    const r = page(bg);
+    assert.equal(codes(r, 'W_CSS_BACKGROUND_INVALID').length, 1, bg);
+    // dropped: white text on the black body, which passes (it was Unknown, and the white would have failed)
+    assert.ok(!r.diagnostics.some(d => /A11Y_CONTRAST/.test(d.code)), `${bg}: ${JSON.stringify(r.diagnostics.map(d => d.code))}`);
+  }
+  assert.ok(page('white').diagnostics.some(d => d.code === 'E_A11Y_CONTRAST'));
+});

@@ -2,6 +2,8 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_BACKGROUND_INVALID: note => ({ code: 'W_CSS_BACKGROUND_INVALID', severity: 'warning', selector: note.selector, property: 'background', css: [{ property: 'background', file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { background: ${note.value} }: ${note.problem}, so the browser drops the whole declaration (no image and no color from it). Write image position / size repeat color, with the color in the last layer` }),
   W_CSS_TIMING_INVALID: note => ({ code: 'W_CSS_TIMING_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { ${note.property}: ${note.value} }: ${note.problem}, so the browser drops the whole declaration and there is no ${note.property.startsWith('anim') ? 'animation' : 'transition'} from it. Write it as property duration easing delay (transition: opacity .3s ease-in-out)` }),
   W_CSS_FONT_FACE_INVALID: note => ({ code: 'W_CSS_FONT_FACE_INVALID', severity: 'warning', css: [{ property: '@font-face', file: note.file, line: note.line }],

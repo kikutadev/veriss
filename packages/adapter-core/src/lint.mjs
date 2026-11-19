@@ -86,6 +86,7 @@ export const recommended = {
   W_CSS_LAYER_OVERRIDDEN: ['warning', 'a later or unlayered rule beats an earlier cascade layer whatever the specificity: move the rule into the same layer, or reorder the layers'],
   W_CSS_FONT_FACE_INVALID: ['warning', 'give @font-face a quoted font-family and a src of url() / local() items, and font-display one of auto, block, swap, fallback, optional'],
   W_CSS_TIMING_INVALID: ['warning', 'write transition / animation as property duration easing delay, with units on every time (300ms), at most two times, and a known easing'],
+  W_CSS_BACKGROUND_INVALID: ['warning', 'write background as image position / size repeat color: the color in the last layer, quotes around a URL with spaces, a position before the /'],
   W_CSS_GRID_TRACKS_INVALID: ['warning', 'fix the grid track list: repeat(auto-fill) takes fixed sizes (minmax(200px, 1fr)), minmax() cannot start with fr, and a repeat count is a positive whole number'],
   W_CSS_COUNTER_UNUSED: ['warning', 'show the counter with content: counter(name), or remove the counter-reset / -increment / -set'],
   W_LAYOUT_ALIGN_BROWSER_DEPENDENT: ['warning', 'centre a block with margin-inline: auto (and a width), or make the parent a grid: justify-self / justify-items in block layout work in Chromium and Safari only'],
