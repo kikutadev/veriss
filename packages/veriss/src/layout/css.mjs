@@ -1277,6 +1277,12 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   if (!box.pseudo && values.display === 'inline' && !blockified && !['img', 'video', 'canvas', 'iframe', 'svg', 'input', 'button', 'select', 'textarea', 'embed', 'object'].includes(box.tag)) {
     const found = [['overflow-x', 'visible'], ['overflow-y', 'visible'], ['text-overflow', 'clip'], ['resize', 'none']].filter(([key, idle]) => sources[key] && values[key] !== undefined && String(values[key]) !== idle);
     if (found.length) { values.$inlineOverflowInert = found.map(([key]) => [key, values[key]]); for (const [key, idle] of found) values[key] = idle; }
+    // F76: flex / grid container properties lay out the children of a flex or grid container: on an inline element they do
+    // nothing (measured in Chromium, Firefox and WebKit, with element children). Recorded for the warning.
+    const containerKeys = ['row-gap', 'column-gap', 'grid-template-columns', 'grid-template-rows', 'grid-template-areas', 'grid-auto-flow', 'grid-auto-rows', 'grid-auto-columns', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content', 'justify-items'];
+    const idleOf = { 'row-gap': ['normal', '0', '0px'], 'column-gap': ['normal', '0', '0px'], 'grid-template-columns': ['none'], 'grid-template-rows': ['none'], 'grid-template-areas': ['none'], 'grid-auto-flow': ['row'], 'grid-auto-rows': ['auto'], 'grid-auto-columns': ['auto'], 'flex-direction': ['row'], 'flex-wrap': ['nowrap'], 'justify-content': ['normal'], 'align-items': ['normal'], 'align-content': ['normal'], 'justify-items': ['normal', 'legacy'] };
+    const container = containerKeys.filter(key => sources[key] && values[key] !== undefined && !idleOf[key].includes(String(sources[key].specified ?? values[key]).trim()));
+    if (container.length) values.$inlineContainerInert = container.map(key => [key, values[key]]);
   }
   const nonscroll = value => ['visible', 'clip'].includes(value);
   const x = values['overflow-x'], y = values['overflow-y'];

@@ -506,6 +506,10 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       message: `${box.label}: text-decoration: none does nothing here — it removes only the element's own line, and it has none; the ${from.style['text-decoration-line']} comes from ${from.box.label} and is drawn across its descendants. Remove the line on ${from.box.label} (and put it on the parts that need it), or make ${box.label} display: inline-block` });
   }
   function inlineOverflow(box, style) {
+    const box2 = style.$inlineContainerInert;
+    if (box2?.length && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(box2[0][0])))
+      layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: box2.map(([key]) => key), css: box2.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+        message: `${box.label}: ${box2.map(([key]) => key).join(', ')} ${box2.length === 1 ? 'has' : 'have'} no effect on a display: inline element (they lay out the children of a flex or grid container). Set display: flex (or inline-flex, grid) on it` });
     const found = style.$inlineOverflowInert;
     if (!found?.length || box.pseudo || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(found[0][0]))) return;
     const shown = [...new Map(found.map(([key, value]) => [key.startsWith('overflow') ? 'overflow' : key, value])).entries()];

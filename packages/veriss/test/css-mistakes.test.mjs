@@ -834,3 +834,12 @@ test('F75: line-height on a select drawn by the browser does nothing', () => {
   assert.equal(w('appearance:none;line-height:50px').length, 0);
   assert.equal(codes(run('.x{line-height:50px}', '<input class="x" aria-label="q">'), 'W_LAYOUT_DECLARATION_INERT').filter(x => x.properties.includes('line-height')).length, 0);
 });
+
+test('F76: flex / grid container properties on an inline element do nothing', () => {
+  const w = (css, html = '<p class="a">t <span class="x">s <b>b</b></span> u</p>') => codes(run(css, html), 'W_LAYOUT_DECLARATION_INERT').filter(x => /display: inline/.test(x.message) && x.properties.some(p => /gap|grid-|flex-|justify|align/.test(p)));
+  const [hit] = w('.x{gap:10px;justify-content:center}');
+  assert.ok(hit && /display: flex/.test(hit.message));
+  assert.ok(hit.properties.includes('justify-content'));
+  assert.equal(w('.x{display:inline-flex;gap:10px}').length, 0);
+  assert.equal(w('.x{grid-template-columns:1fr 1fr}').length, 1);
+});

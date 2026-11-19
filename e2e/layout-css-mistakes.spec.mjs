@@ -861,3 +861,14 @@ test('F75: line-height on a select of appearance auto changes nothing', async ({
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('line-height')), extra || 'auto').toBe(inert);
   }
 });
+
+test('F76: flex / grid container properties on an inline element change nothing', async ({page}) => {
+  const html = '<p class="a">t <span class="x">aa <b>bb</b> <i>cc</i> dd ee ff gg hh</span> u</p>';
+  for (const [d, disp] of [['gap:20px;justify-content:center', 'inline'], ['grid-template-columns:1fr 1fr', 'inline'], ['flex-direction:column;align-items:center', 'inline'], ['gap:20px', 'inline-flex']]) {
+    const shot = async css => { await page.setContent(`<!doctype html><html lang="en"><head><style>body{margin:10px;font:16px sans-serif}.a{width:300px}.x{display:${disp}}${css}</style></head><body>${html}</body></html>`); return (await page.screenshot()).toString('base64'); };
+    const inert = await shot('') === await shot(`.x{${d}}`);
+    expect(inert, `${disp} ${d}`).toBe(disp === 'inline');
+    const warned = (analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `.a{width:300px}.x{display:${disp};${d}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}}).layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && /display: inline element/.test(w.message) && w.properties.some(p => /gap|grid-|flex-|justify|align/.test(p)));
+    expect(warned, `${disp} ${d}`).toBe(inert);
+  }
+});

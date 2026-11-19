@@ -351,6 +351,9 @@
 - [x] **F75. ブラウザーが描く select の `line-height`**(`W_LAYOUT_DECLARATION_INERT`): appearance: auto の select は自分の高さで
   描かれ、line-height で大きさも画素も変わらない(3 つのブラウザーで測った。文字の input・button では高さが変わり、select も
   appearance: none なら変わる)。height・padding か appearance: none を勧める。
+- [x] **F76. inline の要素の flex・grid の容器の性質**(`W_LAYOUT_DECLARATION_INERT`): gap・grid-template-*・grid-auto-*・
+  flex-direction・flex-wrap・justify-content・align-items・align-content・justify-items は flex・grid の容器の子を並べる性質で、
+  display: inline の span では子の要素があっても何も変わらない(3 つのブラウザーで描画が同じ)。display: flex などを勧める。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
   (消えない)ので報告しない。
 
