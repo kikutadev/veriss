@@ -36,3 +36,22 @@ test('scripting-enabled static snapshot excludes noscript fallback',async({page}
   expect(await page.evaluate(()=>matchMedia('(scripting: enabled)').matches)).toBe(true);
   expect(await page.locator('.item').evaluate(el=>el.getBoundingClientRect().width)).toBe(Number(report.sizes.find(s=>s.box==='.item').inlineSize.constant));
 });
+
+test('minified game media queries and safe-area sum match actual layout',async({page})=>{
+  const html='<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,viewport-fit=cover"></head><body><main><div class="hud"></div></main></body></html>';
+  const css='*{box-sizing:border-box;margin:0}html,body,main{display:grid;grid-template-columns:minmax(0,1fr)}.hud{height:90px;padding-top:calc(19px + env(safe-area-inset-top));padding-bottom:calc(env(safe-area-inset-bottom, 40px) + 5px)}@media (min-width:651px)and (max-width:1000px){.hud{height:110px}}@media (max-height:510px)and (min-width:651px){.hud{height:130px}}@media (min-width:651px)and(max-width:1000px){.hud{height:200px}}';
+  for (const [width,height,expected] of [[650,700,90],[651,700,110],[1000,700,110],[1001,700,90],[700,510,130],[700,511,110]]) {
+    await page.setViewportSize({width,height});
+    await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
+    const measurement=await page.locator('.hud').evaluate(el=>({height:el.getBoundingClientRect().height,top:parseFloat(getComputedStyle(el).paddingTop),bottom:parseFloat(getComputedStyle(el).paddingBottom)}));
+    expect(measurement).toEqual({height:expected,top:19,bottom:5});
+    const report=analyzeHTML(html,{css,viewport:{min:width,max:width,height:{min:height,max:height}},safeArea:{top:0,right:0,bottom:0,left:0}});
+    expect(report.status,JSON.stringify(report.diagnostics)).toBe('verified');
+    const size=report.sizes.find(s=>s.box==='.hud');
+    expect(Number(size.blockSize.constant)).toBe(measurement.height);
+    expect(Number(size.contentBlockSize.constant)).toBe(measurement.height-measurement.top-measurement.bottom);
+  }
+  const unknown=analyzeHTML(html,{css,viewport:{min:320,max:1920,height:{min:320,max:1080}}});
+  expect(unknown.status).toBe('unknown');
+  expect(unknown.diagnostics.some(d=>d.message.includes('safeArea'))).toBe(true);
+});

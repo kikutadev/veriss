@@ -21,7 +21,7 @@ export function parseCondition(params, kind) {
       if (!part) return [];
     }
     const atoms = [];
-    for (const term of part.split(/\s+and\s+/i)) {
+    for (const term of part.split(/(?:\s+|(?<=\)))and\s+/i)) {
       if (!/^\([^()]+\)$/.test(term.trim())) throw new Error(`Unsupported ${kind} condition: ${params}`);
       const value = term.trim().slice(1, -1).trim();
       const push = (feature, relation, size) => atoms.push({ feature: feature.toLowerCase(), relation, value: q(size) });

@@ -1267,3 +1267,16 @@ test('F115: an invalid background shorthand is dropped, so the backdrop of the t
   }
   assert.ok(page('white').diagnostics.some(d => d.code === 'E_A11Y_CONTRAST'));
 });
+
+test('minified media conjunction after a closing parenthesis keeps both bounds', () => {
+  const compact = run('@media (min-width:651px)and (max-width:1000px){.a{height:40px}}');
+  const spaced = run('@media (min-width:651px) and (max-width:1000px){.a{height:40px}}');
+  assert.equal(compact.status, 'verified', JSON.stringify(compact.diagnostics));
+  assert.deepEqual(compact.sizes, spaced.sizes);
+  const invalid = run('@media (min-width:651px)and(max-width:1000px){.a{height:40px}}');
+  assert.equal(codes(invalid, 'W_CSS_MEDIA_AND_SPACE').length, 1);
+  assert.equal(invalid.sizes.find(s => s.box === '.a').blockSize.constant, '20');
+  for (const q of ['(max-height:510px)and (max-width:650px)', '(max-height:510px)and (min-width:651px)']) {
+    assert.equal(run('@media '+q+'{.a{height:40px}}').status, 'verified');
+  }
+});

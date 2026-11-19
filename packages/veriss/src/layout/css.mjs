@@ -49,12 +49,17 @@ export const registeredValueProblem = (name, text) => { const r = registeredProp
 // declared safe area (setSafeArea; 0 without viewport-fit=cover, as browsers report).
 const envPattern = /^env\(\s*safe-area-inset-(top|right|bottom|left)\s*(?:,\s*(\d+(?:\.\d{1,6})?px|0)\s*)?\)$/;
 const maxEnv = /^max\(\s*(\d+(?:\.\d{1,6})?px|0)\s*,\s*(env\([^()]*\))\s*\)$/;
+// The constant, nonnegative px + safe-area subset of calc(); other arithmetic stays Unknown.
+const envSum = /^calc\(\s*(?:(\d+(?:\.\d{1,6})?px|0)\s+\+\s+(env\([^()]*\))|(env\([^()]*\))\s+\+\s+(\d+(?:\.\d{1,6})?px|0))\s*\)$/;
+const safeAreaSum = text => { const m = envSum.exec(text ?? ''); return m && envPattern.test(m[2] ?? m[3]) ? [m[1] ?? m[4], m[2] ?? m[3]] : null; };
 let safeArea = null;
 export function setSafeArea(area) { safeArea = area; }
 // em (checklist D2) also resolves later, against the element's font-size (computeStyle); else it is Unknown where used.
-const pxSyntax = text => { if (!/^\d+(?:\.\d{1,6})?r?em$/.test(text) && !envPattern.test(text) && !maxEnv.test(text)) px(text); };
+const pxSyntax = text => { if (!/^\d+(?:\.\d{1,6})?r?em$/.test(text) && !envPattern.test(text) && !maxEnv.test(text) && !safeAreaSum(text)) px(text); };
 export function px(text) {
   const env = envPattern.exec(text ?? ''), envMax = maxEnv.exec(text ?? '');
+  const sum = safeAreaSum(text);
+  if (sum) return add(px(sum[0]), px(sum[1]));
   if (envMax) { const a = px(envMax[1]), b = px(envMax[2]); return cmp(a, b) >= 0 ? a : b; }
   if (env) {
     if (safeArea === 'unknown') throw new Error(`${text}: viewport-fit=cover lets the page under the device's safe area; declare the safeArea option`);
