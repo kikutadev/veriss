@@ -15,6 +15,7 @@
     "eval:component-lint": "node tools/eval-component-lint.mjs"
   },
   "devDependencies": {
+    "@mizchi/vlmkit": "0.24.0",
     "@playwright/test": "1.64.1",
     "playwright": "1.64.1",
     "pngjs": "7.0.0"

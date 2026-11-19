@@ -1,6 +1,7 @@
 node_modules
 test-results
 playwright-report
+.vlmkit
 .mooncakes
 _build
 # The text-metrics build is committed so that a git dependency on @mizchi/veriss needs no MoonBit toolchain.
