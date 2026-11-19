@@ -1241,3 +1241,17 @@ test('F113: an @font-face the browser ignores is not used; an invalid font-displ
   assert.deepEqual(faces('font-family: F; src: local(Arial); font-display: fast'), [['F/auto'], ['font-display fast is not auto, block, swap, fallback or optional']]);
   assert.deepEqual(faces("font-family: 'F'; src: url(f.woff2) format('woff2'), local(F); font-display: swap"), [['F/swap'], []]);
 });
+
+test('F114: an invalid transition / animation value drops the declaration (and is not mistaken for a missing duration)', () => {
+  // the whole shorthand is dropped: no transition, so no "no duration" either
+  for (const css of ['.a{transition:opacity 300}', '.a{transition:opacity .3s easeInOut}', '@keyframes spin{to{opacity:0}}.a{animation:spin 1s 1s 1s}']) {
+    const r = run(css);
+    assert.equal(codes(r, 'W_CSS_TIMING_INVALID').length, 1, css);
+    assert.equal(codes(r, 'W_CSS_TRANSITION_NO_DURATION').length, 0, css);
+  }
+  // a dropped transition-duration leaves the transition at 0s: both are true
+  const longhand = run('.a{transition-duration:300;transition-property:opacity}');
+  assert.equal(codes(longhand, 'W_CSS_TIMING_INVALID').length, 1);
+  assert.equal(codes(longhand, 'W_CSS_TRANSITION_NO_DURATION').length, 1);
+  assert.equal(codes(run('.a{transition:opacity .3s ease-in-out}'), 'W_CSS_TIMING_INVALID').length, 0);
+});

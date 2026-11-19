@@ -5,6 +5,7 @@ import { colorSyntaxProblem } from '../color/index.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import { keywordProblem } from './keyword-syntax.mjs';
+import { timingProblem } from './timing-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
 import { q, cmp, add, mul, div, exact, number } from './linear.mjs';
 import { parseCondition, preferenceValues } from './conditions.mjs';
@@ -929,8 +930,8 @@ export function parseLayoutCSS(sheets, diagnostic) {
           // against the computed value of that property (background-image, text-decoration-line).
           if (/^(?:-webkit-)?user-select$/.test(prop) && d.value.trim().toLowerCase() === 'none') userSelectNone.push({ selectors, file: filename, line: d.source.start.line, selector: node.selector });
           if (dependentProperty[prop] && !wide.has(d.value.trim().toLowerCase())) dependentDeclarations.push({ selectors, contexts, property: prop, value: d.value.trim(), file: filename, line: d.source.start.line, selector: node.selector });
-          // F12: a transition shorthand item with no time is 0s.
-          if (prop === 'transition' && !wide.has(d.value.trim().toLowerCase())) for (const item of postcss.list.comma(d.value)) if (!/(?:^|\s)-?(?:\d+(?:\.\d+)?|\.\d+)m?s(?:\s|$)/i.test(item.trim()) && item.trim().toLowerCase() !== 'none' && !/var\(/i.test(item))
+          // F12: a transition shorthand item with no time is 0s. (An invalid shorthand is F114: dropped, so no transition at all.)
+          if (prop === 'transition' && !wide.has(d.value.trim().toLowerCase()) && !timingProblem(prop, d.value)) for (const item of postcss.list.comma(d.value)) if (!/(?:^|\s)-?(?:\d+(?:\.\d+)?|\.\d+)m?s(?:\s|$)/i.test(item.trim()) && item.trim().toLowerCase() !== 'none' && !/var\(/i.test(item))
             note('W_CSS_TRANSITION_NO_DURATION', { selector: node.selector, file: filename, line: d.source.start.line, item: item.trim() });
         }
       }
@@ -991,6 +992,10 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
         { const prop = declaration.prop.toLowerCase(), problem = /^grid-template-(?:columns|rows)$/.test(prop) && gridTrackProblem(declaration.value);
           if (problem) { note('W_CSS_GRID_TRACKS_INVALID', { property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F114: a transition / animation value the browser drops (a bare number for a time, three times, an unknown
+        // easing word, …; measured in Chromium, Firefox and WebKit): dropped here too and reported.
+        { const problem = timingProblem(declaration.prop, declaration.value);
+          if (problem) { note('W_CSS_TIMING_INVALID', { property: declaration.prop.toLowerCase(), value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F109: a keyword the property does not take (position: center, white-space: no-wrap, …): the browser drops the
         // declaration (measured in Chromium, Firefox and WebKit). keyword-syntax.mjs judges only closed keyword sets.
         { const problem = keywordProblem(declaration.prop, declaration.value);

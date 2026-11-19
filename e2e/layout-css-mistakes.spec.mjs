@@ -1311,3 +1311,17 @@ test('F113: an @font-face the browser ignores is reported, and an invalid font-d
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_FONT_FACE_INVALID'), rule).toBe(!registered || /fast/.test(rule));
   }
 });
+
+test('F114: invalid transition and animation values are dropped by the browser, and reported', async ({page}) => {
+  const cases = [['transition', 'opacity 300', true], ['transition', 'all 0.3 ease', true], ['transition', 'opacity .3s ease-in-out 1s 2s', true], ['transition', 'opacity .3s,', true], ['transition', 'opacity .3s easeInOut', true],
+    ['transition', 'opacity 0.3s cubic-bezier(1,2,3)', true], ['transition', 'none, opacity 1s', true], ['transition', 'opacity .3s', false], ['transition', 'opacity .3s, transform', false],
+    ['animation', 'spin 1s 1s 1s', true], ['animation', 'spin 1 linear', false], ['transition-duration', '300', true], ['transition-duration', '.3s', false]];
+  for (const [prop, value, dropped] of cases) {
+    const before = prop === 'animation' ? 'other 7s' : prop === 'transition' ? 'color 7s' : '7s';
+    await page.setContent(`<!doctype html><html lang="en"><head><style>.a{${prop}:${before}}.a{${prop}:${value}}</style></head><body><div class="a">x</div></body></html>`);
+    const v = await page.evaluate(p => getComputedStyle(document.querySelector('.a')).getPropertyValue(p), prop);
+    expect(v.includes('7s'), `${prop}: ${value} -> ${v}`).toBe(dropped);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `@keyframes spin{to{opacity:0}}*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}.a{${prop}:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_TIMING_INVALID'), `${prop}: ${value}`).toBe(dropped);
+  }
+});

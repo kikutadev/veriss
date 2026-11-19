@@ -388,6 +388,7 @@
 - [x] **F111. 不正な `@property`**(`W_CSS_PROPERTY_INVALID`、**健全性の修正**: 引用符のない `syntax: <length>` を登録していて、`inherits: false` として子へ値が届かない計算をしていた): syntax が文字列でない、知らない構文名、inherits がないか true / false でない、`*` 以外で initial-value がない、`<length>` の initial-value が絶対長さでない(単位のない数、em、%)ときは規則ごと無視され、カスタムプロパティは登録されないまま継承する(3 ブラウザで実測)。ブラウザーと同じく無視する(以前は多くが Unknown)
 - [x] **F112. 層の順番だけで負ける宣言**(`W_CSS_LAYER_OVERRIDDEN`): 詳細度では勝つ宣言(`@layer base { #x.a {…} }`)が、後の層か層の外の宣言(`.a {…}`)に負ける。カスケードは層の順を詳細度より先に見る(CSS Cascade 5 §6.4、3 ブラウザで実測)。値が同じ組、同じ層の中、勝つ側の詳細度も高い組、!important と style 属性は報告しない。宣言の組ごとに一度
 - [x] **F113. 不正な `@font-face`**(`W_CSS_FONT_FACE_INVALID`): font-family がない、名前が不正(`3D Font`)、src がない、src の項目が url() でも local() でもない(`src: Arial`)ときは規則ごと無視され、フォントは読み込まれない(3 ブラウザで `document.fonts` を実測)。以前はこれを字形の入れ替え(CLS)の判定に使っていた(font-family がないものは Unknown)。不正な font-display は記述だけが捨てられ auto になる
+- [x] **F114. 不正な `transition` / `animation`**(`W_CSS_TIMING_INVALID`): 単位のない時間(`transition: opacity 300`、`transition-duration: 300`、`animation-duration: 2`)、1 項目に 3 つの時間、知らないイージング名(`easeInOut` は 2 つ目のプロパティ名として読まれる)、4 つの数でない `cubic-bezier()`、ほかと並べた `none`、空の項目は宣言ごと捨てられる(3 ブラウザで 16 通り実測)。以前は `transition: opacity 300` を「時間のないトランジション」(F12)と誤って説明していた。捨てられた `transition-duration` の後に残る 0s のトランジションは F12 のまま報告する
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
