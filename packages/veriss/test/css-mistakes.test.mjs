@@ -1203,3 +1203,13 @@ test('F87 (or, not): "or(" and "not(" in a media query are function tokens too: 
     assert.ok(hit && /(or|not) \(/.test(hit.message), q);
   }
 });
+
+test('F111: an invalid @property is ignored, so the custom property stays unregistered (an unquoted syntax was registered)', () => {
+  const child = rule => { const r = run(`@property --x { ${rule}; }.p{--x:30px;height:auto}.c{height:var(--x, 5px)}`, '<div class="p"><div class="c"></div></div>'); return [r.status, r.sizes?.find(s => s.box === '.c')?.rect.blockSize.constant, codes(r, 'W_CSS_PROPERTY_INVALID').length]; };
+  // measured: ignored by Chromium, Firefox and WebKit, so --x inherits as an unregistered property (30px)
+  for (const rule of ["syntax: <length>; inherits: false; initial-value: 0px", "syntax: '<length>'; inherits: false", "syntax: '<length>'; initial-value: 0px", "syntax: '<length>'; inherits: false; initial-value: 10",
+    "syntax: '<length>'; inherits: false; initial-value: 1em", "syntax: '<lenght>'; inherits: false; initial-value: 0px", "syntax: '<length>'; inherits: no; initial-value: 0px"])
+    assert.deepEqual(child(rule), ['verified', '30', 1], rule);
+  // valid: registered, does not inherit, so the child gets the initial value
+  assert.deepEqual(child("syntax: '<length>'; inherits: false; initial-value: 0px"), ['verified', '0', 0]);
+});

@@ -2,6 +2,8 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_PROPERTY_INVALID: note => ({ code: 'W_CSS_PROPERTY_INVALID', severity: 'warning', property: note.name, css: [{ property: '@property', file: note.file, line: note.line, selector: `@property ${note.name}` }],
+    message: `@property ${note.name}: ${note.problem}, so the browser ignores the whole rule and ${note.name} stays an unregistered custom property (it inherits and has no type or initial value). Fix the rule: syntax: '<length>'; inherits: false; initial-value: 0px` }),
   W_CSS_SUPPORTS_INVALID: note => ({ code: 'W_CSS_SUPPORTS_INVALID', severity: 'warning', css: [{ property: '@supports', file: note.file, line: note.line }],
     message: `@supports ${note.params}: "${note.written}" with no space is read as a function, so the condition is invalid and its rules never apply in any browser. Write ${note.params.replace(/(?<![\w:-])(and|or|not)\(/gi, '$1 (')}` }),
   W_CSS_KEYWORD_INVALID: note => ({ code: 'W_CSS_KEYWORD_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],

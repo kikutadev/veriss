@@ -90,6 +90,26 @@ const geometry = new Set(['aspect-ratio', 'display', 'appearance', 'box-sizing',
 const lengthOnly = /^(?:(?:min-|max-)?(?:width|height|inline-size|block-size)|margin(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|padding(?:-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?|top|right|bottom|left|inset(?:-(?:inline|block)(?:-(?:start|end))?)?|gap|row-gap|column-gap|font-size|border-(?:top-|bottom-)?(?:left-|right-)?radius|border-(?:top|right|bottom|left)-width|border-width|outline-width|outline-offset|letter-spacing|word-spacing|text-indent|flex-basis)$/;
 // Properties that take a color, alone or inside a shorthand (F107).
 const colorProperty = /^(?:color|background(?:-color)?|border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?(?:-color)?|outline(?:-color)?|caret-color|accent-color|fill|stroke|text-decoration(?:-color)?|text-emphasis(?:-color)?|column-rule(?:-color)?|box-shadow|text-shadow|flood-color|lighting-color|stop-color|scrollbar-color)$/;
+// F111: why the browser ignores an @property rule (CSS Properties and Values API 1 §2; measured in Chromium, Firefox and
+// WebKit), or null. Judged: the syntax must be a quoted string of known component names (or *), inherits true or false,
+// and an initial-value present unless the syntax is *; for <length> the initial value must be an absolute length (not
+// a bare number, em, % or a viewport unit). Anything else is left to the checks after (which keep it Unknown).
+const syntaxComponents = new Set(['length', 'number', 'percentage', 'length-percentage', 'color', 'image', 'url', 'integer', 'angle', 'time', 'resolution', 'transform-function', 'custom-ident', 'transform-list', 'string']);
+function propertyRuleProblem(rawSyntax, inherits, initial) {
+  if (rawSyntax === undefined) return 'it has no syntax descriptor';
+  const quoted = /^(["'])(.*)\1$/s.exec(rawSyntax.trim());
+  if (!quoted) return `the syntax ${rawSyntax.trim()} is not a string (write it in quotes)`;
+  const syntax = quoted[2].trim();
+  if (syntax !== '*') {
+    const unknown = syntax.split('|').map(part => part.trim()).map(part => /^<([a-z-]+)>[+#]?$/i.exec(part)?.[1]).find(name => name !== undefined && !syntaxComponents.has(name.toLowerCase()));
+    if (unknown) return `the syntax names <${unknown}>, which is not a syntax component`;
+  }
+  if (inherits === undefined) return 'it has no inherits descriptor';
+  if (!['true', 'false'].includes(inherits)) return `inherits is ${inherits}, not true or false`;
+  if (syntax !== '*' && initial === undefined) return 'it has no initial-value (required unless the syntax is *)';
+  if (syntax === '<length>' && !/^(?:0|[+-]?(?:\d+\.?\d*|\.\d+)(?:px|cm|mm|in|pt|pc|q))$/i.test(String(initial).trim())) return `the initial-value ${initial} is not an absolute length (a bare number, em, % or a viewport unit is not allowed)`;
+  return null;
+}
 const wide = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
 const decoration = /^(?:background-(?:position|size|repeat|clip|origin|attachment)|border-radius|text-shadow|text-decoration-(?:color|style|thickness)|text-underline-offset|transition-behavior|list-style-(?:position|image))$/;
 // Properties a :hover/:focus rule may set: they repaint (or restack) without changing geometry.
@@ -745,6 +765,9 @@ export function parseLayoutCSS(sheets, diagnostic) {
       if (node.type === 'atrule' && node.name.toLowerCase() === 'property') {
         const name = node.params.trim(), descriptor = d => (node.nodes ?? []).find(x => x.type === 'decl' && x.prop.toLowerCase() === d)?.value.trim();
         const syntax = descriptor('syntax')?.replace(/^["']|["']$/g, '').trim(), inherits = descriptor('inherits')?.toLowerCase(), initial = descriptor('initial-value');
+        // F111: an @property the browser ignores (the property then stays unregistered) is ignored here too and reported.
+        { const invalid = propertyRuleProblem(descriptor('syntax'), inherits, initial);
+          if (invalid) { note('W_CSS_PROPERTY_INVALID', { name, problem: invalid, file: filename, line: node.source.start.line }); continue; } }
         const problemOf = !customName(name) ? 'the name is not a custom property' : !syntax || !(syntax === '*' || typedValue[syntax]) ? `syntax ${syntax ?? '(missing)'} is not modeled` : !['true', 'false'].includes(inherits) ? 'inherits must be true or false' : syntax !== '*' && (initial === undefined || !typedValue[syntax].test(initial)) ? `initial-value ${initial ?? '(missing)'} is not a literal ${syntax}` : null;
         if (problemOf) { problem('U_LAYOUT_CSS', `@property ${name}: ${problemOf}`, node.source.start.line); continue; }
         if (depth > 0) { problem('U_LAYOUT_CSS', `@property ${name} inside a conditional rule is not modeled`, node.source.start.line); continue; }

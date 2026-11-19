@@ -25,6 +25,13 @@ test('initial-value is what var() reads where nothing sets the property, and for
 test('typed values that compute differently (em, var(), calc) and malformed rules stay Unknown', () => {
   assert.equal(height('@property --h{syntax:"<length>";inherits:true;initial-value:10px}.m{--h:2em}.k{height:var(--h)}'), 'unknown');
   assert.equal(height('@property --h{syntax:"<length>";inherits:true;initial-value:10px}.m{--h:var(--x)}.k{height:var(--h)}'), 'unknown');
-  assert.equal(height('@property --h{syntax:"<length>";inherits:true}.k{height:var(--h)}'), 'unknown');
-  assert.equal(height('@property --h{syntax:"<length>";initial-value:10px}.k{height:var(--h)}'), 'unknown');
+});
+
+test('F111: a malformed @property (no initial-value, no inherits) is ignored as in the browser: --h stays unregistered', () => {
+  // measured in Chromium, Firefox and WebKit: the rule is dropped, so .m's --h inherits to .k as an unregistered property
+  for (const rule of ['@property --h{syntax:"<length>";inherits:false}', '@property --h{syntax:"<length>";initial-value:10px}']) {
+    assert.equal(height(`${rule}.m{--h:30px}.k{height:var(--h)}`), '30', rule);
+    const r = analyzeHTML('<html lang="en"><body><div class="m"><div class="k"></div></div></body></html>', {name: 'P', css: `${rule}*{margin:0}`, viewport: {min: 400, max: 400, height: {min: 300, max: 300}}});
+    assert.ok((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_PROPERTY_INVALID'), rule);
+  }
 });

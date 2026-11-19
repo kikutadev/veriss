@@ -1273,3 +1273,17 @@ test('F110: "and(", "or(" and "not(" in @supports make the condition invalid; th
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SUPPORTS_INVALID'), condition).toBe(/(?<![\w:-])(and|or|not)\(/i.test(condition));
   }
 });
+
+test('F111: an invalid @property is ignored by the browser (the property stays unregistered), and by the analyzer', async ({page}) => {
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{--x:30px}.c{height:var(--x, 5px)}';
+  for (const [rule, ignored] of [["syntax: <length>; inherits: false; initial-value: 0px", true], ["syntax: '<length>'; inherits: false", true], ["syntax: '<length>'; initial-value: 0px", true],
+    ["syntax: '<length>'; inherits: false; initial-value: 10", true], ["syntax: '<length>'; inherits: false; initial-value: 1em", true], ["syntax: '<lenght>'; inherits: false; initial-value: 0px", true],
+    ["syntax: '<length>'; inherits: no; initial-value: 0px", true], ["syntax: '<length>'; inherits: false; initial-value: 0px", false]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>@property --x { ${rule}; }${css}</style></head><body><div class="p"><div class="c"></div></div></body></html>`);
+    expect(await page.evaluate(() => document.querySelector('.c').getBoundingClientRect().height), rule).toBe(ignored ? 30 : 0);
+    const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="c"></div></div></body></html>', {name: 'P', css: `@property --x { ${rule}; }${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, rule).toBe('verified');
+    expect(r.sizes.find(s => s.box === '.c').rect.blockSize.constant, rule).toBe(ignored ? '30' : '0');
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_PROPERTY_INVALID'), rule).toBe(ignored);
+  }
+});
