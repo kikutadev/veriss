@@ -1168,3 +1168,19 @@ test('F108: on a table column (col / colgroup) only width, background, border (c
   // min-width differs by browser (WebKit ignores it): not reported
   assert.deepEqual(inert('.c{min-width:200px}'), []);
 });
+
+test('F109: a keyword the property does not take drops the declaration; the earlier value stays (it was Unknown)', () => {
+  const w = r => codes(r, 'W_CSS_KEYWORD_INVALID');
+  const flex = run('.p{display:flex;width:300px;height:auto;flex-direction:row}.p{flex-direction:col}.c{width:50px;height:20px}', '<div class="p"><div class="c"></div><div class="c"></div></div>');
+  assert.equal(flex.status, 'verified');
+  assert.deepEqual(flex.sizes.filter(s => s.box === '.c').map(s => s.rect.inlineStart?.constant ?? s.rect.inlineStart), ['0', '50']);
+  const [hit] = w(flex);
+  assert.match(hit.message, /flex-direction: column\?/);
+  for (const css of ['.a{position:center}', '.a{display:flexbox}', '.a{box-sizing:border}', '.a{overflow:none}', '.a{white-space:no-wrap}', '.a{visibility:none}']) {
+    const r = run(css);
+    assert.equal(r.status, 'verified', css);
+    assert.equal(w(r).length, 1, css);
+  }
+  assert.equal(w(run('.a{position:-webkit-sticky;top:0}')).length, 0);
+  assert.equal(w(run('.a{vertical-align:center}')).length, 0);
+});

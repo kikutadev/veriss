@@ -1247,3 +1247,16 @@ test('F108: on a table column only width, background, visibility and (collapsed)
   const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{padding:20px;color:red}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
   expect((r.layoutWarnings ?? []).filter(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.c').flatMap(w => w.properties)).toEqual(['padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'color']);
 });
+
+test('F109: a keyword the property does not take drops the declaration; vendor keywords and Firefox-only ones are left alone', async ({page}) => {
+  const cases = [['display', 'flexbox', 'block', true], ['position', 'center', 'relative', true], ['text-align', 'middle', 'right', true], ['align-items', 'middle', 'end', true], ['justify-content', 'middle', 'end', true],
+    ['float', 'center', 'left', true], ['overflow', 'none', 'hidden', true], ['white-space', 'no-wrap', 'pre', true], ['letter-spacing', 'auto', '3px', true], ['box-sizing', 'border', 'border-box', true],
+    ['cursor', 'hand', 'pointer', true], ['text-transform', 'capitalized', 'uppercase', true], ['font-weight', 'heavy', '700', true], ['visibility', 'none', 'hidden', true], ['flex-direction', 'col', 'column', true],
+    ['border-style', 'line', 'dashed', true], ['justify-content', 'space-evenly', 'end', false], ['overflow', 'auto', 'hidden', false], ['letter-spacing', '1px', '3px', false], ['display', 'inline flex', 'block', false]];
+  for (const [prop, value, before, dropped] of cases) {
+    const read = async css => { await page.setContent(`<!doctype html><html lang="en"><head><style>${css}</style></head><body><div class="a">x</div></body></html>`); return page.evaluate(p => getComputedStyle(document.querySelector('.a')).getPropertyValue(p), prop); };
+    expect((await read(`.a{${prop}:${before}}.a{${prop}:${value}}`)) === (await read(`.a{${prop}:${before}}`)), `${prop}: ${value}`).toBe(dropped);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}.a{${prop}:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_KEYWORD_INVALID'), `${prop}: ${value}`).toBe(dropped);
+  }
+});

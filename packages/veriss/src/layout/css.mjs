@@ -4,6 +4,7 @@ import { drop } from './dropped.mjs';
 import { colorSyntaxProblem } from '../color/index.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
+import { keywordProblem } from './keyword-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
 import { q, cmp, add, mul, div, exact, number } from './linear.mjs';
 import { parseCondition, preferenceValues } from './conditions.mjs';
@@ -957,6 +958,10 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
         { const prop = declaration.prop.toLowerCase(), problem = /^grid-template-(?:columns|rows)$/.test(prop) && gridTrackProblem(declaration.value);
           if (problem) { note('W_CSS_GRID_TRACKS_INVALID', { property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F109: a keyword the property does not take (position: center, white-space: no-wrap, …): the browser drops the
+        // declaration (measured in Chromium, Firefox and WebKit). keyword-syntax.mjs judges only closed keyword sets.
+        { const problem = keywordProblem(declaration.prop, declaration.value);
+          if (problem) { note('W_CSS_KEYWORD_INVALID', { property: declaration.prop.toLowerCase(), value: declaration.value.trim(), ...problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F107: a color the grammar does not allow (hsl(0, 0, 0), rgb(0 0 0, .5), #12345, …) makes the whole declaration
         // invalid: the browser drops it and the earlier color stays (measured in Chromium, Firefox and WebKit). Read in the
         // properties that take a color (also inside a shorthand), outside url() and strings.
