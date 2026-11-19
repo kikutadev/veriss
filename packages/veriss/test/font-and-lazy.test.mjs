@@ -84,6 +84,13 @@ test('env(safe-area-inset-*) and a bottom bar under viewport-fit=cover (W_LAYOUT
   const bar = report => report.sizes.find(r => r.box === '.bar').contentBlockSize.constant;
   assert.equal(bar(run(', viewport-fit=cover', 'env(safe-area-inset-bottom)', {bottom: 34})), '48');
   assert.equal(bar(run('', 'env(safe-area-inset-bottom)', {bottom: 34})), '82');
+  for (const pad of ['calc(8px + env(safe-area-inset-bottom))', 'calc(env(safe-area-inset-bottom, 40px) + 8px)']) {
+    // Unbounded arithmetic must not be inferred from an unspecified inset.
+    assert.equal(bar(run(', viewport-fit=cover', pad, {bottom: 20})), '54');
+    assert.equal(bar(run('', pad, {bottom: 34})), '74');
+    assert.equal(run(', viewport-fit=cover', pad).status, 'unknown');
+  }
+
   // cover without a declared safe area: the inset is not known.
   assert.match(run(', viewport-fit=cover', 'env(safe-area-inset-bottom)').diagnostics.find(d => d.severity === 'unknown').message, /safeArea/);
   assert.throws(() => run('', '0', {bottom: -1}), /safeArea/);
