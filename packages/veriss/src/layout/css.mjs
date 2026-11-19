@@ -1165,6 +1165,9 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   // position: fixed is laid out as absolute against the viewport; the engine admits it for the accessibility and
   // integrity checks only (at scroll position 0) and keeps every other proof Unknown.
   if (values.position === 'fixed') { values.position = 'absolute'; values.$fixed = true; }
+  // F77: float computes to none on an absolutely positioned (or fixed) box (CSS 2.2 §9.7; measured in Chromium, Firefox and
+  // WebKit: computed none, same position). Recorded for a warning.
+  if (values.position === 'absolute' && !['none', undefined].includes(values.float)) { if (sources.float) values.$floatInert = values.float; values.float = 'none'; }
   // template { display: none } (UA): its content is a fragment, never rendered; an author display would draw an empty
   // box (not measured), so it is left Unknown.
   // datalist { display: none } (UA, measured in Chromium, Firefox and WebKit): its options show only in the field's

@@ -843,3 +843,12 @@ test('F76: flex / grid container properties on an inline element do nothing', ()
   assert.equal(w('.x{display:inline-flex;gap:10px}').length, 0);
   assert.equal(w('.x{grid-template-columns:1fr 1fr}').length, 1);
 });
+
+test('F77: float on an absolutely positioned box computes to none (not a float error)', () => {
+  const html = '<div class="w"><div class="x"></div></div>';
+  const r = run('.w{position:relative;height:100px}.x{position:absolute;top:0;left:0;float:left;width:20px;height:20px}', html);
+  assert.notEqual(r.status, 'violated');
+  assert.ok(!JSON.stringify(r.diagnostics).includes('float is forbidden'));
+  const [hit] = codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.includes('float'));
+  assert.ok(hit && /absolutely positioned/.test(hit.message));
+});

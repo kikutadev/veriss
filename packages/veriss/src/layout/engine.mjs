@@ -548,6 +548,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    if (style.$floatInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
+      layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['float'], ...(style.$sources?.float ? { css: [{ property: 'float', file: style.$sources.float.file, line: style.$sources.float.line, selector: style.$sources.float.selector }] } : {}),
+        message: `${box.label}: float: ${style.$floatInert} has no effect on an absolutely positioned box (its float computes to none). Place it with left / right instead` });
     // F75: a select of appearance auto is drawn by the browser at its own height: line-height changes neither its size nor
     // its pixels (measured in Chromium, Firefox and WebKit; with appearance: none it does).
     if (!box.pseudo && box.tag === 'select' && style.appearance === 'auto' && style.$sources?.['line-height'] && !['normal', 'initial', 'inherit', 'unset'].includes(String(style.$sources['line-height'].specified ?? style['line-height'])) && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('line-height')))

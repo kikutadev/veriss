@@ -354,6 +354,9 @@
 - [x] **F76. inline の要素の flex・grid の容器の性質**(`W_LAYOUT_DECLARATION_INERT`): gap・grid-template-*・grid-auto-*・
   flex-direction・flex-wrap・justify-content・align-items・align-content・justify-items は flex・grid の容器の子を並べる性質で、
   display: inline の span では子の要素があっても何も変わらない(3 つのブラウザーで描画が同じ)。display: flex などを勧める。
+- [x] **F77. 絶対配置の箱の `float`**(`W_LAYOUT_DECLARATION_INERT`、以前は誤って「float は使えない」というエラー): absolute・fixed
+  の箱の float は none に計算される(CSS 2.2 §9.7。3 つのブラウザーで計算値が none、位置も同じ)。解析も none として扱い、
+  書いた float が何もしないと報告する。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く
   (消えない)ので報告しない。
 

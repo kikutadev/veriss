@@ -872,3 +872,17 @@ test('F76: flex / grid container properties on an inline element change nothing'
     expect(warned, `${disp} ${d}`).toBe(inert);
   }
 });
+
+test('F77: float on an absolutely positioned box computes to none', async ({page}) => {
+  const html = '<div class="w"><div class="x" id="x"></div></div>';
+  for (const pos of ['absolute', 'fixed']) {
+    const css = `.w{position:relative;height:100px}.x{position:${pos};top:0;left:0;width:20px;height:20px}`;
+    const at = async f => { await page.setContent(`<!doctype html><html lang="en"><head><style>body{margin:0}${css}${f}</style></head><body>${html}</body></html>`); return page.evaluate(() => getComputedStyle(document.getElementById('x')).float + JSON.stringify(document.getElementById('x').getBoundingClientRect())); };
+    const plain = await at(''), floated = await at('.x{float:right}');
+    expect(floated.startsWith('none'), pos).toBe(true);
+    expect(floated.slice(4), pos).toBe(plain.slice(4));
+    const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}.x{float:right}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}, accessibility: true});
+    expect(r.status, pos).not.toBe('violated');
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('float')), pos).toBe(true);
+  }
+});
