@@ -1149,3 +1149,31 @@ test('F104: list-style-image on an element that is not a list item does nothing'
   expect(r.status).toBe('verified');
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('list-style-image'))).toBe(true);
 });
+
+test('F101: an invalid grid track list drops the declaration', async ({page}) => {
+  const html = '<div class="g"><div class="i"></div><div class="i"></div></div>';
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.g{display:grid;width:300px;grid-template-columns:100px 200px}.i{height:20px}';
+  for (const [v, dropped] of [['repeat(auto-fill,1fr)', true], ['repeat(auto-fill,100px) 1fr', true], ['minmax(1fr,1fr)', true], ['repeat(0,1fr)', true], ['1fr -10px', true], ['fit-content(1fr)', true],
+    ['repeat(auto-fill,100px)', false], ['repeat(auto-fit,minmax(100px,1fr))', false], ['minmax(100px,1fr) 1fr', false]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${css}.g{grid-template-columns:${v}}</style></head><body>${html}</body></html>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.g')).gridTemplateColumns) === '100px 200px', v).toBe(dropped);
+    const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `${css}.g{grid-template-columns:${v}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_GRID_TRACKS_INVALID'), v).toBe(dropped);
+    if (dropped) {
+      expect(r.status, v).toBe('verified');
+      expect(r.sizes.filter(s => s.box === '.i').map(s => s.rect.inlineSize.constant), v).toEqual(['100', '200']);
+    }
+  }
+});
+
+test('F102: a CSS counter that nothing reads changes nothing', async ({page}) => {
+  const html = '<ol class="l"><li class="i">a</li><li class="i">b</li></ol><div class="d">c</div>';
+  const base = '.l{font:16px monospace}';
+  for (const extra of ['.i{counter-increment:step}', '.l{counter-reset:step 5}.i{counter-increment:step 2}', '.d{counter-set:other 3}'])
+    expect(await pixelsAndBoxes(page, base + extra, html), extra).toEqual(await pixelsAndBoxes(page, base, html));
+  // once a counter() shows it, it does change the page (so the check above is not vacuous)
+  const shown = `${base}.i::before{content:counter(step) " "}`;
+  expect(await pixelsAndBoxes(page, `${shown}.i{counter-increment:step 5}`, html)).not.toEqual(await pixelsAndBoxes(page, shown, html));
+  const r = analyzeHTML('<html lang="en"><body><ol class="l"><li class="i"></li></ol></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.i{height:20px;counter-increment:step}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).filter(w => w.code === 'W_CSS_COUNTER_UNUSED').map(w => w.counter)).toEqual(['step']);
+});

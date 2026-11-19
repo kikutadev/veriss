@@ -1,6 +1,7 @@
 import postcss from 'postcss';
 import { calcOperatorProblem } from './calc-syntax.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
+import { gridTrackProblem } from './grid-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
 import { q, cmp, add, mul, div, exact, number } from './linear.mjs';
 import { parseCondition, preferenceValues } from './conditions.mjs';
@@ -636,7 +637,7 @@ function flexShorthand(value) {
 }
 
 export function parseLayoutCSS(sheets, diagnostic) {
-  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], unitlessLength = [], fontInvalid = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], unitlessLength = [], fontInvalid = [], gridTracksInvalid = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
@@ -943,6 +944,10 @@ export function parseLayoutCSS(sheets, diagnostic) {
         { const prop = declaration.prop.toLowerCase();
           const problem = prop === 'font-family' ? (b => b && { family: b })(familyProblem(declaration.value)) : prop === 'font' ? fontShorthandProblem(declaration.value) : null;
           if (problem) { fontInvalid.push({ property: prop, value: declaration.value.trim(), ...problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+        // F101: a grid track list the grammar does not allow (repeat(auto-fill, 1fr), minmax(1fr, …), repeat(0, …)) is
+        // invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
+        { const prop = declaration.prop.toLowerCase(), problem = /^grid-template-(?:columns|rows)$/.test(prop) && gridTrackProblem(declaration.value);
+          if (problem) { gridTracksInvalid.push({ property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F93: a bare number other than 0 where only a length is allowed (width: 100) is invalid in standards mode — the
         // mode analysed here — so the browser drops the declaration (measured in Chromium, Firefox and WebKit; only quirks
         // mode, in WebKit, takes it as px).
@@ -975,6 +980,23 @@ export function parseLayoutCSS(sheets, diagnostic) {
     try { const root = flattenNesting(postcss.parse(sheet.css, { from: sheet.file })); visit(root.nodes, [], null, sheet.file); }
     catch (error) { diagnostic('U_LAYOUT_CSS', error.reason ?? error.message, error.line, sheet.file); }
   }
+  // F102: counter-reset / -increment / -set of a counter that no counter() / counters() in the analysed CSS reads change
+  // nothing that shows (measured in Chromium, Firefox and WebKit). list-item is the counter list markers read.
+  const counterUnused = [];
+  {
+    const declared = [], read = new Set();
+    for (const sheet of sheets) {
+      let root; try { root = postcss.parse(sheet.css, { from: sheet.file }); } catch { continue; }
+      root.walkDecls(d => {
+        const prop = d.prop.toLowerCase();
+        if (prop === 'content') for (const m of d.value.matchAll(/\bcounters?\(\s*([-\w]+)/gi)) read.add(m[1]);
+        if (/^counter-(?:reset|increment|set)$/.test(prop) && !/var\(|^\s*(?:none|inherit|initial|unset|revert|revert-layer)\s*$/i.test(d.value))
+          for (const name of d.value.trim().split(/\s+/).filter(w => !/^-?\d+$/.test(w) && !/^reversed\(/i.test(w))) declared.push({ name, property: prop, selector: d.parent?.selector ?? '', file: sheet.file, line: d.source?.start.line });
+      });
+    }
+    const seen = new Set();
+    for (const d of declared) if (d.name !== 'list-item' && !read.has(d.name) && !seen.has(d.name)) { seen.add(d.name); counterUnused.push(d); }
+  }
   // An animation-name without @keyframes runs no animation.
   // (Checklist F1: the names without @keyframes are kept for a warning — a typo or a missing rule.)
   const missingKeyframes = [];
@@ -983,7 +1005,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
     if (!missingKeyframes.some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) missingKeyframes.push({ name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, unitlessLength, fontInvalid, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
+  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, unitlessLength, fontInvalid, gridTracksInvalid, counterUnused, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
 }
 
 // The UA default family and the user's default font size are not author

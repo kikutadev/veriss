@@ -1076,3 +1076,25 @@ test('F104: list-style-image on an element that is not a list item and has nothi
   assert.ok(!inert('.a{display:list-item;list-style-image:linear-gradient(red,red)}'));
   assert.ok(!inert('.a{list-style-image:linear-gradient(red,red);height:auto}li{height:20px}', '<ul class="a"><li></li></ul>'));
 });
+
+test('F101: an invalid grid track list drops the declaration (it was Unknown)', () => {
+  const html = '<div class="g"><div class="i"></div><div class="i"></div></div>';
+  const cols = v => { const r = run(`.g{display:grid;width:300px;height:auto;grid-template-columns:100px 200px}.i{height:20px}.g{grid-template-columns:${v}}`, html); return [r.status, r.sizes?.filter(s => s.box === '.i').map(s => s.rect.inlineSize.constant).join(','), codes(r, 'W_CSS_GRID_TRACKS_INVALID').length]; };
+  // the earlier 100px 200px stays, as in the browser
+  assert.deepEqual(cols('repeat(auto-fill,1fr)'), ['verified', '100,200', 1]);
+  assert.deepEqual(cols('minmax(1fr,1fr)'), ['verified', '100,200', 1]);
+  assert.deepEqual(cols('repeat(0,1fr)'), ['verified', '100,200', 1]);
+  assert.deepEqual(cols('repeat(auto-fill,100px)'), ['verified', '100,100', 0]);
+});
+
+test('F102: a CSS counter that no counter() / counters() reads changes nothing', () => {
+  const html = '<ol class="l"><li class="i"></li><li class="i"></li></ol>';
+  const unused = css => codes(run(`.l{height:auto}.i{height:20px}${css}`, html), 'W_CSS_COUNTER_UNUSED').map(w => w.counter);
+  assert.deepEqual(unused('.i{counter-increment:step}'), ['step']);
+  assert.deepEqual(unused('.l{counter-reset:step}.i{counter-increment:step 2}'), ['step']);
+  assert.deepEqual(unused('.l{counter-reset:a b 3}.i{counter-increment:a}.i::before{content:counter(a) ". "}'), ['b']);
+  assert.deepEqual(unused('.i{counter-increment:step}.i::before{content:counters(step, ".")}'), []);
+  assert.deepEqual(unused('.i{counter-increment:step}.i::marker{content:counter(step)}'), []);
+  // list-item is the counter list markers read; none resets nothing
+  assert.deepEqual(unused('.i{counter-increment:list-item 2}.l{counter-reset:none}'), []);
+});

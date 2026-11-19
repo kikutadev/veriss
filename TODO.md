@@ -13,8 +13,6 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 
 「現状」は今の解析器の結果。
 
-- [ ] **F101. grid の不正なトラック**(`repeat(auto-fill, 1fr)`、`minmax(1fr, 100px)`): auto-fill の繰り返しは固定の大きさ、minmax の最小は fr 不可で、宣言ごと捨てられる(3 ブラウザで実測)。現状: Unknown
-- [ ] **F102. どこからも読まれない `counter-increment` / `counter-reset`**: `counter()` / `counters()` で読むものがなければ見た目は変わらない(3 ブラウザで実測)。現状: 警告なし
 - [ ] **F103. inline-block の左右の `margin: auto`**: 0 になり中央に寄らない(3 ブラウザで実測)。現状: inline の行は Unknown。`text-align: center` を親に、と案内する
 - [ ] **F105. block の子の `justify-self`**: Chromium と WebKit は寄せるが Firefox は寄せない(実測)。現状: Unknown(健全)。ブラウザごとの違いとして警告する
 
@@ -56,3 +54,5 @@ CSS × DOM の静的検査パターンの候補。実装したものは [docs/st
 - F99. 引用符のない `font-family` の不正な名前(健全性の修正)
 - F100. size か family のない `font` ショートハンド
 - F104. list-item でない要素の `list-style-image`
+- F101. grid の不正なトラック
+- F102. どこからも読まれない CSS カウンター
