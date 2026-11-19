@@ -490,7 +490,7 @@ function expand(property, value) {
   const neutral = {
     'word-break': ['normal'], 'text-wrap-mode': ['wrap'],
     'font-variant-numeric': ['normal'], 'font-variant-ligatures': ['normal'], 'font-feature-settings': ['normal'], 'font-variation-settings': ['normal'], 'text-rendering': ['auto'],
-    'tab-size': ['8'], 'box-decoration-break': ['slice'], '-webkit-box-decoration-break': ['slice'], 'field-sizing': ['fixed'],
+    'box-decoration-break': ['slice'], '-webkit-box-decoration-break': ['slice'], 'field-sizing': ['fixed'],
     'text-size-adjust': ['none', '100%'], '-webkit-text-size-adjust': ['none', '100%'],
     filter: ['none'], 'mix-blend-mode': ['normal'], contain: ['none', 'style'], perspective: ['none'],
   };
@@ -545,6 +545,8 @@ function expand(property, value) {
   }
   // resize: kept so the engine can tell an inert one (overflow visible) from one the user can drag (Unknown there).
   if (property === 'resize') { const v = value.trim().toLowerCase(); if (!wide.has(v) && !['none', 'both', 'horizontal', 'vertical', 'block', 'inline'].includes(v)) throw new Error(`Unsupported resize: ${value}`); return [['resize', v]]; }
+  // F84: tab-size is kept so computeStyle can tell an inert one (white-space collapses tabs) from one that moves text.
+  if (property === 'tab-size') { const v = value.trim().toLowerCase(); if (!wide.has(v) && !/^(?:\d+(?:\.\d+)?|\d+(?:\.\d+)?px)$/.test(v)) throw new Error(`Unsupported tab-size: ${value}`); return [['tab-size', v]]; }
   if (Object.hasOwn(neutral, property)) {
     if (wide.has(value) || neutral[property].includes(value.trim().toLowerCase())) return [];
     throw new Error(`Unsupported ${property}: ${value} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
@@ -1343,6 +1345,13 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   if ((box.pseudo === 'before' || box.pseudo === 'after') && (values.content ?? 'none') !== 'none' && noPseudoHost(box)) { values.$pseudoNotRendered = values.content; values.content = 'none'; }
   // F45: text-indent and text-align-last apply to block containers. On an inline element with no child elements they do
   // nothing (measured in Chromium, Firefox and WebKit); elsewhere they move the lines, which is not modeled.
+  // F84: white-space normal, nowrap and pre-line turn a tab into a space that collapses, so tab-size does nothing there
+  // (measured in Chromium, Firefox and WebKit). It is inherited, so only a box with no element inside is judged.
+  if (values['tab-size'] !== undefined) {
+    if (['8', 'initial', 'unset', 'revert', 'revert-layer'].includes(String(values['tab-size']))) delete values['tab-size'];
+    else if (!box.pseudo && ['normal', 'nowrap', 'pre-line'].includes(String(values['white-space'])) && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { values.$tabSizeInert = values['tab-size']; delete values['tab-size']; }
+    else throw new Error(`Unsupported tab-size: ${values['tab-size']} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
+  }
   for (const [key, idle] of [['text-indent', ['0', '0px', 'initial', 'unset', 'revert', 'revert-layer']], ['text-align-last', ['auto', 'initial', 'unset', 'revert', 'revert-layer']]]) {
     if (values[key] === undefined || idle.includes(String(values[key]))) continue;
     if (!box.pseudo && values.display === 'inline' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { (values.$inlineTextInert ??= []).push([key, values[key]]); delete values[key]; }

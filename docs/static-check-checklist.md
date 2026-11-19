@@ -369,6 +369,8 @@
 - [x] **F89. calc の `+` / `-` の両側の空白**(`W_CSS_CALC_OPERATOR_SPACE`、健全性の修正: 以前は `calc(100%-10px)` を 100% − 10px として verified にしていた): 空白がないと符号付きの数として読まれて値が不正になり、宣言ごと捨てられる。`min()` / `max()` / `clamp()` と入れ子も同じ。`*` と `/` は空白なしで有効(3 ブラウザで 16 通り実測)
 - [x] **F92. block コンテナの `gap`**(`W_LAYOUT_DECLARATION_INERT`): 子のある block は以前から検出していた。子のない block と inline-block にも広げた
 - [x] **F93. 単位のない長さ**(`W_CSS_UNITLESS_LENGTH`、以前は Unknown): `width: 100` など長さしか取らないプロパティの 0 以外の素の数は不正で、宣言ごと捨てられる。解析は標準モード(`<!doctype html>`)を前提にする(quirks モードの WebKit は px として受け付ける)。`line-height` や `flex` のように数を取るプロパティは対象外
+- [x] **F84. 空白を詰める `white-space` の下の `tab-size`**(`W_LAYOUT_DECLARATION_INERT`、以前は Unknown): normal / nowrap / pre-line ではタブが空白になって潰れるので効かない。継承されるので、中に要素のない箱だけを判定し、pre / pre-wrap や子のある箱は Unknown のまま
+- [x] **F94. 表の行・行グループの `border-radius`**(`W_LAYOUT_DECLARATION_INERT`): 分離・collapse どちらの境界モデルでも、行の背景も枠も丸まらない(3 ブラウザでスクリーンショット比較)。角のセルを丸める
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

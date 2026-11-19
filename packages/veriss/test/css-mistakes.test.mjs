@@ -996,3 +996,31 @@ test('F93: a unitless length other than 0 is invalid in standards mode: the decl
   for (const decl of ['width:0', 'margin:0 auto', 'line-height:1.5', 'opacity:.5', 'flex:1', 'z-index:2', 'width:calc(100px * 2)'])
     assert.equal(codes(run(`.a{${decl}}`), 'W_CSS_UNITLESS_LENGTH').length, 0, decl);
 });
+
+test('F94: border-radius on a table row or row group does nothing', () => {
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const hit = (css, collapse = false) => {
+    const r = analyzeHTML('<html lang="en"><body><main class="p"><table class="t"><tbody class="g"><tr class="r"><td class="c"><div class="x"></div></td></tr></tbody></table></main></body></html>',
+      {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}${collapse ? '.t{border-collapse:collapse}' : ''}.c{padding:8px}.x{display:block;height:24px;width:24px}${css}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+    assert.equal(r.status, 'verified', css);
+    return codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.includes('border-radius')).map(w => w.box);
+  };
+  assert.deepEqual(hit('.r{border-radius:8px}'), ['.r']);
+  assert.deepEqual(hit('.g{border-radius:8px}'), ['.g']);
+  assert.deepEqual(hit('.r{border-radius:8px}', true), ['.r']);
+  assert.deepEqual(hit('.r{border-radius:0}'), []);
+  assert.deepEqual(hit('.c{border-radius:8px}'), []);
+});
+
+test('F84: tab-size does nothing where white-space collapses tabs (and no longer makes the analysis Unknown there)', () => {
+  const inert = css => { const r = run(css); return [r.status, codes(r, 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('tab-size'))]; };
+  assert.deepEqual(inert('.a{tab-size:2}'), ['verified', true]);
+  assert.deepEqual(inert('.a{white-space:nowrap;tab-size:20px}'), ['verified', true]);
+  assert.deepEqual(inert('.a{white-space:pre-line;tab-size:4}'), ['verified', true]);
+  assert.deepEqual(inert('.a{tab-size:8}'), ['verified', false]);
+  // where tabs are kept it changes the line, which is not modeled
+  assert.equal(run('.a{white-space:pre;tab-size:2}').status, 'unknown');
+  assert.equal(run('.a{white-space:pre-wrap;tab-size:2}').status, 'unknown');
+  // on a box with an element inside it is inherited there: still Unknown
+  assert.equal(run('.p{tab-size:2}', '<div class="p"><div class="a"></div></div>').status, 'unknown');
+});

@@ -565,6 +565,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     if (style.$floatInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['float'], ...(style.$sources?.float ? { css: [{ property: 'float', file: style.$sources.float.file, line: style.$sources.float.line, selector: style.$sources.float.selector }] } : {}),
         message: `${box.label}: float: ${style.$floatInert} has no effect on an absolutely positioned box (its float computes to none). Place it with left / right instead` });
+    if (style.$tabSizeInert !== undefined && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('tab-size')))
+      layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['tab-size'], ...(style.$sources?.['tab-size'] ? { css: [{ property: 'tab-size', file: style.$sources['tab-size'].file, line: style.$sources['tab-size'].line, selector: style.$sources['tab-size'].selector }] } : {}),
+        message: `${box.label}: tab-size: ${style.$tabSizeInert} has no effect with white-space: ${style['white-space']} (a tab collapses into a space). Use white-space: pre or pre-wrap to keep tabs` });
     // F75: a select of appearance auto is drawn by the browser at its own height: line-height changes neither its size nor
     // its pixels (measured in Chromium, Firefox and WebKit; with appearance: none it does).
     if (!box.pseudo && box.tag === 'select' && style.appearance === 'auto' && style.$sources?.['line-height'] && !['normal', 'initial', 'inherit', 'unset'].includes(String(style.$sources['line-height'].specified ?? style['line-height'])) && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('line-height')))
@@ -3300,6 +3303,16 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // overflow do nothing (measured in Chromium); its children are laid out in its place and inherit from it.
   const contentsBoxKeys = ['inline-size', 'block-size', 'min-inline-size', 'min-block-size', 'max-inline-size', 'max-block-size',
     ...['top', 'right', 'bottom', 'left'].flatMap(side => [`padding-${side}`, `margin-${side}`, `border-${side}`]), 'background-color', 'background-image', 'overflow-x', 'overflow-y', 'aspect-ratio'];
+  function tableRowRadius(box, style, state) {
+    // F94: a table row or row group is not rounded by border-radius, in either border model (measured in Chromium, Firefox
+    // and WebKit: same pixels with a row background and without the radius). Round the first and last cells instead.
+    if (!box.pseudo && (['tr', 'thead', 'tbody', 'tfoot'].includes(box.tag) || /^table-(?:row|row-group|header-group|footer-group)$/.test(String(style.display))) && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('border-radius'))) {
+      const hits = radiusRules.filter(r => r.selectors.some(sel => matches(sel, box, state))), rule = hits.find(r => !r.zero);
+      if (rule && !hits.some(r => r.zero))
+        layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['border-radius'], css: [{ property: 'border-radius', file: rule.file, line: rule.line, selector: rule.selector }],
+          message: `${box.label}: border-radius has no effect on a table ${box.tag === 'tr' || /row$/.test(String(style.display)) ? 'row' : 'row group'} (it does not round its background or border). Round the corner cells (td:first-child, td:last-child) instead` });
+    }
+  }
   function contentsInert(box, style, region) {
     if (box.pseudo || ['button', 'input', 'select', 'textarea', 'img', 'video', 'iframe', 'svg', 'canvas', 'legend'].includes(box.tag) || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path)) return;
     const written = contentsBoxKeys.filter(key => style.$sources?.[key] && !['0', '0px', 'auto', 'none', 'visible', 'transparent'].includes(String(style[key])));
@@ -3625,6 +3638,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     if (c.style.display !== 'contents') return [{ region: c.region, children: [...s.children, { box: child, style: c.style, inherited: inheritedStyle }] }];
                     if (child.text || child.contract || child.targets?.length) throw new Error('display: contents with text, contracts or noshift targets needs anonymous or absent boxes');
                     if (emit) contentsInert(child, c.style, c.region);
+                    if (emit && child.tablePart) tableRowRadius(child, c.style);
                     return [{ region: c.region, children: s.children, contents: c.style }];
                   })));
                   const nested = states.filter(state => state.contents);

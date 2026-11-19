@@ -1048,3 +1048,34 @@ test('F93: a unitless length other than 0 drops the declaration in standards mod
   expect(await pixelsAndBoxes(page, `${base}.a{width:100px}`, '<div class="a">ab</div>')).not.toEqual(await pixelsAndBoxes(page, base, '<div class="a">ab</div>'));
   expect(await pixelsAndBoxes(page, `${base}.a{width:0}`, '<div class="a">ab</div>')).not.toEqual(await pixelsAndBoxes(page, base, '<div class="a">ab</div>'));
 });
+
+test('F94: border-radius on a table row or row group does nothing', async ({page}) => {
+  const html = '<table><tbody class="g"><tr class="r"><td>a</td><td>b</td></tr></tbody></table>';
+  for (const model of ['', 'table{border-collapse:collapse}'])
+    for (const [box, paint] of [['.r', '.r{background:rgb(255,0,0);border:3px solid rgb(0,0,255)}'], ['.g', '.g{background:rgb(255,0,0)}']]) {
+      const base = `${model}td{width:40px;height:30px}${paint}`;
+      expect(await pixelsAndBoxes(page, `${base}${box}{border-radius:12px}`, html), `${model} ${box}`).toEqual(await pixelsAndBoxes(page, base, html));
+    }
+  // on the cells it does round the corners (so the check above is not vacuous)
+  const cells = 'td{width:40px;height:30px;background:rgb(255,0,0)}';
+  expect(await pixelsAndBoxes(page, `${cells}td{border-radius:12px}`, html)).not.toEqual(await pixelsAndBoxes(page, cells, html));
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const r = analyzeHTML('<html lang="en"><body><main class="p"><table class="t"><tbody class="g"><tr class="r"><td class="c"><div class="x"></div></td></tr></tbody></table></main></body></html>',
+    {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.c{padding:8px}.x{display:block;height:24px;width:24px}.r{border-radius:8px}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.r' && w.properties.includes('border-radius'))).toBe(true);
+});
+
+test('F84: tab-size does nothing where white-space collapses tabs', async ({page}) => {
+  const html = '<div class="a">a\tb\tc</div>';
+  for (const ws of ['normal', 'nowrap', 'pre-line']) {
+    const base = `.a{font:16px monospace;width:max-content;white-space:${ws}}`;
+    expect(await pixelsAndBoxes(page, `${base}.a{tab-size:2}`, html), ws).toEqual(await pixelsAndBoxes(page, base, html));
+  }
+  // with white-space: pre it changes the line (so the check above is not vacuous)
+  const pre = '.a{font:16px monospace;width:max-content;white-space:pre}';
+  expect(await pixelsAndBoxes(page, `${pre}.a{tab-size:2}`, html)).not.toEqual(await pixelsAndBoxes(page, pre, html));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;tab-size:2}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('tab-size'))).toBe(true);
+});
