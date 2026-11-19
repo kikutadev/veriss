@@ -26,9 +26,14 @@ export function htmlBoxTree(html) {
   // A body element as the root: parse as a document and check from body (its attributes, such as aria-hidden, count).
   // An html element as the root (a whole document): its font-size is what rem resolves against. The head
   // (with no boxes) is dropped.
-  const asHtml=/^\s*(?:<!doctype html>\s*)?<html[\s>]/i.test(html);
-  const asBody=asHtml || /^\s*<body[\s>]/i.test(html);
-  const documentNode=asBody ? parse(asHtml ? (/^\s*<!doctype/i.test(html) ? html.trim() : `<!doctype html>${html.trim()}`) : `<!doctype html><html><head></head>${html.trim()}</html>`,{sourceCodeLocationInfo:true,onParseError:error=>unknown(`HTML parse recovery: ${error.code}`)}).childNodes.find(n=>n.tagName==='html') : null;
+  // Leading HTML comments (e.g. generated-file notices) do not change the
+  // document root. Keep the original text for parse5 and source offsets.
+  const prefix=/^(?:\s|<!--[\s\S]*?-->)*(<!doctype html>)?(?:\s|<!--[\s\S]*?-->)*/i.exec(html);
+  const first=html.slice(prefix[0].length);
+  const asHtml=/^<html[\s>]/i.test(first);
+  const asBody=asHtml || !prefix[1] && /^<body[\s>]/i.test(first);
+  const source=asHtml ? (prefix[1] ? html : `<!doctype html>${html}`) : `<!doctype html><html><head></head>${html}</html>`;
+  const documentNode=asBody ? parse(source,{sourceCodeLocationInfo:true,onParseError:error=>unknown(`HTML parse recovery: ${error.code}`)}).childNodes.find(n=>n.tagName==='html') : null;
   if(asHtml) {
     if(documentNode.childNodes.some(n=>n.tagName==='head' && n.childNodes.some(c=>c.tagName && !['meta','title'].includes(c.tagName)))) unknown('A head with elements other than meta and title is not modeled (pass styles as the css option)');
     // The viewport meta tag (zoom restrictions: the meta-viewport rule) is kept as a fact of the html root.
@@ -41,7 +46,7 @@ export function htmlBoxTree(html) {
   // Checklist F27 (moves the parser makes): an element written inside a <table> outside its cells is moved before the
   // table (foster parenting), and a <form> start tag inside a form is dropped. Found from the source offsets.
   {
-    const source=asBody ? (asHtml ? (/^\s*<!doctype/i.test(html) ? html.trim() : `<!doctype html>${html.trim()}`) : `<!doctype html><html><head></head>${html.trim()}</html>`) : html;
+    const input=asBody ? source : html;
     // (Within the same bounds as the conversion below — 64 levels, 2048 elements — beyond which the input is refused anyway.)
     const all=[]; let bounded=true;
     (function collect(n,ancestors){ if(!bounded) return; if(ancestors.length>64 || all.length>2048) { bounded=false; return; } if(n.tagName) all.push({n,ancestors}); for(const c of n.childNodes??[]) collect(c,n.tagName ? [...ancestors,n] : ancestors); })(fragment,[]);
@@ -51,7 +56,7 @@ export function htmlBoxTree(html) {
       const t=tables.find(t=>t.n!==x.n && at>t.n.sourceCodeLocation.startOffset && at<(t.n.sourceCodeLocation.endOffset ?? Infinity) && !x.ancestors.includes(t.n));
       if(t) x.n.fostered=true; }
     const formStarts=new Set(all.filter(x=>x.n.tagName==='form' && x.n.sourceCodeLocation).map(x=>x.n.sourceCodeLocation.startOffset));
-    for(const m of source.matchAll(/<form[\s>]/gi)) if(!formStarts.has(m.index)) { const outer=all.filter(x=>x.n.tagName==='form' && x.n.sourceCodeLocation && x.n.sourceCodeLocation.startOffset<m.index && m.index<(x.n.sourceCodeLocation.endOffset ?? Infinity)).at(-1); if(outer) outer.n.nestedForm=true; }
+    for(const m of input.matchAll(/<form[\s>]/gi)) if(!formStarts.has(m.index)) { const outer=all.filter(x=>x.n.tagName==='form' && x.n.sourceCodeLocation && x.n.sourceCodeLocation.startOffset<m.index && m.index<(x.n.sourceCodeLocation.endOffset ?? Infinity)).at(-1); if(outer) outer.n.nestedForm=true; }
   }
   if(roots.length!==1 || !asBody && fragment.childNodes.some(n=>n.nodeName==='#text' && n.value.trim())) throw new TypeError('Static HTML adapter requires a single root element');
   let count=0;
@@ -59,6 +64,9 @@ export function htmlBoxTree(html) {
     if(++count>2048 || depth>64) throw new TypeError('HTML box tree limit exceeded');
     const attrs=Object.fromEntries(node.attrs.map(a=>[a.name,a.value]));
     for(const attr of node.attrs) {
+      // These anchor link relations do not change rendering or layout;
+      // keep the attribute in the box tree for CSS attribute selectors.
+      if(!attr.namespace && node.tagName==='a' && attr.name==='rel' && attr.value.split(/[\t\n\f\r ]+/).every(token=>['','noopener','noreferrer','nofollow','external'].includes(token.toLowerCase()))) continue;
       // An img's or source's size and selection attributes are modeled (width/height hints and aspect-ratio).
       if(['details','dialog'].includes(node.tagName) && attr.name==='open') continue;
       if(node.tagName==='svg' && !attr.namespace && /^(?:width|height|viewbox|xmlns|version|fill|stroke|stroke-width|stroke-linecap|stroke-linejoin|stroke-miterlimit|stroke-dasharray|fill-rule|clip-rule|fill-opacity|stroke-opacity|opacity|preserveaspectratio|focusable)$/i.test(attr.name)) continue;

@@ -160,6 +160,10 @@ const linearAny = (maps, value) => {
 function expand(property, value) {
   property = aliases[property] ?? property;
   property = insets[property] ?? property;
+  // CSS permits a leading decimal point. Normalize only standalone length
+  // tokens of length-valued properties, not strings, identifiers or functions.
+  if (lengthOnly.test(property)) value = value.replace(/(^|\s)(-?)\.(\d{1,6})(px|rem|em)(?=\s|$)/g,
+    (_, space, sign, digits, unit) => `${space}${sign}0.${digits}${unit}`);
   // Area names are case-sensitive identifiers.
   if (!['container', 'container-name', 'content', 'grid-template-areas', 'grid-area'].includes(property) && !(['grid-row', 'grid-column'].includes(property) && /^-?[A-Za-z_][\w-]*$/.test(value.trim()))) value = value.toLowerCase();
   if (property === 'container-name' && value.toLowerCase() === 'none') value = 'none';
