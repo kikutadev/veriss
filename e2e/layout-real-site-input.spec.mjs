@@ -83,3 +83,45 @@ test('snapshot game contracts match browser rectangles in both axes',async({page
   const safe=analyzeSnapshots({states,css,contracts:[{kind:'within-viewport',target:'right'}]},{viewport:{min:320,max:800,height:{min:400,max:900}},safeArea:{top:20}});
   expect(safe.findings.some(f=>f.code==='E_SNAPSHOT_CONTRACT')).toBe(true);
 });
+
+test('game model separates DOM/canvas geometry, HUD union and live action observations',async({page})=>{
+  const {verifyGameUI,domGeometry}=await import('../packages/adapter-core/src/game-ui.mjs');
+  const {captureGameObservation}=await import('../tools/capture-snapshots.mjs');
+  const profile={id:'desktop',viewport:{min:320,max:800,height:{min:400,max:900}}};
+  const css='*{box-sizing:border-box;margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}main{position:relative;display:grid;grid-template-columns:minmax(0,1fr);height:100px}#hud{position:absolute;left:0;top:0;width:100px;height:50px}#extra{position:absolute;left:50px;top:0;width:100px;height:50px}';
+  const html='<!doctype html><html lang="en"><head><title>Game</title></head><body><main id="field"><div id="hud"></div><div id="extra"></div></main></body></html>';
+  const model={version:1,initial:'play',states:['play','pause'],transitions:[{from:'play',event:'pause',to:'pause'}],profiles:[profile],contracts:[
+    {id:'space',kind:'max-occupancy',target:'field',overlays:['hud','extra'],max:'1/4',states:['play']},
+    {id:'tight',kind:'max-occupancy',target:'field',overlays:['hud','extra'],max:'1/8',states:['play']},
+    {id:'stable',kind:'stable',target:'hud',event:'pause'},
+    {id:'action',kind:'action',event:'pause'}
+  ]};
+  const evidence=['play','pause'].flatMap(state=>domGeometry({state,profile,html,css,targets:['hud','extra']}));
+  // The simulated scene renderer's model is independently supplied. Its
+  // CSS-pixel projection is compared below against the browser's field box.
+  const a=(constant,coefficient='0')=>({constant,coefficient});
+  evidence.push({state:'play',profile:'desktop',target:'field',source:'scene',assumptions:['scene uses full viewport width and 100 CSS px height at origin'],rows:[{rect:{inlineStart:a('0'),blockStart:a('0'),inlineSize:a('0','1'),blockSize:a('100')}}]});
+  const check=verifyGameUI({model,evidence});
+  expect(check.contracts.map(c=>c.status)).toEqual(['verified','violated','verified','unknown']);
+  const observations=[];
+  for(const width of [320,600,800]){
+    await page.setViewportSize({width,height:600});
+    await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
+    const targets=['field','hud','extra'];
+    const one=await captureGameObservation(page,{state:'play',profile:'desktop',targets});
+    observations.push(one);
+    const {field,hud,extra}=one.rects;
+    expect((hud.width*50+extra.width*50-50*50)/(field.width*field.height)).toBeCloseTo(75/width);
+    await page.evaluate(()=>document.querySelector('#hud').addEventListener('click',()=>document.body.dataset.mode='pause'));
+    await page.locator('#hud').click({position:{x:10,y:10}});
+    expect(await page.locator('body').getAttribute('data-mode')).toBe('pause');
+    observations.push(await captureGameObservation(page,{state:'pause',profile:'desktop',targets}),
+      {state:'play',profile:'desktop',width,height:600,event:'pause',to:'pause',passed:true});
+  }
+  const report=verifyGameUI({model,evidence,observations});
+  expect(report.contracts.find(c=>c.id==='space').observations.map(o=>o.status)).toEqual(['passed','passed','passed']);
+  expect(report.contracts.find(c=>c.id==='tight').observations.map(o=>o.status)).toEqual(['failed','passed','passed']);
+  expect(report.contracts.find(c=>c.id==='stable').observations.map(o=>o.status)).toEqual(['passed','passed','passed']);
+  expect(report.contracts.find(c=>c.id==='action').observations.map(o=>o.status)).toEqual(['passed','passed','passed']);
+  expect(report.outcome).toBe('failed');
+});

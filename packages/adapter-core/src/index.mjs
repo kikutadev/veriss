@@ -405,3 +405,5 @@ function analyzeStatesOnce({ states, css, unknowns = [], assumptions = [], scope
   return out;
 }
 export { lint, formatText, recommended } from './lint.mjs';
+
+export {verifyGameUI, domGeometry} from './game-ui.mjs';

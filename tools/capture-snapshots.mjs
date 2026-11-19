@@ -12,3 +12,19 @@ export async function captureSnapshot(page, choices, {headLayoutIndependent=fals
   },headLayoutIndependent);
   return {html:snapshot,choices};
 }
+
+// Record a point observation independently of proof. No automatic scrolling;
+// the caller drives state transitions and checks their expected outcome.
+export async function captureGameObservation(page,{state,profile,targets}) {
+  const data=await page.evaluate(targets=>{
+    const rects=Object.create(null);
+    for(const id of targets){
+      const matches=[...document.querySelectorAll('[id]')].filter(e=>e.id===id);
+      if(matches.length!==1||!matches[0].getClientRects().length)continue;
+      const r=matches[0].getBoundingClientRect();
+      rects[id]=Object.fromEntries(['x','y','width','height'].map(k=>[k,Number(r[k].toFixed(6))]));
+    }
+    return {width:innerWidth,height:innerHeight,rects:Object.fromEntries(Object.entries(rects))};
+  },targets);
+  return {state,profile,...data};
+}

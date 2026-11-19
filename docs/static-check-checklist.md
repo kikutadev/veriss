@@ -418,3 +418,8 @@
   e2e/layout-real-site-input.spec.mjs の snapshot game contracts で 320/800px 幅・400/550/551/900px 高さの
   シフト境界と非重複を Chromium / Firefox / WebKit で照合 (2026-11-20、3/3 成功)。
   実行中の DOM の到達可能性や Canvas 内部の位置、ペイント・hit testing は保証に含めない。
+
+- [x] **H2. game UI model**: 宣言した到達状態・profile 別に独立証拠を検査。HUD の重複を二重計上しない
+  occupancy、遷移端点、操作観測を分離する。e2e/layout-real-site-input.spec.mjs の game model separates
+  で幅320/600/800pxの矩形・面積率・クリック遷移を3ブラウザーで照合。
+  二次式の内部極大・厳密な開閉境界・矛盾した証拠・観測不一致は adapter-core/test/game-ui.test.mjs。
