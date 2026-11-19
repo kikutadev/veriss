@@ -67,6 +67,8 @@ export function htmlBoxTree(html) {
       // These anchor link relations do not change rendering or layout;
       // keep the attribute in the box tree for CSS attribute selectors.
       if(!attr.namespace && node.tagName==='a' && attr.name==='rel' && attr.value.split(/[\t\n\f\r ]+/).every(token=>['','noopener','noreferrer','nofollow','external'].includes(token.toLowerCase()))) continue;
+      // Machine-readable dates and image fetch-priority hints do not change the static box.
+      if(!attr.namespace && (node.tagName==='time' && attr.name==='datetime' || node.tagName==='img' && attr.name==='fetchpriority')) continue;
       // An img's or source's size and selection attributes are modeled (width/height hints and aspect-ratio).
       if(['details','dialog'].includes(node.tagName) && attr.name==='open') continue;
       if(node.tagName==='svg' && !attr.namespace && /^(?:width|height|viewbox|xmlns|version|fill|stroke|stroke-width|stroke-linecap|stroke-linejoin|stroke-miterlimit|stroke-dasharray|fill-rule|clip-rule|fill-opacity|stroke-opacity|opacity|preserveaspectratio|focusable)$/i.test(attr.name)) continue;

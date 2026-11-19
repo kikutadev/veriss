@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {analyzeHTML,htmlBoxTree} from '../src/html.mjs';
 
 const css='*{box-sizing:border-box;margin:0;padding:0}html{font-size:16px}main,a{display:block}';
-const run=(html,extra='')=>analyzeHTML(html,{css:css+extra,viewport:{min:320,max:1920}});
+const run=(html,extra='',block=false)=>analyzeHTML(html,{css:css+extra,viewport:{min:320,max:1920,...(block?{height:{min:480,max:1080}}:{})}});
 const page='<html lang="ja"><head><title>T</title></head><body><main></main></body></html>';
 
 test('document comments preserve the html root and layout',()=>{
@@ -68,4 +68,28 @@ test('side border reset keeps the initial width if style is set later',()=>{
     assert.deepEqual(r.sizes,b.sizes,reset);
   }
   assert.equal(run(html,'main{border-left:inherit}').status,'unknown');
+});
+
+test('time with datetime has ordinary inline and block geometry',()=>{
+  for(const display of ['block','inline']){
+    const decl='main{display:grid;grid-template-columns:minmax(0,1fr)} .date{display:'+display+';height:24px}';
+    const html=tag=>'<main><'+tag+' class="date"'+(tag==='time'?' datetime="2026-11-20"':'')+'></'+tag+'></main>';
+    const ref=run(html('span'),decl,true), actual=run(html('time'),decl,true);
+    assert.equal(ref.status,'verified');
+    assert.equal(actual.status,'verified');
+    assert.deepEqual(actual.sizes,ref.sizes);
+  }
+  assert.equal(run('<main datetime="2026-11-20"></main>').status,'unknown');
+});
+test('image fetchpriority is a loading hint, not a geometry attribute',()=>{
+  const decl='img{display:block;width:80px;height:40px}';
+  const html=attr=>'<main><img src="a.png" alt="a" width="80" height="40" '+attr+'></main>';
+  const ref=run(html(''),decl,true);
+  assert.equal(ref.status,'verified');
+  for(const value of ['high','low','auto']){
+    const actual=run(html('fetchpriority="'+value+'"'),decl,true);
+    assert.equal(actual.status,'verified');
+    assert.deepEqual(actual.sizes,ref.sizes);
+  }
+  assert.equal(run('<main fetchpriority="high"></main>').status,'unknown');
 });
