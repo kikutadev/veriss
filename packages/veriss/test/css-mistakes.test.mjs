@@ -872,3 +872,45 @@ test('F79: a media query with a unitless length (600) or a space before the unit
   }
   assert.equal(codes(run('.a{height:20px}@media (min-width: 600px){.a{height:40px}}'), 'W_CSS_MEDIA_INVALID_LENGTH').length, 0);
 });
+
+test('F80: overflow-wrap does nothing on text that white-space: nowrap or pre keeps on one line', () => {
+  const runT = (css, html, sel) => analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}, boxes: {[sel]: {overflow: 'clip', overflowBlock: 'clip'}}});
+  const html = '<div class="t">averyveryveryverylongwordthatdoesnotfit</div>';
+  const inert = (css, h = html, sel = '.t') => {
+    const r = runT(`.t,.c{width:100px;height:20px;overflow:hidden}${css}`, h, sel);
+    assert.equal(r.status, 'verified', css);
+    return codes(r, 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('overflow-wrap'));
+  };
+  assert.ok(inert('.t{white-space:nowrap;overflow-wrap:anywhere}'));
+  assert.ok(inert('.t{white-space:pre;overflow-wrap:break-word}'));
+  assert.ok(!inert('.t{overflow-wrap:anywhere}'));
+  assert.ok(!inert('.t{white-space:pre-wrap;overflow-wrap:anywhere}'));
+  // a child that wraps again inherits the overflow-wrap, so it is not inert on the parent
+  assert.ok(!inert('.p{white-space:nowrap;overflow-wrap:anywhere}.c{white-space:normal}', '<div class="p"><div class="c">averyveryveryverylongword</div></div>', '.c'));
+});
+
+test('F81: column-span outside a multi-column container does nothing (and no longer makes the analysis Unknown)', () => {
+  const r = run('.a{column-span:all}');
+  assert.equal(r.status, 'verified');
+  assert.ok(codes(r, 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('column-span')));
+  const none = run('.a{column-span:none}');
+  assert.equal(none.status, 'verified');
+  assert.ok(!codes(none, 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('column-span')));
+  for (const v of ['initial', 'unset']) assert.ok(!codes(run(`.a{column-span:${v}}`), 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('column-span')), v);
+  assert.equal(run('.a{column-span:inherit}').status, 'unknown');
+  // inside a multi-column container the analysis stays Unknown (multi-column layout is not modeled)
+  assert.equal(run('.p{columns:2}.a{column-span:all}', '<div class="p"><div class="a"></div></div>').status, 'unknown');
+});
+
+test('F82: empty-cells: hide does nothing with border-collapse: collapse', () => {
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const hit = css => {
+    const r = analyzeHTML('<html lang="en"><body><main class="p"><table class="t"><tbody><tr><td class="c"><div class="x"></div></td><td class="c"></td></tr></tbody></table></main></body></html>',
+      {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.c{padding:8px}.x{display:block;height:24px;width:24px}${css}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+    assert.equal(r.status, 'verified', css);
+    return codes(r, 'W_LAYOUT_DECLARATION_INERT').some(w => w.properties.includes('empty-cells'));
+  };
+  assert.equal(hit('.t{border-collapse:collapse;empty-cells:hide}'), true);
+  assert.equal(hit('.t{empty-cells:hide}'), false);
+  assert.equal(hit('.t{border-collapse:collapse;empty-cells:show}'), false);
+});

@@ -903,6 +903,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           for (const key of ['row-gap', 'column-gap']) if (style.$sources?.[key] && !['normal', '0', '0px'].includes(String(style.$sources[key].specified ?? style[key]).trim())) inert.push([key, `${key === 'row-gap' ? 'row-gap' : 'gap'} does not space the cells of a table; use border-spacing`]);
           if (style.$tablePaddingInert) for (const [key] of style.$tablePaddingInert) inert.push([key, 'a table with border-collapse: collapse has no padding (its border is shared with the cells); pad the cells, or use border-collapse: separate']);
           if (String(style['border-collapse']) === 'collapse' && style.$sources?.['border-spacing'] && !/^0(?:px)?(?:\s+0(?:px)?)?$/.test(String(style['border-spacing']))) inert.push(['border-spacing', 'border-spacing has no effect with border-collapse: collapse (the cells share their borders). Use border-collapse: separate for spacing, or remove it']);
+          // F82: empty-cells: hide only hides empty cells in the separated border model (measured in Chromium, Firefox and
+          // WebKit: with collapse the empty cell's background and borders are still painted).
+          if (String(style['border-collapse']) === 'collapse' && style.$sources?.['empty-cells'] && String(style['empty-cells']) === 'hide') inert.push(['empty-cells', 'empty-cells: hide has no effect with border-collapse: collapse (the empty cells are still drawn); use border-collapse: separate']);
           for (const [prop, text] of inert) if (!layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(prop)))
             layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: [prop], css: at(prop), message: `${box.label}: ${text}`, ...ranges(r) });
         }
@@ -2400,6 +2403,11 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           const scroller = [...parents].reverse().find(p => p.box.tag === 'html' || ['overflow-x', 'overflow-y'].some(key => !['visible', 'clip'].includes(String(p.style[key]))));
           if (scroller && String(scroller.style['scroll-snap-type'] ?? 'none') === 'none') reasons.push(['scroll-snap-align', `its scroll container ${scroller.box.tag === 'html' ? '(the viewport)' : scroller.box.label} has no scroll-snap-type, so it never snaps; set scroll-snap-type on ${scroller.box.tag === 'html' ? 'html' : 'it'}`]);
         }
+        // F80: overflow-wrap only adds break points where lines may wrap; nowrap and pre never wrap, so it does nothing
+        // (measured in Chromium, Firefox and WebKit). Descendants inherit it, so only a box with no element inside is checked.
+        if (set('overflow-wrap', 'normal') && ['nowrap', 'pre'].includes(String(style['white-space'])) && !box.children.some(child => !child.anonymous)) reasons.push(['overflow-wrap', `its white-space is ${style['white-space']}, so its lines never wrap and there is nothing to break (use white-space: normal, or text-overflow: ellipsis to mark the cut)`]);
+        // F81: column-span takes a box out of its multi-column container's columns; with none above it there is nothing to span.
+        if (set('column-span', 'none')) reasons.push(['column-span', 'it is not inside a multi-column container (column-count or column-width), so there are no columns to span'])
         if (set('resize', 'none')) reasons.push(['resize', `its overflow is ${style['overflow-x']} ${style['overflow-y']}, and only a box whose overflow is not visible can be resized; set overflow: auto on it`]);
         if (set('line-clamp', 'none') && style.$lineClamp === undefined && !['-webkit-box', '-webkit-inline-box'].includes(style.display)) reasons.push(['line-clamp', `it is display: ${style.display}, not -webkit-box`]);
         if (reasons.length) layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: reasons.map(r => r[0]),

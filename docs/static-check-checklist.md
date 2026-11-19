@@ -359,6 +359,9 @@
   書いた float が何もしないと報告する。
 - [x] **F78. media query の `var()`**(`W_CSS_MEDIA_VAR`、以前は Unknown): custom property は media query の中では置き換わらない
 - [x] **F79. media query の単位なし長さ・単位前の空白**(`W_CSS_MEDIA_INVALID_LENGTH`、以前は Unknown): `(min-width: 600)` や `(min-width: 600 px)` は不正な query で決して一致しない。`0` だけは単位なしで有効
+- [x] **F80. `white-space: nowrap` / `pre` の下の `overflow-wrap`**(`W_LAYOUT_DECLARATION_INERT`): 折り返さない行には折る場所がないので効かない。中に折り返しを戻す要素があるときは継承先で効くので警告しない
+- [x] **F81. multi-column の外の `column-span`**(`W_LAYOUT_DECLARATION_INERT`、以前は Unknown): 段組の祖先がなければ跨ぐ段がない。`initial` / `unset` は `none` として扱い、`inherit` は Unknown のまま
+- [x] **F82. `border-collapse: collapse` の表の `empty-cells: hide`**(`W_LAYOUT_DECLARATION_INERT`): 空のセルを隠すのは分離境界モデルだけで、collapse では背景も枠も描かれる(3 ブラウザでスクリーンショット比較)
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

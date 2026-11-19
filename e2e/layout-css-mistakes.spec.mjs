@@ -911,3 +911,46 @@ test('F79: a media query with a unitless or spaced length never matches', async 
   }
   expect(await page.evaluate(() => matchMedia('(min-width: 0)').matches)).toBe(true);
 });
+
+test('F80: overflow-wrap does nothing under white-space: nowrap or pre', async ({page}) => {
+  const word = 'averyveryveryverylongwordthatdoesnotfit';
+  const measure = async css => {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>*{margin:0}.t{width:100px;font:16px monospace}${css}</style></head><body><div class="t">${word}</div></body></html>`);
+    return page.evaluate(() => { const t = document.querySelector('.t'); return [t.getBoundingClientRect().height, t.scrollWidth]; });
+  };
+  for (const ws of ['nowrap', 'pre']) for (const ow of ['anywhere', 'break-word'])
+    expect(await measure(`.t{white-space:${ws};overflow-wrap:${ow}}`), `${ws} ${ow}`).toEqual(await measure(`.t{white-space:${ws}}`));
+  // under normal wrapping it does break the word (so the check above is not vacuous)
+  expect((await measure('.t{overflow-wrap:anywhere}'))[0]).toBeGreaterThan((await measure(''))[0]);
+  const r = analyzeHTML(`<html lang="en"><body><div class="t">${word}</div></body></html>`, {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.t{width:100px;height:20px;overflow:hidden;white-space:nowrap;overflow-wrap:anywhere}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}, boxes: {'.t': {overflow: 'clip', overflowBlock: 'clip'}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('overflow-wrap'))).toBe(true);
+});
+
+test('F81: column-span outside a multi-column container does nothing', async ({page}) => {
+  const measure = async css => {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>*{margin:0}.p{width:300px}.a{height:20px}.b{height:30px}${css}</style></head><body><div class="p"><div class="a"></div><div class="b"></div></div></body></html>`);
+    return page.evaluate(() => [...document.querySelectorAll('.p,.a,.b')].map(e => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
+  };
+  expect(await measure('.a{column-span:all}')).toEqual(await measure(''));
+  // in a multi-column container it does take the box out of the columns (so the check above is not vacuous)
+  expect(await measure('.p{columns:2}.a{column-span:all}')).not.toEqual(await measure('.p{columns:2}'));
+  const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;column-span:all}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('column-span'))).toBe(true);
+});
+
+test('F82: empty-cells: hide does nothing with border-collapse: collapse', async ({page}) => {
+  const shot = async css => {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>*{margin:0}td{width:40px;height:20px;background:rgb(255,0,0);border:2px solid rgb(0,0,255)}${css}</style></head><body><table><tbody><tr><td>a</td><td></td></tr></tbody></table></body></html>`);
+    return (await page.locator('table').screenshot()).toString('base64');
+  };
+  expect(await shot('table{border-collapse:collapse;empty-cells:hide}')).toBe(await shot('table{border-collapse:collapse}'));
+  // with separate borders it does hide the empty cell (so the check above is not vacuous)
+  expect(await shot('table{empty-cells:hide}')).not.toBe(await shot(''));
+  const g = 'display:grid;grid-template-columns:minmax(0,1fr)';
+  const r = analyzeHTML('<html lang="en"><body><main class="p"><table class="t"><tbody><tr><td class="c"><div class="x"></div></td><td class="c"></td></tr></tbody></table></main></body></html>',
+    {name: 'P', css: `*{box-sizing:border-box;margin:0}html,body{${g}}.p{display:block}.c{padding:8px}.x{display:block;height:24px;width:24px}.t{border-collapse:collapse;empty-cells:hide}`, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}});
+  expect(r.status).toBe('verified');
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('empty-cells'))).toBe(true);
+});
