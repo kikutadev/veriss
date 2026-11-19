@@ -124,3 +124,12 @@ npm registry の integrity は sha512-eGNMu3BNqU0Z85P+ouYG5OCZqIABU+QsW6vUieFt9p
 本段階では同じ座標系・同じ state/profile の完全一致を入口とし、任意の親割当への証明の移植はしない。
 既存の region 演算を高速経路として残し、汎用的な含意判定を Z3 へ委ねる。
 cache はプロセス内の session を所有者とし、外から供給した proof を信頼しない。
+
+### 実測結果と仕様
+
+実装の正本は [layout-contract-ir.md](../layout-contract-ir.md#証明セッションと条件付きの合成)。
+`node experiments/bench-relational-proof.mjs` で同じ合成データ (32契約、各8区分) を11回計測。
+Apple Silicon, Node v26.12.1、中央値: 通常26.75ms、初回 cache 有り23.12ms、
+全一致3.49ms、1対象の変更4.70ms。前処理済み ObligationIR を検証する時間であり、
+実際の CSS パースや幾何抽出を含まない。合成だけで常に高速化するとは主張しない。
+同じ証拠の一致から始め、一般の parent allocation への証明移植は未実装。

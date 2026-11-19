@@ -8,7 +8,7 @@ import {obligationModel as makeModel} from './layout/model.mjs';
 import {validateTargetMetadata} from './layout/target-metadata.mjs';
 
 import {createRelationalContractIR,createRelationalObligationIR,verifyRelationalObligation} from './relational-contract.mjs';
-export {createStateIR,createEnvironmentIR,createEvidenceIR,layoutGeometry,verifyUI,verifyRelationalObligation} from './relational-contract.mjs';
+export {createStateIR,createEnvironmentIR,createEvidenceIR,layoutGeometry,verifyUI,verifyRelationalObligation,createRelationalProofSession} from './relational-contract.mjs';
 
 const freeze=value=>{if(value && typeof value==='object') {Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const snapshot=value=>freeze(structuredClone(value));

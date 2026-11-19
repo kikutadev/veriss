@@ -1,7 +1,7 @@
 // Snapshot syntax adapter. Geometry coverage, relation predicates and witnesses
 // are handled by the same public relational ContractIR profile as other UIs.
 import {parse} from 'parse5';
-import {createLayoutIR,layoutGeometry,verifyUI} from '@mizchi/veriss/contracts';
+import {createLayoutIR,layoutGeometry,createRelationalProofSession} from '@mizchi/veriss/contracts';
 
 const attr=(n,k)=>n.attrs?.find(a=>a.name===k)?.value;
 const describe=c=>JSON.stringify(c);
@@ -31,7 +31,7 @@ export function snapshotContracts(results,{name,viewport,contracts=[],scrollbars
     unknown('snapshot geometry','requires two viewport axes, zero host insets and one scrollbar/DPR profile');return {findings,unknowns};
   }
   const profile={id:'snapshot',viewport,...(safeArea?{safeArea}:{}),...(ua?{ua}:{}),...(scrollbars?.length?{scrollbar:scrollbars[0]}:{}),...(devicePixelRatios?.length?{dpr:devicePixelRatios[0]}:{})};
-  const layouts=new Map();
+  const layouts=new Map(),session=createRelationalProofSession();
   function evidence(s,entries) {
     try{
       if(!layouts.has(s.id))layouts.set(s.id,createLayoutIR(s.report));
@@ -51,7 +51,7 @@ export function snapshotContracts(results,{name,viewport,contracts=[],scrollbars
         {id:'snapshot',kind,target:'one',...(transition?{event:'compare'}:kind==='within-viewport'?{}:{other:'two'}),states:[a.id]}
       ]};
       const facts=transition?[...evidence(a,{one:ea}),...evidence(b,{one:eb})]:evidence(a,kind==='within-viewport'?{one:ea}:{one:ea,two:eb});
-      const result=verifyUI({model,evidence:facts}).contracts[0];
+      const result=session.verifyUI({model,evidence:facts}).contracts[0];
       const witness=result.cases.find(c=>c.witness)?.witness;
       if(witness) {
         findings.push({code,severity:'error',box:label,rule:'snapshot-contract',states:same?[a.choices]:[a.choices,b.choices],html:a.html,

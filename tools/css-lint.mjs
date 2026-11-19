@@ -59,12 +59,13 @@ const adapters = {
 };
 const all = [];
 let unchecked = false;
+const proofSession=opt.contracts?(await import('../packages/veriss/src/layout-contract.mjs')).createRelationalProofSession():undefined;
 for (const file of files) {
   const source = readFileSync(file, 'utf8'), load = adapters[extname(file)];
   if (opt.contracts) {
     try {
       const {checkUIManifest}=await import('./ui-manifest.mjs');
-      const result=await checkUIManifest(file);
+      const result=await checkUIManifest(file,{session:proofSession});
       unchecked ||= result.outcome==='unknown';
       all.push(...lint(result,{file}));
     }catch(e){unchecked=true;all.push({file,severity:'info',code:'U_UI_CONTRACT',message:'not checked: '+e.message});}

@@ -1,4 +1,5 @@
 import type {LayoutAffine,LayoutRectangle,LayoutScrollbarProfile,LayoutBoxContract} from './layout-contracts.d.ts';
+import type {LayoutSolverAPI} from './layout-z3.mjs';
 import type {LayoutIR} from './layout-contract.mjs';
 type Frozen<T> = T extends object ? {readonly [K in keyof T]:Frozen<T[K]>} : T;
 export type Exact = string;
@@ -43,7 +44,8 @@ export type EvidenceIR=Frozen<{version:1;kind:'evidence';entries:GeometryEvidenc
 export interface RelationalImplementation {state:StateIR;environment:EnvironmentIR;evidence:EvidenceIR}
 export type RelationalObligationIR=Frozen<{version:1;kind:'obligation';operation:'relational';contract:RelationalContractIR;implementation:RelationalImplementation;cases:{contract:string;profile:string;transition:{from:string;to?:string;event?:string};targets:{state:string;target:string;endpoint:string}[]}[]}>;
 export type Observation={state:string;profile:string;width:number;height:number;rects?:Readonly<Record<string,{x:number;y:number;width:number;height:number}>>;event?:string;to?:string;passed?:boolean};
-export interface RelationCase {state?:string;profile:string;to?:string;event?:string;status:Status;coverage?:{status:'verified'|'unknown'};sources?:string[];assumptions?:string[];reason?:string;witness?:{width:Exact;height:Exact}}
+export interface CompositionDependency {component:string;contract:string;bind:Readonly<Record<string,string>>}
+export interface RelationCase {method?:'composition';dependencies?:CompositionDependency[];state?:string;profile:string;to?:string;event?:string;status:Status;coverage?:{status:'verified'|'unknown'};sources?:string[];assumptions?:string[];reason?:string;witness?:{width:Exact;height:Exact}}
 export interface RelationResult {id:string;kind:Relation['kind'];status:Status;cases:RelationCase[];observations:{status:'passed'|'failed'|'unknown';sample:Observation;after?:Observation;reason?:string}[];reason?:string}
 export interface RelationalProof {
   version:1;operation:'relational';contract:RelationalContractIR;state:StateIR;environment:EnvironmentIR;status:Status;outcome:'verified'|'failed'|'unknown';
@@ -60,3 +62,16 @@ export function verifyRelationalObligation(obligation:RelationalObligationIR,opt
 export function verifyUI(input:{model:UIModel;evidence?:readonly GeometryEvidence[];observations?:readonly Observation[]}):RelationalProof;
 export function layoutGeometry(input:{state:string;profile:EnvironmentProfile;layout:LayoutIR;targets:readonly string[];paths?:Readonly<Record<string,string>>;local?:{assumptions:readonly string[];origin?:Pick<LayoutRectangle,'inlineStart'|'blockStart'>}}):GeometryEvidence[];
 export function profileKey(profile:EnvironmentProfile):string;
+
+
+export interface RelationalCompositionImport {
+  obligation:RelationalObligationIR;contract:string;bind:Readonly<Record<string,string>>;
+}
+export interface RelationalProofSession {
+  verify(obligation:RelationalObligationIR,options?:{observations?:readonly Observation[]}):RelationalProof;
+  verifyUI(input:{model:UIModel;evidence?:readonly GeometryEvidence[];observations?:readonly Observation[]}):RelationalProof;
+  compose(obligation:RelationalObligationIR,imports:readonly RelationalCompositionImport[],api:LayoutSolverAPI,options?:{timeoutMs?:number;observations?:readonly Observation[]}):Promise<RelationalProof>;
+  stats():{entries:number;keyBytes:number;hits:number;misses:number;evictions:number};
+  clear():void;
+}
+export function createRelationalProofSession(options?:{maxEntries?:number;maxKeyBytes?:number}):RelationalProofSession;

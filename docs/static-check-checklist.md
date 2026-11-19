@@ -428,3 +428,9 @@
   二次式の内部極大・厳密な開閉境界・矛盾した証拠・観測不一致は adapter-core/test/ui-contracts.test.mjs。
 
 - [x] **H3. relational/1 汎用述語**: 同じ ContractIR / LayoutIR / ObligationIR API と snapshot/lint 間で矩形証明器を共有。レスポンシブな設定画面の16px間隔、44px操作寸法、保存時の安定性を通常のWeb UI で検査。境界600/601px、幅320/1000px、高さ400/900pxを3ブラウザーで比較。単体は relational-contract.test.mjs, ui-contracts.test.mjs。
+
+- [x] **H4. 条件付きの関係述語合成と差分証明**: 独立した左右の固定領域の保証から
+  ページの非重複を導く。元の HTML/CSS で領域を別々に抽出し、幅を44%から60%へ変更すると
+  保証を再利用せず違反と判定。Chromium/Firefox/WebKit で境界幅・高さを実測する
+  (`e2e/layout-partial-geometry.spec.mjs`)。キャッシュと含意の判定、被覆/状態/環境変更、
+  観測失敗の扱いは `relational-composition.test.mjs`。

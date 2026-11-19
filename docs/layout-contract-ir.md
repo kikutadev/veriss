@@ -263,3 +263,42 @@ state 64、遷移256、profile16、契約128、ObligationIR case 32768、evidenc
 各証拠 rows 128、半平面64、処理内の領域256、AST 展開256ノード・深さ32。
 契約×profile の処理予算30000、occupancy overlay 4。上限超過は Unknown または不正入力として拒否。
 全 CSS、全 JS、描画・clip/hit testing・アニメーション中間状態まで一般に保証するものではない。
+
+### 証明セッションと条件付きの合成
+
+`createRelationalProofSession()` はプロセス内の case-level proof cache を所有する。
+`session.verify(obligation, {observations})` と `session.verifyUI(input)` は通常の API と同じ判定を返す。
+キーは完全な環境 profile、展開した述語 (target を参照順に正規化)、
+必要な EvidenceIR 行と出所・仮定。state/profile/target の名前そのものは、
+各 case の新しい到達性・束縛を確認してからキーの証拠部分から除く。
+同じ source hash と断定できない場合も CSS 抽出を省略せず、実際の新しい証拠が一致した場合だけ利用する。
+元の region work charge を保持し、budget 不足の場合は通常の検査へ戻るため、
+キャッシュの有無で既存の budget 境界を緩めない。
+Verified のみを保存し、Unknown/Violated・観測の結果・外から渡した Proof/report は保存しない。
+観測と到達 state/profile は毎回検査する。
+既定は1024件・キー4MB相当 (UTF-16 code units × 2) の LRU、`stats()` で hit/miss/eviction、
+`clear()` で破棄。snapshot lint と複数 manifest の lint は1実行内でこの session を共有する。
+
+`session.compose(parent, imports, api, options?)` は同じ座標系で成立する子の保証を
+親の要求への含意として利用する。imports は
+`[{obligation: childObligation, contract: 'childRule', bind: {childTarget:'parentTarget'}}]`。
+外部 proof を信頼せず、child の ObligationIR を再構築して case ごとの証明と被覆を確認する。
+各親 case について同じ state ID、完全一致する environment profile、
+束縛先の矩形の全 affine 行・領域・provenance/assumptions が一致する保証のみ使う。
+親の目標が参照するすべての target が証明済み前提に現れる必要がある。
+非線形 occupancy、時間・遷移の契約は初版の合成対象外 (通常経路の検証は可能)。
+
+前提の論理積 A、親の要求 G、環境 E とし、既存 SMT adapter で E ∧ A の充足可能性を先に確認、
+E ∧ A ∧ ¬G が UNSAT のときのみ親 case の `method:"composition"` と
+`dependencies` を返す。child と親の geometry の cross product を作る必要がない。
+SAT は抽象前提が親を含意しないことを示すだけで実装の反例ではない。
+前提が合わない/未証明、含意が成立しない/Unknown、予算超過の場合は通常の幾何検証へ戻る。
+合成は最大32 import、1回の compose で16回の新規 SMT 判定、同じ含意の session 内再利用あり。
+Z3 API (Context の同一性) を含むキーの Verified だけを保存する。
+既存の `verifyLayoutModel` を使うため、solver の初期化と終了は利用側が所有する。
+
+これは明示的に同じ環境・幾何を共有する局所証明の合成であり、
+Troika の任意の親文脈に対する independently-true の全機能ではない。
+局所座標の平行移動や親の割当幅を子の変数へ代入する一般的な summary の輸入、
+CSS 抽出自体の差分化、source provenance の自動依存解析、永続キャッシュは対象外。
+既存の自動部分幾何の抽出は引き続き利用できる。

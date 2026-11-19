@@ -5,6 +5,7 @@ import {rational} from './layout/smt.mjs';
 import {rectangle,clip,partition,scalar,diff,sum,sample,times,affine as serializeAffine} from './layout/region.mjs';
 import {occupancyFailure} from './layout/occupancy.mjs';
 import {expandPredicate,predicateTargets,predicateRegions} from './layout/relational-predicate.mjs';
+import {verifyPredicateImplication} from './layout/relational-implication.mjs';
 
 const zero=q(0), neg=a=>times(a,q(-1));
 const axes=['inlineStart','blockStart','inlineSize','blockSize'];
@@ -144,7 +145,26 @@ function observedGeometry(c,p,observations,instances,predicate,refs) {
  }
  return out;
 }
-function evaluateRelational({model,evidence=[],observations=[],compiledCases}) {
+// Strip only identity labels; their mapping is checked separately. Everything
+// affecting the actual rectangle or its provenance remains in the cache key.
+function evidenceValue(e){
+ if(!e)return null;
+ const {state,profile,target,...rest}=e;
+ return rest;
+}
+function mapPredicate(value,bind){
+ if(!value||typeof value!=='object')return value;
+ if(Array.isArray(value))return value.map(v=>mapPredicate(v,bind));
+ if(Object.hasOwn(value,'target'))return {...value,target:bind(value.target,value.endpoint??'before')};
+ return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,mapPredicate(v,bind)]));
+}
+const caseKey=(contract,profile,transition)=>JSON.stringify([contract,profile,transition]);
+function arithmeticKey(c,p,predicate,refs,used){
+ const names=new Map(refs.map(([endpoint,target],i)=>[JSON.stringify([endpoint,target]),String(i)]));
+ const expr=predicate?mapPredicate(predicate,(target,endpoint)=>names.get(JSON.stringify([endpoint,target]))):{kind:c.kind,max:c.max};
+ return JSON.stringify([p,expr,used.map(evidenceValue)]);
+}
+function evaluateRelational({model,evidence=[],observations=[],compiledCases,cache,derived}) {
   ensure(list(evidence,4096)&&list(observations,4096),'Evidence limit exceeded');
   const key=(s,p,t)=>JSON.stringify([s,p,t]);
   const entries=new Map(), assumptions=new Set(['Declared state graph and supplied geometry are trusted abstractions of implementation; profiles describe unscrolled CSS pixels, not paint or hit testing. DOM evidence uses a closed author cascade and the declared scrollbar profile (overlay by default).']);
@@ -192,10 +212,26 @@ function evaluateRelational({model,evidence=[],observations=[],compiledCases}) {
         const used=obligation.targets.map(({state,target})=>entries.get(key(state,p.id,target)));
         const localAssumptions=[...new Set([...(p.assumptions??[]),...(p.input?['Input profile '+p.input+' is caller-supplied, not an inferred CSS media environment.']:[]),...(p.fontProfile?['Font profile '+p.fontProfile+' is caller-supplied.']:[]),...used.flatMap(e=>e?.assumptions??[])])];localAssumptions.forEach(a=>assumptions.add(a));
         const meta={...base,sources:used.map(e=>e?.source??'missing'),assumptions:localAssumptions};
+        const derivation=derived?.get(caseKey(c.id,p.id,t));
+        if(derivation){
+          derivation.assumptions.forEach(a=>assumptions.add(a));
+          cases.push({...meta,assumptions:[...new Set([...meta.assumptions,...derivation.assumptions])],sources:[...meta.sources,...derivation.sources],
+            status:'verified',coverage:{status:'verified'},method:'composition',dependencies:derivation.dependencies});
+          continue;
+        }
+        const cacheKey=cache?arithmeticKey(c,p,predicate,refs,used):null;
+        const hit=cache?.get(cacheKey,budget.left);
+        if(hit!==undefined){
+          budget.left-=hit;
+          cases.push({...meta,coverage:{status:'verified'},status:'verified'});
+          continue;
+        }
+        const remaining=budget.left;
         let covered=false;
         try{
           const groups=used.map(e=>prepare(e,domain,budget));covered=true;
           const bad=cross(domain,groups,budget,(reg,rects)=>failure(c,p,predicate,refs,reg,rects,budget));
+          if(!bad)cache?.set(cacheKey,remaining-budget.left);
           cases.push({...meta,coverage:{status:'verified'},status:bad?'violated':'verified',...(bad?{witness:{width:exact(bad.x),height:exact(bad.y)}}:{})});
         }catch(e){cases.push({...meta,coverage:{status:covered?'verified':'unknown'},status:'unknown',reason:e.message})}
       }
@@ -271,19 +307,125 @@ export function createRelationalObligationIR(contract,implementation) {
  ensure(cases.length<=32768,'Relational obligation case limit exceeded');
  return immutable({version:1,kind:'obligation',operation:'relational',contract,implementation:{state,environment,evidence},cases});
 }
-export function verifyRelationalObligation(obligation,{observations=[]}={}) {
+function canonicalObligation(obligation){
  ensure(obligation?.operation==='relational'&&obligation.kind==='obligation'&&obligation.version===1,'Invalid relational ObligationIR');
  // Reconstruct at the serialized IR boundary: never trust edited obligation cases.
- const canonical=createRelationalObligationIR(obligation.contract,obligation.implementation);
+ return createRelationalObligationIR(obligation.contract,obligation.implementation);
+}
+function verifyCanonical(canonical,{observations=[]}={},cache,derived){
  const {state,environment,evidence}=canonical.implementation;
  const model={version:1,initial:state.initial,states:state.states,transitions:state.transitions,profiles:environment.profiles,contracts:canonical.contract.contracts};
- return {...evaluateRelational({model,evidence:evidence.entries,observations,compiledCases:canonical.cases}),operation:'relational',contract:canonical.contract,state,environment};
+ return {...evaluateRelational({model,evidence:evidence.entries,observations,compiledCases:canonical.cases,cache,derived}),operation:'relational',contract:canonical.contract,state,environment};
 }
-export function verifyUI({model,evidence=[],observations=[]}) {
+export function verifyRelationalObligation(obligation,options){
+ return verifyCanonical(canonicalObligation(obligation),options);
+}
+
+/** A process-local proof session. External proof reports are never accepted.
+ * Exact case dependencies permit reuse even when a different target ID is
+ * bound to identical geometry. The original proof work charge is retained.
+ */
+export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_000}={}){
+ ensure(Number.isSafeInteger(maxEntries)&&maxEntries>0&&maxEntries<=16384&&Number.isSafeInteger(maxKeyBytes)&&maxKeyBytes>0&&maxKeyBytes<=64_000_000,'Invalid proof cache limits');
+ const entries=new Map(),solverIds=new WeakMap();let size=0,hits=0,misses=0,evictions=0,nextSolver=0;
+ const remove=k=>{size-=k.length*2;entries.delete(k)};
+ const cache={
+  get(k,remaining){
+   if(!entries.has(k)||entries.get(k)>remaining){misses++;return undefined}
+   const cost=entries.get(k);entries.delete(k);entries.set(k,cost);hits++;return cost;
+  },
+  set(k,cost){
+   const bytes=k.length*2;if(bytes>maxKeyBytes)return;
+   if(entries.has(k))remove(k);
+   while(entries.size>=maxEntries||size+bytes>maxKeyBytes){remove(entries.keys().next().value);evictions++}
+   entries.set(k,cost);size+=bytes;
+  }
+ };
+ // Premises and goals are recompiled at their public IR boundaries. No
+ // externally submitted proof, cache key or implication result is trusted.
+ const verify=(obligation,options)=>verifyCanonical(canonicalObligation(obligation),options,cache);
+ const compose=async(obligation,imports,api,options={})=>{
+  const canonical=canonicalObligation(obligation);
+  ensure(list(imports,32),'Composition import limit');
+  const {environment,evidence}=canonical.implementation;
+  const factKey=(s,p,t)=>JSON.stringify([s,p,t]);
+  const index=facts=>new Map(facts.entries.map(e=>[factKey(e.state,e.profile,e.target),e]));
+  const parentFacts=index(evidence),seenSources=new Map();
+  const children=imports.map(item=>{
+   ensure(own(item,['obligation','contract','bind'])&&id(item.contract)&&item.bind&&typeof item.bind==='object'&&!Array.isArray(item.bind)&&Object.entries(item.bind).every(([a,b])=>id(a)&&id(b)),'Invalid composition import');
+   if(!seenSources.has(item.obligation)){
+    const source=canonicalObligation(item.obligation);
+    seenSources.set(item.obligation,{source,report:verifyCanonical(source,{},cache),facts:index(source.implementation.evidence)});
+   }
+   const {source,report,facts}=seenSources.get(item.obligation);
+   const claim=source.contract.contracts.find(c=>c.id===item.contract);
+   ensure(claim,'Unknown imported contract');
+   const predicate=rulePredicate(claim);
+   ensure(predicate&&!claim.event,'Only state-invariant linear predicates may be imported');
+   const refs=ruleRefs(claim,predicate);
+   ensure(refs.every(([endpoint,t])=>endpoint==='before'&&Object.hasOwn(item.bind,t))&&Object.keys(item.bind).length===new Set(refs.map(r=>r[1])).size,'Incomplete or extraneous target binding');
+   const proof=report.contracts.find(c=>c.id===claim.id);
+   return {source,claim,predicate,refs,proof,facts,bind:Object.fromEntries(Object.entries(item.bind))};
+  });
+  const derived=new Map(),implications=new Map();let solverCalls=0;
+  const solver=api?.Context;
+  if(typeof solver==='function'&&!solverIds.has(solver))solverIds.set(solver,++nextSolver);
+  // Composition is an optimization: a failed implication never constitutes
+  // an implementation counterexample. Check the original geometry instead.
+  for(const goal of canonical.contract.contracts){
+   const predicate=rulePredicate(goal);
+   if(!predicate||goal.event)continue;
+   const refs=ruleRefs(goal,predicate);
+   for(const inst of canonical.cases.filter(c=>c.contract===goal.id)){
+    const p=environment.profiles.find(p=>p.id===inst.profile),s=inst.transition.from;
+    const premises=[],dependencies=[],assumptions=[],sources=[],covered=new Set();
+    for(const child of children){
+     const cp=child.source.implementation.environment.profiles.find(v=>v.id===p.id);
+     if(!cp||JSON.stringify(cp)!==JSON.stringify(p))continue;
+     const result=child.proof.cases.find(v=>v.state===s&&v.profile===p.id&&!v.event&&v.status==='verified'&&v.coverage?.status==='verified');
+     if(!result)continue;
+     const mapped=child.refs.map(([,t])=>[t,child.bind[t]]);
+     if(!mapped.every(([from,to])=>{
+      const a=child.facts.get(factKey(s,p.id,from)),b=parentFacts.get(factKey(s,p.id,to));
+      return a&&b&&JSON.stringify(evidenceValue(a))===JSON.stringify(evidenceValue(b));
+     }))continue;
+     mapped.forEach(([,to])=>covered.add(to));
+     premises.push(mapPredicate(child.predicate,t=>child.bind[t]));
+     assumptions.push(...result.assumptions);sources.push(...result.sources);
+     dependencies.push({component:child.source.contract.component,contract:child.claim.id,bind:child.bind});
+    }
+    if(!premises.length||!refs.every(([,t])=>covered.has(t)))continue;
+    // Bound extra solver work for a single call and reuse an identical
+    // symbolic implication across state cases.
+    const key=JSON.stringify([p,premises,predicate]);
+    if(!implications.has(key)){
+     if(implications.size>=128)continue;
+     const memoKey='implication:'+solverIds.get(solver)+':'+key;
+     const reusable=typeof solver==='function';
+     if(reusable&&cache.get(memoKey,0)!==undefined)implications.set(key,true);
+     else if(solverCalls>=16)implications.set(key,false);
+     else try{
+      solverCalls++;
+      const result=(await verifyPredicateImplication(p,premises,predicate,api,{timeoutMs:options.timeoutMs??5000})).status==='verified';
+      implications.set(key,result);
+      if(result&&reusable)cache.set(memoKey,0);
+     }catch{implications.set(key,false)}
+    }
+    if(implications.get(key))derived.set(caseKey(goal.id,p.id,inst.transition),{dependencies,assumptions,sources});
+   }
+  }
+  return verifyCanonical(canonical,options,cache,derived);
+ };
+ return Object.freeze({verify,compose,verifyUI:({observations=[],...input})=>verifyCanonical(uiObligation(input),{observations},cache),stats:()=>({entries:entries.size,keyBytes:size,hits,misses,evictions}),clear:()=>{entries.clear();size=0;hits=misses=evictions=0}});
+}
+function uiObligation({model,evidence=[]}) {
  ensure(own(model,['version','component','initial','states','transitions','profiles','contracts','definitions'])&&model.version===1,'Invalid UI model version/fields');
  const {initial,states,transitions,profiles,contracts,definitions}=model;
  const contract=createRelationalContractIR({component:model.component??'Document',profile:'relational/1',contracts,definitions});
- return verifyRelationalObligation(createRelationalObligationIR(contract,{state:createStateIR({initial,states,transitions}),environment:createEnvironmentIR(profiles),evidence:createEvidenceIR(evidence)}),{observations});
+ return createRelationalObligationIR(contract,{state:createStateIR({initial,states,transitions}),environment:createEnvironmentIR(profiles),evidence:createEvidenceIR(evidence)});
+}
+export function verifyUI({observations=[],...input}){
+ return verifyCanonical(uiObligation(input),{observations});
 }
 /** Existing LayoutIR -> evidence, independent of the authored contract.
  * Environment binding is trusted: the report does not contain every UA/font
