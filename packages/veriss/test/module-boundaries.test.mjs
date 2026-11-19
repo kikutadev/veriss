@@ -39,3 +39,9 @@ test('the syntax stage hands its findings over as one list of notes (M3): no war
 test('the style stage records dropped declarations in one list (M4): no per-case $...Inert mark is left', () => {
   for (const file of files('.')) assert.deepEqual(readFileSync(join(src, file), 'utf8').match(/\$[a-zA-Z]+Inert\b/g) ?? [], [], file);
 });
+
+test('the CSS-mistake checks live in rules/css-mistakes.mjs (M5): they import nothing, and the engine no longer defines them', () => {
+  assert.deepEqual(importsOf('rules/css-mistakes.mjs'), []);
+  const engine = readFileSync(join(src, 'layout/engine.mjs'), 'utf8');
+  for (const name of ['cssMistakes', 'firstPseudoInert', 'inlineAutoMargin', 'pseudoWithoutContent', 'tableRowRadius', 'aspectInert', 'contentsInert']) assert.ok(!new RegExp(`function ${name}\\(`).test(engine), name);
+});

@@ -100,8 +100,8 @@ export default {
 | M2 | 境界テストを置く(今ある逆向きの依存は許可リストに載せ、減らしていく) | 小 |
 | M3 | `notes[]` を導入する。28 の配列を 1 つずつ移し、engine の分割代入をなくす | 中 |
 | M4 | `dropped[]` を導入する。11 の `$…Inert` を移す | 中 |
-| M5 | `rules/css-mistakes` を作り、`cssMistakes` と `inline*` を事実を読む形にして engine から出す。`walkStyles` をなくす | 大 |
-| M6 | `solve` の中の「効かない宣言」の判定(`reasons`)を規則に移す。layout は「親の display」「flow の中か」などを事実として出す | 大 |
+| M5 | `rules/css-mistakes` を作り、`cssMistakes` と `inline*` を engine から出す。依存は `createCssMistakes({ report, facts, tools })` の引数に明示する(済み)。`walkStyles` をなくすのは M6 に回す(style の段が単独で事実を出せるようになってから) | 大 |
+| M6 | `solve` の中の「効かない宣言」の判定(`reasons`)を規則に移す。layout は「親の display」「flow の中か」などを事実として出す。`walkStyles` をなくす | 大 |
 | M7 | `rules/contrast` を作り、色の規則を移す。`needs: ['style']` にして、レイアウトなしでも判定する | 中 |
 | M8 | a11y の残りを `a11y-dom` と `a11y-geometry` に分ける。`integrity`、`cls` も規則にする | 中 |
 | M9 | 境界テストの許可リストが空になったら、`packages/` に出す | 小 |

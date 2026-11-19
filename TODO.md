@@ -143,7 +143,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] M2. import の向きを調べる境界テスト
 - [x] M3. 構文の検査の結果を `notes[]` にまとめる(28 の配列)
 - [x] M4. 捨てた宣言を `dropped[]` にまとめる(11 の `$…Inert`)
-- [ ] M5. `rules/css-mistakes` を engine から出す
+- [x] M5. `rules/css-mistakes` を engine から出す(`cssMistakes` と周りの検査 560 行を `createCssMistakes({ report, facts, tools })` に。後追いの `walkStyles` は style の段が単独で事実を出せるようになる M6 以降に回す)
 - [ ] M6. `solve` の中の「効かない宣言」の判定を規則に移す
 - [ ] M7. `rules/contrast`(レイアウトなしでも判定する)
 - [ ] M8. a11y を DOM の規則と幾何の規則に分ける
