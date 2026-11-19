@@ -282,6 +282,7 @@ function expand(property, value) {
   if (property === 'border' || property === 'border-inline' || property === 'border-block' || /^border-(?:top|right|bottom|left)$/.test(property)) {
     const sides = property === 'border' ? ['left', 'right', 'top', 'bottom'] : property === 'border-inline' ? ['left', 'right'] : property === 'border-block' ? ['top', 'bottom'] : [property.slice(7)];
     // The color is kept as paint (border-<side>-color) for the non-text contrast rules.
+    if (sides.length === 1 && ['initial', 'unset'].includes(value)) value = 'none';
     if (wide.has(value)) {
       if (sides.length === 1) throw new Error(`Unsupported ${property}: ${value}`);
       return sides.flatMap(side => [[`border-${side}`, value], [`border-${side}-color`, value]]);

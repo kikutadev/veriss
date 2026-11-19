@@ -62,5 +62,10 @@ test('side border reset keeps the initial width if style is set later',()=>{
   const b=run(html,'main{border-left:3px solid currentcolor}');
   assert.equal(a.status,'verified');
   assert.deepEqual(a.sizes,b.sizes);
+  for(const reset of ['initial','unset']) {
+    const r=run(html,'main{border-left:'+reset+'} main{border-left-style:solid}');
+    assert.equal(r.status,'verified',reset);
+    assert.deepEqual(r.sizes,b.sizes,reset);
+  }
   assert.equal(run(html,'main{border-left:inherit}').status,'unknown');
 });
