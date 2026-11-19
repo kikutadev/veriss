@@ -640,7 +640,9 @@ function flexShorthand(value) {
 }
 
 export function parseLayoutCSS(sheets, diagnostic) {
-  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], importantTypo = [], mediaAndFunction = [], calcSpacing = [], unitlessLength = [], fontInvalid = [], gridTracksInvalid = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  // Findings of the syntax stage, one shape: { code, ...data } (ADR-0016 M3). The rules/syntax-notes.mjs catalog words them.
+  const notes = [], note = (code, data) => { notes.push({ code, ...data }); }, notesOf = code => notes.filter(n => n.code === code);
+  const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
@@ -654,7 +656,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
       if (++count > 2048) { problem('U_LAYOUT_LIMIT', 'CSS node limit exceeded'); return; }
       if (node.type === 'atrule' && node.name.toLowerCase() === 'import') {
         if (!ruleSeen) { problem('U_LAYOUT_CSS', `@import ${node.params.trim()} loads another stylesheet, which the analysis does not have`, node.source.start.line); continue; }
-        importIgnored.push({ params: node.params.trim(), file: filename, line: node.source.start.line, nested: depth > 0 });
+        note('W_CSS_IMPORT_IGNORED', { params: node.params.trim(), file: filename, line: node.source.start.line, nested: depth > 0 });
         continue;
       }
       if (!(node.type === 'atrule' && (node.name.toLowerCase() === 'charset' || (node.name.toLowerCase() === 'layer' && !node.nodes)))) ruleSeen = true;
@@ -690,7 +692,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
           // is laid out again to find layout shifts.
           const layout = [];
           // !important in a keyframe makes the declaration invalid there: the browser ignores it (CSS Animations 1 §3).
-          for (const d of frame.nodes ?? []) if (d.type === 'decl' && d.important && !keyframeImportant.some(n => n.line === d.source.start.line && n.file === filename && n.property === d.prop.toLowerCase())) keyframeImportant.push({ name, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line });
+          for (const d of frame.nodes ?? []) if (d.type === 'decl' && d.important && !notesOf('W_CSS_KEYFRAME_IMPORTANT').some(n => n.line === d.source.start.line && n.file === filename && n.property === d.prop.toLowerCase())) note('W_CSS_KEYFRAME_IMPORTANT', { name, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line });
           let easing; for (const d of frame.nodes ?? []) if (d.type === 'decl' && !d.important) { const prop = d.prop.toLowerCase(), value = d.value.trim().toLowerCase(); if (prop === 'animation-timing-function') { easing = value; continue; } if (prop === 'background-color' || prop === 'background') props['background-color'] = value; if (prop === 'opacity') props.opacity = value; if (!prop.startsWith('--') && !statePaint.test(prop) && !/^(?:transform|translate|scale|rotate|filter|backdrop-filter|will-change|offset(?:-.*)?)$/.test(prop)) layout.push(`${d.prop}:${d.value}`); }
           // easing: this keyframe's animation-timing-function, which eases the intervals that start at it.
           frames.push({ offset, props, ...(layout.length ? { layout: layout.join(';') } : {}), ...(easing ? { easing } : {}) });
@@ -778,13 +780,13 @@ export function parseLayoutCSS(sheets, diagnostic) {
             .concat([...node.params.matchAll(/\(\s*(?:width|height)\s*(?:<=|>=|<|>|=)\s*([^)<>=]+?)\s*\)/gi)].map(m => m[1]))
             .concat([...node.params.matchAll(/\(\s*([^()<>=]+?)\s*(?:<=|>=|<|>|=)\s*(?:width|height)\s*\)/gi)].map(m => m[1]));
           const bad = values.find(v => /^\s*(?:\d*\.)?\d+\s*$/.test(v) && Number(v) !== 0 || /^\s*(?:\d*\.)?\d+\s+[a-z%]+\s*$/i.test(v));
-          if (bad) { mediaBadLength.push({ params: node.params.trim(), value: bad.trim(), file: filename, line: node.source.start.line }); continue; }
+          if (bad) { note('W_CSS_MEDIA_INVALID_LENGTH', { params: node.params.trim(), value: bad.trim(), file: filename, line: node.source.start.line }); continue; }
         }
         // F87: "and(" (no space) is a function token, not the keyword and: the query is invalid and never matches (measured
         // in Chromium, Firefox and WebKit). In a list only that query fails, so only a single query is handled.
-        if (node.name.toLowerCase() === 'media' && /\band\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { mediaAndFunction.push({ params: node.params.trim(), file: filename, line: node.source.start.line }); continue; }
+        if (node.name.toLowerCase() === 'media' && /\band\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { note('W_CSS_MEDIA_AND_SPACE', { params: node.params.trim(), file: filename, line: node.source.start.line }); continue; }
         if (node.name.toLowerCase() === 'media' && /var\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) {
-          mediaVar.push({ params: node.params.trim(), file: filename, line: node.source.start.line });
+          note('W_CSS_MEDIA_VAR', { params: node.params.trim(), file: filename, line: node.source.start.line });
           continue;
         }
         try {
@@ -821,7 +823,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
       if (selectors.some(sel => sel.state === 'visited')) {
         const visitedColor = /^(?:color|background-color|border-(?:(?:top|right|bottom|left|block-start|block-end|inline-start|inline-end)-)?color|column-rule-color|outline-color|text-decoration-color|text-emphasis-color|caret-color|fill|stroke|--.*)$/;
         for (const d of [...(node.nodes ?? [])]) if (d.type === 'decl' && !visitedColor.test(d.prop.toLowerCase())) {
-          visitedIgnored.push({ selector: node.selector, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line });
+          note('W_CSS_VISITED_IGNORED', { selector: node.selector, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line });
           d.remove();
         }
       }
@@ -833,7 +835,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
         const markerApplies = /^(?:color|content|font(?:-.*)?|line-height|white-space(?:-collapse)?|text-wrap(?:-mode)?|direction|unicode-bidi|text-combine-upright|animation(?:-.*)?|transition(?:-.*)?|letter-spacing|word-spacing|text-transform|--.*)$/;
         for (const d of [...(node.nodes ?? [])]) if (d.type === 'decl') {
           const prop = d.prop.toLowerCase();
-          if (!markerApplies.test(prop)) { markerIgnored.push({ selector: node.selector, property: prop, file: filename, line: d.source.start.line }); d.remove(); }
+          if (!markerApplies.test(prop)) { note('W_CSS_MARKER_IGNORED', { selector: node.selector, property: prop, file: filename, line: d.source.start.line }); d.remove(); }
           else if (!/^(?:color|animation(?:-.*)?|transition(?:-.*)?|--.*)$/.test(prop)) markerSizing.push({ selectors, property: prop, file: filename, line: d.source.start.line });
         }
       }
@@ -843,7 +845,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
       if (selectors.some(sel => sel.pseudoElement === 'selection')) {
         if (!selectors.every(sel => sel.pseudoElement === 'selection')) { problem('U_LAYOUT_SELECTOR', `${node.selector}: a selector list mixing ::selection with other selectors is not modeled`, node.source.start.line); continue; }
         for (const d of node.nodes ?? []) if (d.type === 'decl' && /^(?:font-size|font-weight|letter-spacing|opacity|padding(?:-.*)?|margin(?:-.*)?|border(?:-(?:top|right|bottom|left))?(?:-(?:width|style|color))?|outline(?:-.*)?)$/i.test(d.prop))
-          selectionIgnored.push({ selector: node.selector, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line });
+          note('W_CSS_SELECTION_IGNORED', { selector: node.selector, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line });
         continue;
       }
       // F37: ::first-letter / ::first-line are kept out of the cascade: the engine reports them where they never apply (a
@@ -865,12 +867,12 @@ export function parseLayoutCSS(sheets, diagnostic) {
       // dropped by the browser (measured: CSS.supports is false in Chromium, Firefox and WebKit): dropped here too.
       for (const d of [...(node.nodes ?? [])]) if (d.type === 'decl' && d.prop.toLowerCase() === 'grid-template-areas') {
         const why = invalidAreas(d.value);
-        if (why) { gridAreasInvalid.push({ selector: node.selector, value: d.value, why, file: filename, line: d.source.start.line }); d.remove(); }
+        if (why) { note('W_CSS_GRID_AREAS_INVALID', { selector: node.selector, value: d.value, why, file: filename, line: d.source.start.line }); d.remove(); }
       }
       // F47: in ::placeholder, margin, height, display and position are ignored by Chromium, Firefox and WebKit (measured
       // against a ::placeholder rule without them: same pixels, same field size) — reported and dropped.
       if (selectors.length && selectors.every(sel => sel.pseudoElement === 'placeholder'))
-        for (const d of [...(node.nodes ?? [])]) if (d.type === 'decl' && /^(?:margin(?:-(?:top|right|bottom|left))?|height|display|position)$/i.test(d.prop)) { placeholderIgnored.push({ selector: node.selector, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line }); d.remove(); }
+        for (const d of [...(node.nodes ?? [])]) if (d.type === 'decl' && /^(?:margin(?:-(?:top|right|bottom|left))?|height|display|position)$/i.test(d.prop)) { note('W_CSS_PLACEHOLDER_IGNORED', { selector: node.selector, property: d.prop.toLowerCase(), file: filename, line: d.source.start.line }); d.remove(); }
       // Checklist F6: one property declared twice in a rule — the earlier declaration never applies (the later wins, or
       // the !important one). A later value the browser may not support (a newer function, unit or keyword, or a
       // vendor-prefixed one) is the progressive-enhancement fallback pattern and is left alone.
@@ -880,9 +882,9 @@ export function parseLayoutCSS(sheets, diagnostic) {
         for (const d of node.nodes ?? []) {
           if (d.type !== 'decl') continue;
           const prop = d.prop.toLowerCase(), earlier = seenProps.get(prop);
-          if (earlier && !newer.test(d.value) && !newer.test(earlier.value) && !duplicateDeclarations.some(n => n.file === filename && n.line === d.source.start.line && n.property === prop)) {
+          if (earlier && !newer.test(d.value) && !newer.test(earlier.value) && !notesOf('W_CSS_DUPLICATE_DECLARATION').some(n => n.file === filename && n.line === d.source.start.line && n.property === prop)) {
             const dead = earlier.important && !d.important ? d : earlier;
-            duplicateDeclarations.push({ property: prop, selector: node.selector, file: filename, line: dead.source.start.line, dead: dead.value.trim(), kept: (dead === d ? earlier : d).value.trim(), same: earlier.value.trim() === d.value.trim() });
+            note('W_CSS_DUPLICATE_DECLARATION', { property: prop, selector: node.selector, file: filename, line: dead.source.start.line, dead: dead.value.trim(), kept: (dead === d ? earlier : d).value.trim(), same: earlier.value.trim() === d.value.trim() });
           }
           seenProps.set(prop, d);
           // F15, F16: a declaration that only acts with another property: kept with the rule's selectors, checked per box
@@ -891,7 +893,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
           if (dependentProperty[prop] && !wide.has(d.value.trim().toLowerCase())) dependentDeclarations.push({ selectors, contexts, property: prop, value: d.value.trim(), file: filename, line: d.source.start.line, selector: node.selector });
           // F12: a transition shorthand item with no time is 0s.
           if (prop === 'transition' && !wide.has(d.value.trim().toLowerCase())) for (const item of postcss.list.comma(d.value)) if (!/(?:^|\s)-?(?:\d+(?:\.\d+)?|\.\d+)m?s(?:\s|$)/i.test(item.trim()) && item.trim().toLowerCase() !== 'none' && !/var\(/i.test(item))
-            noDurationTransitions.push({ selector: node.selector, file: filename, line: d.source.start.line, item: item.trim() });
+            note('W_CSS_TRANSITION_NO_DURATION', { selector: node.selector, file: filename, line: d.source.start.line, item: item.trim() });
         }
       }
       // A state rule (:hover, :focus, …) may only repaint: the layout is proved for the base state.
@@ -924,7 +926,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
       {
         const named = authored.filter(d => /^(?:transition|transition-property)$/i.test(d.prop) && /(?:^|[\s,])display(?:[\s,]|$)/i.test(d.value));
         const discrete = authored.some(d => /^transition-behavior$/i.test(d.prop) && /allow-discrete/i.test(d.value)) || named.some(d => /allow-discrete/i.test(d.value));
-        if (named.length && !discrete) transitionNotes.push({ file: filename, line: named[0].source.start.line, selector: node.selector });
+        if (named.length && !discrete) note('W_CSS_TRANSITION_DISPLAY', { file: filename, line: named[0].source.start.line, selector: node.selector });
       }
       const conflicts=findCSSWriteConflicts(authored.map(declaration=>declaration.prop));
       for(const conflict of conflicts) {
@@ -941,28 +943,28 @@ export function parseLayoutCSS(sheets, diagnostic) {
         // F86: a "!word" other than !important at the end of a value makes the declaration invalid: the browser drops it
         // (measured in Chromium, Firefox and WebKit). PostCSS keeps it in the value; it is dropped here and reported.
         { const bang = !declaration.prop.startsWith('--') && !declaration.important && /!\s*([a-z][\w-]*)\s*$/i.exec(declaration.value);
-          if (bang && bang[1].toLowerCase() !== 'important') { importantTypo.push({ property: declaration.prop.toLowerCase(), value: declaration.value.trim(), word: bang[0].replace(/\s+/g, ''), selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+          if (bang && bang[1].toLowerCase() !== 'important') { note('W_CSS_IMPORTANT_TYPO', { property: declaration.prop.toLowerCase(), value: declaration.value.trim(), word: bang[0].replace(/\s+/g, ''), selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F99 / F100: an unquoted family name that is not a run of identifiers (Font Awesome 5 Free), or a font shorthand
         // without a size or a family, is invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
         { const prop = declaration.prop.toLowerCase();
           const problem = prop === 'font-family' ? (b => b && { family: b })(familyProblem(declaration.value)) : prop === 'font' ? fontShorthandProblem(declaration.value) : null;
-          if (problem) { fontInvalid.push({ property: prop, value: declaration.value.trim(), ...problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+          if (problem) { note('W_CSS_FONT_INVALID', { property: prop, value: declaration.value.trim(), ...problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F101: a grid track list the grammar does not allow (repeat(auto-fill, 1fr), minmax(1fr, …), repeat(0, …)) is
         // invalid: the browser drops the declaration (measured in Chromium, Firefox and WebKit).
         { const prop = declaration.prop.toLowerCase(), problem = /^grid-template-(?:columns|rows)$/.test(prop) && gridTrackProblem(declaration.value);
-          if (problem) { gridTracksInvalid.push({ property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+          if (problem) { note('W_CSS_GRID_TRACKS_INVALID', { property: prop, value: declaration.value.trim(), problem, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         // F93: a bare number other than 0 where only a length is allowed (width: 100) is invalid in standards mode — the
         // mode analysed here — so the browser drops the declaration (measured in Chromium, Firefox and WebKit; only quirks
         // mode, in WebKit, takes it as px).
         { const prop = declaration.prop.toLowerCase(), value = declaration.value.trim();
           if (lengthOnly.test(prop) && !/[(]/.test(value)) {
             const bare = value.split(/[\s/]+/).find(t => /^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(t) && Number(t) !== 0);
-            if (bare) { unitlessLength.push({ property: prop, value, bare, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; }
+            if (bare) { note('W_CSS_UNITLESS_LENGTH', { property: prop, value, bare, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; }
           } }
         // F89: + or - without white space on both sides in calc() / min() / max() / clamp() makes the value invalid: the
         // browser drops the declaration (measured in Chromium, Firefox and WebKit), so it is dropped here too.
         { const bad = !declaration.prop.startsWith('--') && calcOperatorProblem(declaration.value);
-          if (bad) { calcSpacing.push({ property: declaration.prop.toLowerCase(), value: declaration.value.trim(), written: bad, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
+          if (bad) { note('W_CSS_CALC_OPERATOR_SPACE', { property: declaration.prop.toLowerCase(), value: declaration.value.trim(), written: bad, selector: node.selector, file: filename, line: declaration.source.start.line }); continue; } }
         try {
           const custom=declaration.prop.startsWith('--'),property=custom ? declaration.prop : declaration.prop.toLowerCase();
           const expression=custom || /var\(/i.test(declaration.value) ? variableValue(declaration.value) : undefined;
@@ -985,7 +987,6 @@ export function parseLayoutCSS(sheets, diagnostic) {
   }
   // F102: counter-reset / -increment / -set of a counter that no counter() / counters() in the analysed CSS reads change
   // nothing that shows (measured in Chromium, Firefox and WebKit). list-item is the counter list markers read.
-  const counterUnused = [];
   {
     const declared = [], read = new Set();
     for (const sheet of sheets) {
@@ -998,17 +999,16 @@ export function parseLayoutCSS(sheets, diagnostic) {
       });
     }
     const seen = new Set();
-    for (const d of declared) if (d.name !== 'list-item' && !read.has(d.name) && !seen.has(d.name)) { seen.add(d.name); counterUnused.push(d); }
+    for (const d of declared) if (d.name !== 'list-item' && !read.has(d.name) && !seen.has(d.name)) { seen.add(d.name); note('W_CSS_COUNTER_UNUSED', d); }
   }
   // An animation-name without @keyframes runs no animation.
   // (Checklist F1: the names without @keyframes are kept for a warning — a typo or a missing rule.)
-  const missingKeyframes = [];
   for (const rule of rules) for (const declaration of rule.declarations) if (declaration.property === 'animation-name' && !wide.has(declaration.value)) declaration.value = postcss.list.comma(declaration.value).map(name => {
     if (name === 'none' || keyframes.has(name)) return name;
-    if (!missingKeyframes.some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) missingKeyframes.push({ name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
+    if (!notesOf('W_CSS_KEYFRAMES_MISSING').some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) note('W_CSS_KEYFRAMES_MISSING', { name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, importantTypo, mediaAndFunction, calcSpacing, unitlessLength, fontInvalid, gridTracksInvalid, counterUnused, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
+  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules };
 }
 
 // The UA default family and the user's default font size are not author

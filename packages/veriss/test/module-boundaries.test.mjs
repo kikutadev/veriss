@@ -26,3 +26,12 @@ test('the syntax validators are imported only by the syntax stage (layout/css.mj
   for (const validator of ['layout/calc-syntax.mjs', 'layout/font-syntax.mjs', 'layout/grid-syntax.mjs'])
     assert.deepEqual(files('.').filter(file => importsOf(file).includes(validator)), ['layout/css.mjs'], validator);
 });
+
+test('rules/ reads facts only: it imports no stage (layout/) module', () => {
+  for (const file of files('rules')) assert.deepEqual(importsOf(file).filter(target => target.startsWith('layout/')), [], file);
+});
+
+test('the syntax stage hands its findings over as one list of notes (M3): no warning-only array is destructured by the engine', () => {
+  const engine = readFileSync(join(src, 'layout/engine.mjs'), 'utf8');
+  for (const name of ['mediaVar', 'fontInvalid', 'counterUnused', 'calcSpacing', 'importIgnored', 'duplicateDeclarations']) assert.ok(!new RegExp(`\\b${name}\\b`).test(engine), name);
+});
