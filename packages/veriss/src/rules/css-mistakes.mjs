@@ -133,8 +133,31 @@ export function createCssMistakes({ report, facts, tools }) {
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, css: keys.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
       message: `${box.label}: ${keys.join(', ')} ${keys.length === 1 ? 'has' : 'have'} no effect on a table ${box.tag === 'col' ? 'column' : 'column group'}: a column is not an ancestor of its cells (nothing is inherited from it) and has no box to pad or size; only width, background, visibility${String(style['border-collapse']) === 'collapse' ? ' and border' : ' and, with border-collapse: collapse, border'} act on it. Style the cells instead (td:nth-child(…))` });
   }
+  // F117: transform-style: preserve-3d does nothing on an inline box (not transformable), and a grouping property on the
+  // same element (overflow other than visible, opacity below 1, filter, isolation: isolate, mix-blend-mode, clip-path,
+  // mask) flattens it: the children's 3D positions are painted into its plane (CSS Transforms 2 §6.2.1; measured in
+  // Chromium, Firefox and WebKit, overflow: clip included). contain: paint flattens it in Firefox only; not judged.
+  function preserve3dInert(box, style, parentStyle) {
+    // As in inlineAutoMargin: block flow is laid out as a one-column grid, so an inline child reads as blockified; a
+    // real flex or grid parent does blockify it (and makes it transformable).
+    const inline = String(style.$inlineDisplay ?? style.display) === 'inline' && !(parentStyle && ['flex', 'inline-flex', 'grid', 'inline-grid'].includes(String(parentStyle.display)) && !parentStyle.$blockFlow);
+    const source = style.$sources?.['transform-style'];
+    if (box.pseudo || !source || style['transform-style'] !== 'preserve-3d' || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('transform-style'))) return;
+    const by = inline ? null : [
+      ...['overflow-x', 'overflow-y'].filter(key => !['visible', undefined].includes(style[key])).slice(0, 1).map(key => `overflow: ${style[key]}`),
+      ...(style.opacity !== undefined && Number(style.opacity) < 1 ? [`opacity: ${style.opacity}`] : []),
+      ...['filter', 'clip-path', 'mask', 'mask-image'].filter(key => style[key] !== undefined && !['none', 'initial'].includes(String(style[key]))).map(key => `${key}: ${style[key]}`),
+      ...(style.isolation === 'isolate' ? ['isolation: isolate'] : []),
+      ...(style['mix-blend-mode'] !== undefined && style['mix-blend-mode'] !== 'normal' ? [`mix-blend-mode: ${style['mix-blend-mode']}`] : []),
+    ];
+    if (by && !by.length) return;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['transform-style'], css: [{ property: 'transform-style', file: source.file, line: source.line, selector: source.selector }],
+      message: by ? `${box.label}: transform-style: preserve-3d is flattened by ${by.join(', ')} on the same element: its children's 3D transforms are painted into its plane, as with flat. Move ${by.length === 1 ? 'that property' : 'those properties'} to a wrapper or to the children`
+        : `${box.label}: transform-style: preserve-3d has no effect on a display: inline box (it is not transformable). Make it inline-block or block` });
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    preserve3dInert(box, style, ancestors?.at(-1)?.style);
     layerShadowed(box, style);
     columnInert(box, style);
     inlineAutoMargin(box, style, ancestors?.at(-1)?.style);
@@ -595,5 +618,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

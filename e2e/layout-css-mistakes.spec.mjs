@@ -1351,3 +1351,27 @@ test('F116: an invalid will-change is dropped (the earlier value stays, a fixed 
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_FIXED_TRAPPED'), value).toBe(top === 50);
   }
 });
+
+test('F117: transform-style: preserve-3d contains fixed children and makes a stacking context; a grouping property flattens it, contain: paint only in Firefox', async ({page, browserName}) => {
+  const view = {min: 320, max: 1200, height: {min: 300, max: 900}}, base = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}';
+  for (const [extra, flattened] of [['', false], ['overflow:hidden', true], ['overflow:clip', true], ['opacity:.5', true], ['isolation:isolate', true], ['contain:paint', browserName === 'firefox']]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.g{perspective:200px;width:300px;height:300px;padding:50px}.p{transform-style:preserve-3d;width:200px;height:200px;${extra}}.c{width:100px;height:100px;background:red;transform:translateZ(100px)}</style><div class="g"><div class="p"><div class="c"></div></div></div>`);
+    expect(await page.evaluate(() => document.querySelector('.c').getBoundingClientRect().width), extra).toBe(flattened ? 100 : 200);
+    await page.setContent(`<!doctype html><style>${base}.p{margin-top:50px;height:100px;transform-style:preserve-3d;${extra}}.f{position:fixed;top:0;left:0;width:10px;height:10px}</style><div class="p"><div class="f"></div></div>`);
+    expect(await page.evaluate(() => document.querySelector('.f').getBoundingClientRect().top), extra).toBe(50);
+    if (extra === 'contain:paint') continue;
+    const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="f"></div></div></body></html>', {name: 'P', css: `${base}.p{margin-top:50px;height:100px;transform-style:preserve-3d;${extra}}.f{position:fixed;top:0;left:0;width:10px;height:10px}`, viewport: view});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_FIXED_TRAPPED'), extra).toBe(true);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('transform-style')), extra).toBe(flattened);
+  }
+  // A stacking context: a z-index: -1 child stays above the parent's background.
+  for (const [style, above] of [['transform-style:preserve-3d', true], ['transform-style:flat', false]]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.p{width:100px;height:100px;background:blue;${style}}.c{position:relative;z-index:-1;width:50px;height:50px;background:red}</style><div class="p"><div class="c"></div></div>`);
+    expect(await page.evaluate(() => document.elementFromPoint(10, 10).className), style).toBe(above ? 'c' : 'p');
+  }
+  // On a span in block flow (not transformable) it does nothing: no containing block.
+  await page.setContent(`<!doctype html><style>*{margin:0}.w{margin-top:50px}.p{transform-style:preserve-3d}.f{position:fixed;top:0;left:0;width:10px;height:10px}</style><div class="w"><span class="p"><span class="f"></span></span></div>`);
+  expect(await page.evaluate(() => document.querySelector('.f').getBoundingClientRect().top)).toBe(0);
+  const r = analyzeHTML('<html lang="en"><body><div class="a"><span class="p"></span></div></body></html>', {name: 'P', css: `${base}.a{height:auto}.p{transform-style:preserve-3d}`, viewport: view});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && /display: inline/.test(w.message))).toBe(true);
+});

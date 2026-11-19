@@ -1278,3 +1278,18 @@ test('F116: an invalid will-change is dropped, so it does not trap a fixed child
   }
   assert.match(codes(run(css('transform opacity'), html), 'W_CSS_KEYWORD_INVALID')[0].message, /needs commas.*transform, opacity\?/);
 });
+
+test('F117: transform-style: preserve-3d contains fixed children (it was Unknown), and a grouping property or an inline box makes it do nothing', () => {
+  const html = '<div class="p"><div class="f"></div></div>', css = e => `.p{height:100px;${e}}.f{position:fixed;top:0;left:0;width:10px;height:10px}`;
+  const inert = r => codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties.includes('transform-style'));
+  assert.equal(codes(run(css('transform-style:flat'), html), 'W_LAYOUT_FIXED_TRAPPED').length, 0);
+  for (const e of ['transform-style:preserve-3d', 'transform-style:preserve-3d;overflow:hidden']) assert.match(codes(run(css(e), html), 'W_LAYOUT_FIXED_TRAPPED')[0].message, /transform-style: preserve-3d/, e);
+  assert.equal(inert(run(css('transform-style:preserve-3d'), html)).length, 0);
+  for (const [e, by] of [['overflow:hidden', 'overflow: hidden'], ['overflow:clip', 'overflow: clip'], ['opacity:.5', 'opacity: .5'], ['isolation:isolate', 'isolation: isolate']])
+    assert.match(inert(run(css(`transform-style:preserve-3d;${e}`), html))[0]?.message ?? '', new RegExp(`flattened by ${by.replace('.', '\\.')}`), e);
+  // display: inline in block flow is not transformable; as a grid item it is blockified, and preserve-3d applies.
+  const inline = run('.a{height:auto}.p{transform-style:preserve-3d}', '<div class="a"><span class="p"></span></div>');
+  assert.match(inert(inline)[0]?.message ?? '', /display: inline/);
+  assert.equal(inert(run('.a{height:auto}.p{display:inline-block;transform-style:preserve-3d}', '<div class="a"><span class="p"></span></div>')).length, 0);
+  assert.equal(run('.a{backface-visibility:hidden;transform-style:flat}').status, 'verified');
+});

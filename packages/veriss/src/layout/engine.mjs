@@ -1,7 +1,7 @@
 import { q, add, sub, mul, cmp, div, exact, number } from './linear.mjs';
 import { scalar, width, height, sum, diff, times, evaluate, affine, sample, rectangle, clip, partition, projection, serialize } from './region.mjs';
 import { validateOptions } from './input.mjs';
-import { parseLayoutCSS, computeStyle, matches, px, setRootFontSize, setSafeArea, containsFixed, setUAProfile, setRegisteredProperties, animationsOf, transitionsOf, dependentProperty } from './css.mjs';
+import { parseLayoutCSS, computeStyle, matches, px, setRootFontSize, setSafeArea, containsFixed, fixedContainer, setUAProfile, setRegisteredProperties, animationsOf, transitionsOf, dependentProperty } from './css.mjs';
 import { resolveUAProfile } from './ua-profile.mjs';
 import { parseCondition } from './conditions.mjs';
 import { tracks, tracks as gridTracks, place, parseAreas, expandTracks } from './grid.mjs';
@@ -453,7 +453,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // walk where the layout did not run, so they are reported whether or not the layout is decided).
   // F9: a ::before or ::after styled but with no content is never generated.
   // CSS mistakes found on one box's computed style (rules/css-mistakes.mjs, ADR-0016 M5).
-  const { firstInert, firstPseudoInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
+  const { firstInert, firstPseudoInert, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
     report: { warnings: layoutWarnings, unknown, diagnostics, ranges },
     facts: { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles },
     tools: { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: box => focusableBox(box) },
@@ -1534,6 +1534,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       inlineStateTransforms(child, style);
       inlineTextAlignment(child, style);
       inlineAutoMargin(child, style);
+      preserve3dInert(child, style);
       inlineOverflow(child, style);
       decorationNone(child, style, parents);
       firstPseudoInert(child, style);
@@ -3538,8 +3539,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                           // The trap is a likely bug (a toast or modal meant for the viewport, placed against a header or a
                           // card): a warning besides the Unknown, so it is not only a not-checked line.
                           if (trap && !layoutWarnings.some(w => w.code === 'W_LAYOUT_FIXED_TRAPPED' && w.path === item.box.path)) layoutWarnings.push({ code: 'W_LAYOUT_FIXED_TRAPPED', severity: 'warning', box: item.box.label, path: item.box.path, ancestor: trap.box.label,
-                            message: `${item.box.label} is position: fixed, but ${trap.box.label} (${trap.style.transform !== 'none' ? `transform: ${trap.style.transform}` : trap.style['backdrop-filter'] !== 'none' ? `backdrop-filter: ${trap.style['backdrop-filter']}` : `will-change: ${trap.style['will-change']}`}) becomes its containing block: it is placed against ${trap.box.label} and moves with it instead of staying on the viewport. Render it outside that box (a portal to the end of body), or drop the property`, ...ranges(r) });
-                          if (trap) throw Object.assign(new Error(`${item.box.label} is position: fixed, but its ancestor ${trap.box.label} has ${trap.style.transform !== 'none' ? `transform: ${trap.style.transform}` : trap.style['backdrop-filter'] !== 'none' ? `backdrop-filter: ${trap.style['backdrop-filter']}` : `will-change: ${trap.style['will-change']}`}, which makes it the containing block: ${item.box.label} is placed against ${trap.box.label} and scrolls with it, not with the viewport. Move it outside that box (for example to the end of body), or drop the property`), { code: 'U_LAYOUT_FIXED_CONTAINED', box: item.box, region: r, ancestor: trap.box.label, ancestorPath: trap.box.path, property: 'transform' });
+                            message: `${item.box.label} is position: fixed, but ${trap.box.label} (${fixedContainer(trap.style)}) becomes its containing block: it is placed against ${trap.box.label} and moves with it instead of staying on the viewport. Render it outside that box (a portal to the end of body), or drop the property`, ...ranges(r) });
+                          if (trap) throw Object.assign(new Error(`${item.box.label} is position: fixed, but its ancestor ${trap.box.label} has ${fixedContainer(trap.style)}, which makes it the containing block: ${item.box.label} is placed against ${trap.box.label} and scrolls with it, not with the viewport. Move it outside that box (for example to the end of body), or drop the property`), { code: 'U_LAYOUT_FIXED_CONTAINED', box: item.box, region: r, ancestor: trap.box.label, ancestorPath: trap.box.path, property: 'transform' });
                           if (finalAncestors.some(ancestor=>ancestor.clipped || ancestor.subgrid || (ancestor.style && (containsFixed(ancestor.style) || ['overflow-x','overflow-y'].some(key=>ancestor.style[key] !== 'visible'))))) throw Object.assign(new Error(`${item.box.label} is position: fixed inside a transformed, clipped or scrolling ancestor`), { code: 'U_LAYOUT_CSS' });
                           const viewport = { inline: width, block: height, origin: { inline: scalar(0), block: scalar(0) } };
                           return solve(item.box,{inline:viewport.inline,block:viewport.block,containingBlock:{path:'viewport',...viewport}},r,finalAncestors,item.inherited ?? style,emit).map(result=>result.region);
@@ -3625,6 +3626,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         try { inlineStateTransforms(child, c.style); } catch { /* the rest still runs */ }
         try { inlineTextAlignment(child, c.style); } catch { /* the rest still runs */ }
         try { inlineAutoMargin(child, c.style); } catch { /* the rest still runs */ }
+        try { preserve3dInert(child, c.style); } catch { /* the rest still runs */ }
         try { inlineOverflow(child, c.style); } catch { /* the rest still runs */ }
         try { decorationNone(child, c.style, chain); } catch { /* the rest still runs */ }
         try { firstPseudoInert(child, c.style); } catch { /* the rest still runs */ }
