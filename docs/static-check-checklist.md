@@ -401,6 +401,8 @@
 - [x] **F124. `select` の `text-indent`**(`W_LAYOUT_SELECT_INDENT`、以前は select ごと Unknown): Firefox だけが表示中の選択肢を 2 倍字下げする(10px で 22、Chromium 16、WebKit 17。`appearance: none` でも同じ)。select の大きさは変わらないので、解析は select では `text-indent` を外して進める。`input` は 3 ブラウザーで揃う。`text-align` と `padding` は select でも揃った(実測)
 - [x] **F125. メディアクエリの `em` / `rem` とページのルートの `font-size`**(`W_CSS_MEDIA_EM_ROOT`、解析はこのクエリで Unknown のまま): メディアクエリの em と rem はブラウザーの既定の文字サイズ(利用者が変えなければ 16px)で、`html { font-size: 62.5% }` などを見ない(Chromium・Firefox・WebKit で実測: 50rem は 800px のまま)。ルートに 16px 以外の `font-size`(または `font`)があるときだけ報告する
 - [x] **F126. 片方の軸だけの `overflow: hidden`**(`W_CSS_OVERFLOW_PROMOTED`): もう片方の軸に書いた `visible` は `auto` に、`clip` は `hidden` になり、両方の軸でスクロール(切り取り)する(Chromium・Firefox・WebKit で実測)。片方だけ切るなら `clip`。著者が書いた軸だけ報告する(`overflow-x: hidden` だけのときは報告しない)
+- [x] **F127. html や body だけの `box-sizing: border-box`**(`W_CSS_BOX_SIZING_NOT_INHERITED`): `box-sizing` は継承されないので、ほかの要素は content-box のまま(Chromium・Firefox・WebKit で実測: 幅 100px と padding 10px で 120px)。ほかの要素に `box-sizing` を書く規則がなく、大きさと padding か border を書いた規則があるときだけ報告する
+- [x] **F128. 縦の `margin` の %**(`W_CSS_MARGIN_PERCENT_WIDTH`、解析は % の margin で Unknown のまま): 包含ブロックの幅に対する割合で、高さではない(Chromium・Firefox・WebKit で実測: 400×100 で 10% は 40px)。縦の `padding` の % は縦横比の定番の書き方なので報告しない
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

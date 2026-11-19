@@ -1373,3 +1373,17 @@ test('F126: an axis written visible (or clip) beside a scrolling one computes to
   assert.match(hit('.a{overflow-x:auto;overflow-y:clip}')[0]?.message ?? '', /computes to hidden/);
   for (const css of ['.a{overflow-x:hidden}', '.a{overflow-x:clip;overflow-y:visible}', '.a{overflow:hidden}', '.a{overflow:auto}']) assert.equal(hit(css).length, 0, css);
 });
+
+test('F127: box-sizing on html or body alone is not inherited by the elements that size with padding', () => {
+  const hit = css => codes(run(css), 'W_CSS_BOX_SIZING_NOT_INHERITED');
+  assert.match(hit('html{box-sizing:border-box}.b{width:100px;padding:10px}')[0]?.message ?? '', /not inherited.*box-sizing: inherit/);
+  assert.equal(hit('body{box-sizing:border-box}.b{height:10px;border:1px solid}').length, 1);
+  for (const css of ['html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}.b{width:100px;padding:10px}', 'html{box-sizing:border-box}', 'html{box-sizing:border-box}.b{box-sizing:border-box;width:100px;padding:10px}', '.b{width:100px;padding:10px}'])
+    assert.equal(hit(css).length, 0, css);
+});
+
+test('F128: a vertical margin in % is a share of the width', () => {
+  const hit = css => codes(run(css), 'W_CSS_MARGIN_PERCENT_WIDTH');
+  for (const css of ['.a{margin-top:10%}', '.a{margin:5% 0}', '.a{margin-bottom:2.5%}']) assert.equal(hit(css).length, 1, css);
+  for (const css of ['.a{margin:0 5%}', '.a{padding-top:56.25%}', '.a{margin-left:10%}', '.a{margin-top:0%}', '.a{margin-top:10px}']) assert.equal(hit(css).length, 0, css);
+});

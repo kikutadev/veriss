@@ -2,6 +2,10 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_MARGIN_PERCENT_WIDTH: note => ({ code: 'W_CSS_MARGIN_PERCENT_WIDTH', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { ${note.property}: ${note.value} }: a vertical margin of ${note.percent} is a share of the containing block's width, not its height, so the gap grows with the width of the page. Use a length (or vh / cqh) for a vertical gap` }),
+  W_CSS_BOX_SIZING_NOT_INHERITED: note => ({ code: 'W_CSS_BOX_SIZING_NOT_INHERITED', severity: 'warning', selector: note.selector, property: 'box-sizing', css: [{ property: 'box-sizing', file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { box-sizing: border-box }: box-sizing is not inherited, so every other element stays content-box (${note.affected} adds its padding and border to its width and height). Add *, *::before, *::after { box-sizing: inherit } (or border-box)` }),
   W_CSS_MEDIA_EM_ROOT: note => ({ code: 'W_CSS_MEDIA_EM_ROOT', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }, { property: 'font-size', file: note.root.file, line: note.root.line, selector: note.root.selector }],
     message: `@media ${note.params}: em and rem in a media query are the browser's default font size (16px unless the user changed it), not ${note.root.selector} { font-size: ${note.root.value} }, so ${(m => m ? `${m[1]}${m[2]} is ${+(Number(m[1]) * 16).toFixed(2)}px` : 'the breakpoint is 16px-based')(/(\d*\.?\d+)\s*(r?em)\b/i.exec(note.params))}. Write the breakpoint for 16px (or in px)` }),
   W_CSS_ISOLATION_SELF: note => ({ code: 'W_CSS_ISOLATION_SELF', severity: 'warning', selector: note.selector, property: 'isolation', css: [{ property: 'isolation', file: note.file, line: note.line, selector: note.selector }],

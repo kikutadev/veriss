@@ -93,6 +93,8 @@ export const recommended = {
   W_CSS_ISOLATION_SELF: ['warning', 'put isolation: isolate on the parent: on the blended element itself it does not stop that element from blending with the page'],
   W_CSS_MEDIA_EM_ROOT: ['warning', 'write em / rem breakpoints for 16px: in a media query they ignore the root font-size'],
   W_CSS_OVERFLOW_PROMOTED: ['warning', 'write overflow-x: clip (or overflow-y: clip) to cut one axis: with hidden / auto / scroll, the other axis cannot stay visible'],
+  W_CSS_BOX_SIZING_NOT_INHERITED: ['warning', 'add *, *::before, *::after { box-sizing: inherit }: box-sizing on html or body alone is not inherited'],
+  W_CSS_MARGIN_PERCENT_WIDTH: ['warning', 'use a length (or vh / cqh) for a vertical margin: a % margin-top / margin-bottom is a share of the width'],
   W_CSS_GRID_TRACKS_INVALID: ['warning', 'fix the grid track list: repeat(auto-fill) takes fixed sizes (minmax(200px, 1fr)), minmax() cannot start with fr, and a repeat count is a positive whole number'],
   W_CSS_COUNTER_UNUSED: ['warning', 'show the counter with content: counter(name), or remove the counter-reset / -increment / -set'],
   W_LAYOUT_ALIGN_BROWSER_DEPENDENT: ['warning', 'centre a block with margin-inline: auto (and a width), or make the parent a grid: justify-self / justify-items in block layout work in Chromium and Safari only'],

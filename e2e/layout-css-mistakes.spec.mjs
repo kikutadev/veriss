@@ -1488,3 +1488,18 @@ test('F126: overflow-y: visible beside overflow-x: hidden computes to auto, clip
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_OVERFLOW_PROMOTED'), css).toBe(reported);
   }
 });
+
+test('F127: box-sizing on html is not inherited; F128: margin-top % is a share of the width', async ({page}) => {
+  const width = async css => { await page.setContent(`<!doctype html><style>*{margin:0}${css}.b{width:100px;padding:10px}</style><div class="b"></div>`); return page.evaluate(() => document.querySelector('.b').getBoundingClientRect().width); };
+  for (const [css, w, reported] of [['html{box-sizing:border-box}', 120, true], ['body{box-sizing:border-box}', 120, true], ['html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}', 100, false]]) {
+    expect(await width(css), css).toBe(w);
+    const r = analyzeHTML('<html lang="en"><body><div class="b"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}.b{width:100px;padding:10px;height:20px}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BOX_SIZING_NOT_INHERITED'), css).toBe(reported);
+  }
+  for (const [w, h] of [[400, 100], [200, 300]]) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.p{width:${w}px;height:${h}px;display:flow-root}.c{margin-top:10%;height:10px}</style><div class="p"><div class="c"></div></div>`);
+    expect(await page.evaluate(() => document.querySelector('.c').getBoundingClientRect().top), `${w}x${h}`).toBe(w / 10);
+  }
+  const r = analyzeHTML('<html lang="en"><body><div class="c"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{margin-top:10%;height:10px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MARGIN_PERCENT_WIDTH')).toBe(true);
+});

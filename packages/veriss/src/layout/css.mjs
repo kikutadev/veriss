@@ -996,6 +996,15 @@ export function parseLayoutCSS(sheets, diagnostic) {
         const blend = last('mix-blend-mode'), iso = last('isolation');
         if (blend && iso && iso.value.trim().toLowerCase() === 'isolate' && !/^(?:normal|initial|unset|inherit|revert|revert-layer)$/i.test(blend.value.trim()) && !/var\(/i.test(blend.value))
           note('W_CSS_ISOLATION_SELF', { blend: blend.value.trim(), selector: node.selector, file: filename, line: iso.source.start.line }); }
+      // F128: a percentage margin-top / margin-bottom is a share of the containing block's width, not its height (CSS 2.2
+      // §8.3; measured in Chromium, Firefox and WebKit: 10% in a 400x100 box is 40px). Vertical padding in % is the usual
+      // aspect-ratio trick and is not reported. (The layout stays Unknown on % margins.)
+      for (const d of node.nodes) if (d.type === 'decl') {
+        const prop = d.prop.toLowerCase(), parts = prop === 'margin' ? postcss.list.space(d.value) : null;
+        const vertical = prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-block' || prop === 'margin-block-start' || prop === 'margin-block-end' ? [d.value.trim()] : parts ? [parts[0], parts[2] ?? parts[0]] : [];
+        const pct = vertical.find(v => /^-?(?:\d*\.)?\d+%$/.test(v) && !/^-?0+(?:\.0+)?%$/.test(v));
+        if (pct) note('W_CSS_MARGIN_PERCENT_WIDTH', { property: prop, value: d.value.trim(), percent: pct, selector: node.selector, file: filename, line: d.source.start.line });
+      }
       // F122: a size keyword some browsers drop (stretch, -moz-available, -webkit-fit-content, intrinsic) without a value
       // the others take: each browser ends on a different value (measured in Chromium, Firefox and WebKit). Reported;
       // the layout stays Unknown on these keywords.
@@ -1077,6 +1086,24 @@ export function parseLayoutCSS(sheets, diagnostic) {
       if (v && !/^(?:16px|100%|1em|1rem|medium|12pt|inherit|initial|unset|revert|revert-layer|var\(.*)$/i.test(v)) rootFont = { value: v, selector: rule.selector, file: sheet.file, line: d.source.start.line };
     }); });
   }
+  // F127: box-sizing is not inherited: border-box on html / :root / body alone leaves every other element content-box
+  // (measured in Chromium, Firefox and WebKit). Reported unless some rule also sets it on the other elements (the
+  // *, *::before, *::after { box-sizing: inherit } pattern, or any rule for other elements).
+  { let rootSizing = null, elsewhere = false, affected = null;
+    for (const sheet of sheets) {
+      let root; try { root = postcss.parse(sheet.css, { from: sheet.file }); } catch { continue; }
+      root.walkDecls(/^box-sizing$/i, d => {
+        const rule = d.parent; if (rule?.type !== 'rule') return;
+        const sels = postcss.list.comma(rule.selector).map(sel => sel.trim());
+        if (sels.every(sel => /^(?:html|:root|body)$/i.test(sel)) && d.value.trim().toLowerCase() === 'border-box') rootSizing ??= { selector: rule.selector, file: sheet.file, line: d.source.start.line };
+        else elsewhere = true;
+      });
+      // Only where it matters: a rule for other elements that sets a size and a padding or border.
+      root.walkRules(rule => { if (affected || postcss.list.comma(rule.selector).every(sel => /^(?:html|:root|body)$/i.test(sel.trim()))) return;
+        const has = re => rule.nodes?.some(d => d.type === 'decl' && re.test(d.prop) && !/^(?:0|0px|auto|none)$/i.test(d.value.trim()));
+        if (has(/^(?:width|height|inline-size|block-size)$/i) && has(/^(?:padding|border)(?:-|$)/i)) affected = rule.selector; });
+    }
+    if (rootSizing && !elsewhere && affected) note('W_CSS_BOX_SIZING_NOT_INHERITED', { ...rootSizing, affected }); }
   for (const sheet of sheets) {
     try { const root = flattenNesting(postcss.parse(sheet.css, { from: sheet.file })); visit(root.nodes, [], null, sheet.file); }
     catch (error) { diagnostic('U_LAYOUT_CSS', error.reason ?? error.message, error.line, sheet.file); }
