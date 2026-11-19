@@ -1260,3 +1260,16 @@ test('F109: a keyword the property does not take drops the declaration; vendor k
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_KEYWORD_INVALID'), `${prop}: ${value}`).toBe(dropped);
   }
 });
+
+test('F110: "and(", "or(" and "not(" in @supports make the condition invalid; the analyzer no longer applies the rules', async ({page}) => {
+  const css = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}';
+  for (const [condition, applies] of [['(display: grid) and(gap:1px)', false], ['(display: grid) or(display: banana)', false], ['not(display: banana)', false],
+    ['(display: grid) and (gap:1px)', true], ['(display: grid)and (gap:1px)', true], ['(display: grid) AND (gap: 1px)', true], ['NOT (display: grid)', false]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${css}@supports ${condition}{.a{height:40px}}</style></head><body><div class="a"></div></body></html>`);
+    expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height), condition).toBe(applies ? 40 : 20);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `${css}@supports ${condition}{.a{height:40px}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, condition).toBe('verified');
+    expect(r.sizes.find(s => s.box === '.a').rect.blockSize.constant, condition).toBe(applies ? '40' : '20');
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SUPPORTS_INVALID'), condition).toBe(/(?<![\w:-])(and|or|not)\(/i.test(condition));
+  }
+});

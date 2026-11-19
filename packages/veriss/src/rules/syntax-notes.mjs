@@ -2,6 +2,8 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_SUPPORTS_INVALID: note => ({ code: 'W_CSS_SUPPORTS_INVALID', severity: 'warning', css: [{ property: '@supports', file: note.file, line: note.line }],
+    message: `@supports ${note.params}: "${note.written}" with no space is read as a function, so the condition is invalid and its rules never apply in any browser. Write ${note.params.replace(/(?<![\w:-])(and|or|not)\(/gi, '$1 (')}` }),
   W_CSS_KEYWORD_INVALID: note => ({ code: 'W_CSS_KEYWORD_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { ${note.property}: ${note.value} }: ${note.property} has no keyword ${note.keyword} (it takes ${note.allowed}), so the browser drops the whole declaration and the earlier ${note.property} stays.${note.suggest ? ` Did you mean ${note.property}: ${note.value.replace(new RegExp(`\\b${note.keyword}\\b`, 'i'), note.suggest)}?` : ''}` }),
   W_CSS_COLOR_INVALID: note => ({ code: 'W_CSS_COLOR_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],

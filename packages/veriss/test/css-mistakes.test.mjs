@@ -1184,3 +1184,12 @@ test('F109: a keyword the property does not take drops the declaration; the earl
   assert.equal(w(run('.a{position:-webkit-sticky;top:0}')).length, 0);
   assert.equal(w(run('.a{vertical-align:center}')).length, 0);
 });
+
+test('F110: "and(", "or(" or "not(" in @supports is a function token: the condition is invalid and never applies (it was applied)', () => {
+  const h = css => { const r = run(`@supports ${css}{.a{height:40px}}`); return [r.status, r.sizes.find(s => s.box === '.a').rect.blockSize.constant, codes(r, 'W_CSS_SUPPORTS_INVALID').length]; };
+  for (const c of ['(display: grid) and(gap:1px)', '(display: grid) or(display: banana)', 'not(display: banana)']) assert.deepEqual(h(c), ['verified', '20', 1], c);
+  for (const c of ['(display: grid) and (gap:1px)', '(display: grid)and (gap:1px)', '(display: grid) AND (gap: 1px)']) assert.deepEqual(h(c), ['verified', '40', 0], c);
+  for (const c of ['not (display: grid)', 'NOT (display: grid)']) assert.deepEqual(h(c), ['verified', '20', 0], c);
+  // not( inside a selector() argument is the :not() pseudo-class, not the keyword
+  assert.equal(codes(run('@supports selector(:not(a)){.a{height:40px}}'), 'W_CSS_SUPPORTS_INVALID').length, 0);
+});

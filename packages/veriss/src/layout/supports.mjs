@@ -91,6 +91,14 @@ const selectorSupported = arg => {
 };
 
 // The condition's text → true, false or undefined (not decided).
+// F110: "and(", "or(" or "not(" (the keyword with no space before the parenthesis) is a function token, so the whole
+// condition is invalid and its rules never apply (measured in Chromium, Firefox and WebKit). The arguments of selector(),
+// font-tech() and font-format() are not read (:not( there is the pseudo-class). The keyword written, or null.
+export function supportsFunctionToken(text) {
+  let s = String(text), prev;
+  do { prev = s; s = s.replace(/\b(?:selector|font-tech|font-format)\((?:[^()]|\([^()]*\))*\)/gi, ' x '); } while (s !== prev);
+  return /(?<![\w:-])(and|or|not)\(/i.exec(s)?.[0] ?? null;
+}
 export function supportsCondition(text) {
   let i = 0;
   const s = String(text).trim();
@@ -98,7 +106,7 @@ export function supportsCondition(text) {
   const fail = () => { throw new Error('undecided'); };
   // The text inside the parentheses that start at i (i is just past '('); leaves i past the matching ')'.
   const group = () => { const start = i; let depth = 1; while (i < s.length && depth) { if (s[i] === '(') depth++; else if (s[i] === ')') depth--; i++; } if (depth) fail(); return s.slice(start, i - 1); };
-  const word = w => { ws(); if (s.slice(i, i + w.length).toLowerCase() === w && !/[a-z0-9-]/i.test(s[i + w.length] ?? '') && /[\s(]/.test(s[i + w.length] ?? '(')) { i += w.length; return true; } return false; };
+  const word = w => { ws(); if (s.slice(i, i + w.length).toLowerCase() === w && !/[a-z0-9-]/i.test(s[i + w.length] ?? '') && /\s/.test(s[i + w.length] ?? '')) { i += w.length; return true; } return false; };
   const inParens = () => {
     ws();
     if (s.slice(i, i + 9).toLowerCase() === 'selector(') { i += 9; const arg = group().trim().toLowerCase().replace(/\s+/g, ' '); return selectorSupported(arg); }

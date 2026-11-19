@@ -81,6 +81,7 @@ export const recommended = {
   W_CSS_FONT_INVALID: ['warning', 'quote a family name that has a word starting with a digit, and give the font shorthand both a size and a family: otherwise the browser drops the declaration'],
   W_CSS_COLOR_INVALID: ['warning', 'fix the color: 3, 4, 6 or 8 hex digits; the comma form keeps every value the same kind (hsl saturation and lightness in %); the space form puts the alpha after /'],
   W_CSS_KEYWORD_INVALID: ['warning', 'use a keyword the property takes (text-align: center, white-space: nowrap, flex-direction: column): any other drops the declaration'],
+  W_CSS_SUPPORTS_INVALID: ['warning', 'put a space between and / or / not and the parenthesis in @supports: and( is read as a function and the rules never apply'],
   W_CSS_GRID_TRACKS_INVALID: ['warning', 'fix the grid track list: repeat(auto-fill) takes fixed sizes (minmax(200px, 1fr)), minmax() cannot start with fr, and a repeat count is a positive whole number'],
   W_CSS_COUNTER_UNUSED: ['warning', 'show the counter with content: counter(name), or remove the counter-reset / -increment / -set'],
   W_LAYOUT_ALIGN_BROWSER_DEPENDENT: ['warning', 'centre a block with margin-inline: auto (and a width), or make the parent a grid: justify-self / justify-items in block layout work in Chromium and Safari only'],

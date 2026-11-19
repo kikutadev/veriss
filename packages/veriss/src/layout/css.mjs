@@ -8,7 +8,7 @@ import { keywordProblem } from './keyword-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
 import { q, cmp, add, mul, div, exact, number } from './linear.mjs';
 import { parseCondition, preferenceValues } from './conditions.mjs';
-import { supportsCondition } from './supports.mjs';
+import { supportsCondition, supportsFunctionToken } from './supports.mjs';
 import { flattenNesting } from './nesting.mjs';
 import {customName,variableValue,variableEnvironment,substituteDeclaration} from './variables.mjs';
 
@@ -769,6 +769,8 @@ export function parseLayoutCSS(sheets, diagnostic) {
       // @supports: its rules apply where the condition holds in every target browser, and are skipped where it fails in
       // all of them; a condition not decided from the known features (supports.mjs) is Unknown.
       if (node.type === 'atrule' && node.name.toLowerCase() === 'supports' && node.nodes) {
+        const written = supportsFunctionToken(node.params);
+        if (written) { note('W_CSS_SUPPORTS_INVALID', { params: node.params.trim(), written, file: filename, line: node.source.start.line }); continue; }
         const holds = supportsCondition(node.params);
         if (holds === true) visit(node.nodes, contexts, layer, filename, depth + 1, preferences);
         else if (holds === undefined) problem('U_LAYOUT_CSS', `@supports ${node.params.trim()}: the condition is not decided from the features known to be supported in every target browser`, node.source.start.line);
