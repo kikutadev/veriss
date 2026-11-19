@@ -1,0 +1,194 @@
+{
+  "model": {
+    "version": 1,
+    "initial": "title",
+    "states": [
+      "title",
+      "play",
+      "paused"
+    ],
+    "transitions": [
+      {
+        "from": "title",
+        "event": "start",
+        "to": "play"
+      },
+      {
+        "from": "play",
+        "event": "pause",
+        "to": "paused"
+      }
+    ],
+    "profiles": [
+      {
+        "id": "webkit-overlay",
+        "ua": "webkit",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      }
+    ],
+    "contracts": [
+      {
+        "id": "title-game-fit",
+        "kind": "within-viewport",
+        "target": "game",
+        "states": [
+          "title"
+        ]
+      },
+      {
+        "id": "title-impact-fit",
+        "kind": "within-viewport",
+        "target": "impact",
+        "states": [
+          "title"
+        ]
+      },
+      {
+        "id": "title-view-fit",
+        "kind": "within-viewport",
+        "target": "view",
+        "states": [
+          "title"
+        ]
+      },
+      {
+        "id": "play-game-fit",
+        "kind": "within-viewport",
+        "target": "game",
+        "states": [
+          "play"
+        ]
+      },
+      {
+        "id": "play-impact-fit",
+        "kind": "within-viewport",
+        "target": "impact",
+        "states": [
+          "play"
+        ]
+      },
+      {
+        "id": "play-view-fit",
+        "kind": "within-viewport",
+        "target": "view",
+        "states": [
+          "play"
+        ]
+      },
+      {
+        "id": "play-pad-fit",
+        "kind": "within-viewport",
+        "target": "pad",
+        "states": [
+          "play"
+        ]
+      },
+      {
+        "id": "play-dodge-fit",
+        "kind": "within-viewport",
+        "target": "dodge",
+        "states": [
+          "play"
+        ]
+      },
+      {
+        "id": "paused-game-fit",
+        "kind": "within-viewport",
+        "target": "game",
+        "states": [
+          "paused"
+        ]
+      },
+      {
+        "id": "paused-impact-fit",
+        "kind": "within-viewport",
+        "target": "impact",
+        "states": [
+          "paused"
+        ]
+      },
+      {
+        "id": "paused-view-fit",
+        "kind": "within-viewport",
+        "target": "view",
+        "states": [
+          "paused"
+        ]
+      },
+      {
+        "id": "start-action",
+        "kind": "action",
+        "event": "start"
+      },
+      {
+        "id": "pause-action",
+        "kind": "action",
+        "event": "pause"
+      }
+    ]
+  },
+  "points": [
+    [
+      320,
+      568
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      844,
+      390
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "screens": [
+    {
+      "state": "title",
+      "wait": "#game[data-mode=title]:not(.booting)",
+      "targets": {
+        "game": "#game",
+        "impact": "#inkImpact",
+        "view": "#view"
+      }
+    },
+    {
+      "state": "play",
+      "click": "#start",
+      "wait": "#game[data-mode=play]",
+      "settle": 250,
+      "event": "start",
+      "from": "title",
+      "targets": {
+        "game": "#game",
+        "impact": "#inkImpact",
+        "view": "#view",
+        "pad": "#pad",
+        "dodge": "#dodge"
+      }
+    },
+    {
+      "state": "paused",
+      "click": "#pause",
+      "wait": "#game[data-mode=paused]",
+      "event": "pause",
+      "from": "play",
+      "targets": {
+        "game": "#game",
+        "impact": "#inkImpact",
+        "view": "#view"
+      }
+    }
+  ]
+}

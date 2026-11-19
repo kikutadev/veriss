@@ -1,0 +1,80 @@
+{
+  "model": {
+    "version": 1,
+    "initial": "planning",
+    "states": [
+      "planning"
+    ],
+    "transitions": [],
+    "profiles": [
+      {
+        "id": "webkit-overlay",
+        "ua": "webkit",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      }
+    ],
+    "contracts": [
+      {
+        "id": "planning-shell-fit",
+        "kind": "within-viewport",
+        "target": "shell",
+        "states": [
+          "planning"
+        ]
+      },
+      {
+        "id": "planning-app-fit",
+        "kind": "within-viewport",
+        "target": "app",
+        "states": [
+          "planning"
+        ]
+      },
+      {
+        "id": "planning-toolbar-fit",
+        "kind": "within-viewport",
+        "target": "toolbar",
+        "states": [
+          "planning"
+        ]
+      }
+    ]
+  },
+  "points": [
+    [
+      320,
+      568
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      844,
+      390
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "screens": [
+    {
+      "state": "planning",
+      "wait": ".game-shell[data-mode=planning]",
+      "targets": {
+        "shell": ".game-shell",
+        "app": "#app",
+        "toolbar": ".toolbar"
+      }
+    }
+  ]
+}

@@ -56,6 +56,11 @@ let safeArea = null;
 export function setSafeArea(area) { safeArea = area; }
 // em (checklist D2) also resolves later, against the element's font-size (computeStyle); else it is Unknown where used.
 const pxSyntax = text => { if (!/^\d+(?:\.\d{1,6})?r?em$/.test(text) && !envPattern.test(text) && !maxEnv.test(text) && !safeAreaSum(text)) px(text); };
+// A small typed grammar: no percentages (intrinsic cycles), no arithmetic
+// or mixed numbers. The layout engine resolves the value over its region.
+const viewportLengthTerm = String.raw`(?:\d+(?:\.\d{1,6})?|\.\d{1,6})(?:px|[sld]?v(?:w|h|min|max))`;
+const viewportLengthSyntax = new RegExp(`^(?:${viewportLengthTerm}|clamp\\(\\s*${viewportLengthTerm}\\s*,\\s*${viewportLengthTerm}\\s*,\\s*${viewportLengthTerm}\\s*\\)|(?:min|max)\\(\\s*${viewportLengthTerm}(?:\\s*,\\s*${viewportLengthTerm})+\\s*\\))$`);
+export const viewportLength = text => viewportLengthSyntax.test(String(text)) && /v(?:w|h|min|max)\b/.test(String(text));
 export function px(text) {
   const env = envPattern.exec(text ?? ''), envMax = maxEnv.exec(text ?? '');
   const sum = safeAreaSum(text);
@@ -254,7 +259,7 @@ function expand(property, value) {
   if (property === 'content') { if (['none', 'normal'].includes(value)) return [['content', 'none']]; if (/^(?:""|'')$/.test(value)) return [['content', 'empty']]; if (/^(?:"[^"]*"|'[^']*')$/.test(value)) return [['content', `text:${cssString(value)}`]]; throw new Error(`Unsupported content: ${value}`); }
   if (property === 'gap') {
     const parts = postcss.list.space(value); if (parts.length > 2) throw new Error('Unsupported gap');
-    parts.forEach(part => { if (part !== 'normal') pxSyntax(part); }); return [['row-gap', parts[0]], ['column-gap', parts.at(-1)]];
+    parts.forEach(part => { if (part !== 'normal' && !viewportLength(part)) pxSyntax(part); }); return [['row-gap', parts[0]], ['column-gap', parts.at(-1)]];
   }
   if (property === 'overflow') {
     const parts = postcss.list.space(value); if (parts.length > 2) throw new Error('Unsupported overflow');
@@ -262,14 +267,14 @@ function expand(property, value) {
   }
   if (property === 'padding') {
     const p = postcss.list.space(value); if (p.length < 1 || p.length > 4) throw new Error('Unsupported padding');
-    if (!wide.has(value)) p.forEach(pxSyntax); return [['padding-top', p[0]], ['padding-right', p[1] ?? p[0]], ['padding-bottom', p[2] ?? p[0]], ['padding-left', p[3] ?? p[1] ?? p[0]]];
+    if (!wide.has(value)) p.forEach(part => { if (!viewportLength(part)) pxSyntax(part); }); return [['padding-top', p[0]], ['padding-right', p[1] ?? p[0]], ['padding-bottom', p[2] ?? p[0]], ['padding-left', p[3] ?? p[1] ?? p[0]]];
   }
   if (property === 'padding-inline' || property === 'padding-block') {
     const p = postcss.list.space(value); if (p.length > 2) throw new Error('Unsupported padding-inline');
-    if (!wide.has(value)) p.forEach(pxSyntax); return property === 'padding-inline' ? [['padding-left', p[0]], ['padding-right', p[1] ?? p[0]]] : [['padding-top', p[0]], ['padding-bottom', p[1] ?? p[0]]];
+    if (!wide.has(value)) p.forEach(part => { if (!viewportLength(part)) pxSyntax(part); }); return property === 'padding-inline' ? [['padding-left', p[0]], ['padding-right', p[1] ?? p[0]]] : [['padding-top', p[0]], ['padding-bottom', p[1] ?? p[0]]];
   }
   if (['padding-left', 'padding-right', 'padding-inline-start', 'padding-inline-end', 'padding-top', 'padding-bottom', 'padding-block-start', 'padding-block-end'].includes(property)) {
-    if (!wide.has(value)) pxSyntax(value); return [[property.replace('inline-start', 'left').replace('inline-end', 'right').replace('block-start', 'top').replace('block-end', 'bottom'), value]];
+    if (!wide.has(value) && !viewportLength(value)) pxSyntax(value); return [[property.replace('inline-start', 'left').replace('inline-end', 'right').replace('block-start', 'top').replace('block-end', 'bottom'), value]];
   }
   if (/^margin(?:-(?:inline|block|left|right|top|bottom|inline-start|inline-end|block-start|block-end))?$/.test(property)) {
     const sides = property === 'margin' ? ['top', 'right', 'bottom', 'left'] : property === 'margin-inline' ? ['left', 'right'] : property === 'margin-block' ? ['top', 'bottom'] : [property.slice(7).replace('inline-start', 'left').replace('inline-end', 'right').replace('block-start', 'top').replace('block-end', 'bottom')];

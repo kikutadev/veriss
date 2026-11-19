@@ -152,3 +152,15 @@ pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44
 ### 自動部分証拠の導入
 
 目標: 手書きの矩形式を要求せず、完全な HTML snapshot と author CSS の依存関係を検査し、独立した明示サイズの矩形だけを自動抽出して relational/1 の証拠へ接続する。元の全ページ判定は変更しない。セレクター・継承・含有ブロック・内容依存・外部 CSS・環境の不明な依存は拒否する。正常/反例/拒否の unit と3ブラウザー照合、実入力での評価、再実行 CLI、gate と fork main への統合を完了条件とする。無制限の CSS の自動分割は保証しない。
+
+### Responsive gap model (継続)
+目標は実CSSの幅依存の余白・グリッドの連続範囲解析を前進させること。まず gap の区分アフィン化を grid/flex の既存解法へ接続し、幅と高さの分岐及び overflow 反例を3ブラウザーで照合する。次に同一HTML/CSSを再測定する。全ページの Unknown は未対応を無視せず残す。既存ゲートと fork main 統合を完了条件とする。
+
+### Responsive gap and padding (2026-11-20)
+- Tested revision `b4d04c0`: viewport-dependent gap and supported block padding use exact piecewise-affine geometry. Explicit grid tracks, flex wrapping and nested block/grid are tested. Variable subgrid / auto-repeat gaps, flexible-item / native intrinsic / positioned padding and percentage expressions remain Unknown where not modeled.
+- Same reviewed inputs and prior width-only scripting profile: Unknown 241 -> 175 (HOME 62 -> 43, ABOUT/WORKS/ARTICLES each 48 -> 33, GALLERY 35 -> 33). All five full-page reports remain Unknown with zero geometric checks. Full width/height + overlay/classic scrollbar profiles remain Unknown too; diagnostic counts are repeated per profile. Do not interpret the reduced count as proof.
+- Portfolio audit branch `f2b415a`: reviewed HOME grid horizontal projection, 795 checks, Z3 verified, 264 configurations / 2640 horizontal rectangles (234 captured and 30 live configurations) matched across 3 engines. Broken three-column track control exceeded viewport at 320px in all 3 engines and Z3 reported violated. The model uses synthetic vertical content; the proof covers horizontal outer geometry only.
+- Separate live page audit: 5 paths × 22 widths × 3 heights × 2 states × 3 engines = 1980/1980 sampled checks, no failures; reduced motion and third-party requests blocked, first gallery detail only. Checks document/main horizontal overflow, visible island bounds, viewer visibility and close control, Escape closing. One initial test race following Escape was corrected and all points rerun. This is not continuous-size, all-state or complete accessibility proof.
+- Strict full-page runner exits 1 on Unknown; a small known-good fixture confirms exit 0 and Z3 verified across all 5 inputs. No deployed site changes.
+- Gate on `b4d04c0`: 6 unit groups failure 0, component-lint 4 runs unchanged, 348 E2E passed, supervisor exit 0 / 645 observed processes / remaining 0.
+- Whole-page blockers remaining include ancestor state selectors, View Transition pseudo-elements, preference-dependent geometry, SVG / paint effects, variable margins, external stylesheet/font data and native/mixed-content geometry. Full static verification is not complete.

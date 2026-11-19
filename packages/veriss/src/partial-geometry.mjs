@@ -57,6 +57,8 @@ function matchPart(t,n){
     return typeof v==='string'&&/^[A-Za-z0-9_-]+$/.test(v)?a[k]===v:null;
   }
   if(t.type==='PseudoClassSelector'&&t.name==='root'&&!t.children)return n.tagName==='html';
+  if(t.type==='PseudoClassSelector'&&['is','where'].includes(t.name)&&t.children?.[0]?.type==='SelectorList')
+    return t.children[0].children.reduce((a,sel)=>triOr(a,matchSelector(sel,n)),false);
   if(isGeneratedPseudo(t))return true; // match its originating element, not an actual box
   return null;
 }
@@ -84,7 +86,8 @@ function matchSelector(selector,n){
 const staticSelector=s=>s.children.every((t,i)=>isGeneratedPseudo(t)?i===s.children.length-1:t.type==='Combinator'?[' ','>'].includes(t.name):
   t.type==='TypeSelector'?t.name==='*'||ascii.test(t.name):
   ['IdSelector','ClassSelector'].includes(t.type)?ascii.test(t.name):
-  t.type==='PseudoClassSelector'?t.name==='root'&&!t.children:
+  t.type==='PseudoClassSelector'?(t.name==='root'&&!t.children||
+    ['is','where'].includes(t.name)&&t.children?.[0]?.type==='SelectorList'&&t.children[0].children.every(sel=>!generatedSelector(sel)&&staticSelector(sel))):
   t.type==='AttributeSelector'&&/^[a-z][a-z0-9_-]*$/.test(t.name?.name??'')&&!t.flags&&
     (t.matcher===null||dataAttr.test(t.name?.name??'')&&t.matcher==='='&&/^[A-Za-z0-9_-]+$/.test(t.value?.value??t.value?.name??'')));
 function declarations(nodes){
@@ -189,9 +192,8 @@ export function projectIndependentGeometry(html,css,target,profile,binding){
       // syntax may invalidate its entire comma-separated rule.
       let selectors;try{selectors=csstree.toPlainObject(csstree.parse(node.selector,{context:'selectorList'})).children}catch{refuse('Unparsed CSS selector '+node.selector)}
       for(const script of inertScripts)if(geometryDecls.some(d=>!/^(?:box-sizing|(?:margin|padding)(?:-[\w-]+)?|border(?:-[\w-]+)?)$/i.test(d.prop))&&selectors.some(sel=>matchSelector(sel,script)!==false))inertScripts.delete(script);
-      // Resets often include *,*:before,*:after. A generated box cannot
-      // exist here unless some relevant content declaration creates it; that
-      // is always refused. Do not count pseudo rules as size guarantees.
+      // Do not count pseudo rules as size guarantees; inspect their possible
+      // generated content and positioning separately.
       const generated=selectors.filter(generatedSelector);
       for(const sel of generated)for(const n of chain){
         const match=matchSelector(sel,n);

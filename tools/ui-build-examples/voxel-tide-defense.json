@@ -1,0 +1,148 @@
+{
+  "model": {
+    "version": 1,
+    "initial": "home",
+    "states": [
+      "home",
+      "prepare"
+    ],
+    "transitions": [
+      {
+        "from": "home",
+        "event": "start",
+        "to": "prepare"
+      }
+    ],
+    "profiles": [
+      {
+        "id": "webkit-overlay",
+        "ua": "webkit",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      }
+    ],
+    "contracts": [
+      {
+        "id": "home-app-fit",
+        "kind": "within-viewport",
+        "target": "app",
+        "states": [
+          "home"
+        ]
+      },
+      {
+        "id": "home-field-fit",
+        "kind": "within-viewport",
+        "target": "field",
+        "states": [
+          "home"
+        ]
+      },
+      {
+        "id": "home-scene-fit",
+        "kind": "within-viewport",
+        "target": "scene",
+        "states": [
+          "home"
+        ]
+      },
+      {
+        "id": "home-home-play-fit",
+        "kind": "within-viewport",
+        "target": "home-play",
+        "states": [
+          "home"
+        ]
+      },
+      {
+        "id": "prepare-app-fit",
+        "kind": "within-viewport",
+        "target": "app",
+        "states": [
+          "prepare"
+        ]
+      },
+      {
+        "id": "prepare-field-fit",
+        "kind": "within-viewport",
+        "target": "field",
+        "states": [
+          "prepare"
+        ]
+      },
+      {
+        "id": "prepare-scene-fit",
+        "kind": "within-viewport",
+        "target": "scene",
+        "states": [
+          "prepare"
+        ]
+      },
+      {
+        "id": "prepare-start-wave-fit",
+        "kind": "within-viewport",
+        "target": "start-wave",
+        "states": [
+          "prepare"
+        ]
+      },
+      {
+        "id": "start-action",
+        "kind": "action",
+        "event": "start"
+      }
+    ]
+  },
+  "points": [
+    [
+      320,
+      568
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      844,
+      390
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "screens": [
+    {
+      "state": "home",
+      "wait": "#home-play",
+      "settle": 250,
+      "targets": {
+        "app": "#app",
+        "field": "#field",
+        "scene": "#scene",
+        "home-play": "#home-play"
+      }
+    },
+    {
+      "state": "prepare",
+      "click": "#home-play",
+      "wait": "#start-wave",
+      "settle": 300,
+      "event": "start",
+      "from": "home",
+      "targets": {
+        "app": "#app",
+        "field": "#field",
+        "scene": "#scene",
+        "start-wave": "#start-wave"
+      }
+    }
+  ]
+}

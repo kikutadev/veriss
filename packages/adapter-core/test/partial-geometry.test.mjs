@@ -51,3 +51,8 @@ test('class bindings, hidden selectors, and out-of-flow generated decoration',()
  assert.equal(verify(bad).status,'unknown');
  assert.equal(verify(domGeometry({...options,partial:false})).status,'unknown');
 });
+test('selector-list disjunction excludes unrelated subjects but not a possible dependency',()=>{
+ const style=css+':where(html,body){margin:0}:is(.decor:has(.x),.other){height:8px}';
+ assert.equal(verify(check(html,style)).status,'verified');
+ assert.equal(verify(check(html,style+':is(#shell:has(kbd),.other){height:8px}')).status,'unknown');
+});

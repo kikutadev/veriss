@@ -101,7 +101,7 @@ import { parseColor, over, luminance, contrastRatio, opaqueValue, backdrop as ba
 export { parseColor, contrastRatio } from '../color/index.mjs';
 import { animationsOf, transitionsOf } from './css.mjs';
 import { exact, number } from './linear.mjs';
-import { scalar, sum, diff, times, sample, clip, serialize, width as domainWidth, height } from './region.mjs';
+import { scalar, asAffine, sum, diff, times, sample, clip, serialize, width as domainWidth, height } from './region.mjs';
 import { languageTag } from './text-font.mjs';
 import { q, add, mul, cmp, div } from './linear.mjs';
 import { intersect } from './integrity.mjs';
@@ -709,7 +709,7 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
   const scrollersOf = target => placed.filter(row => row.overflow === 'scroll' && isAncestor(row.path, target.path) && row.path !== root?.path && !row.box.documentRoot);
   for (const target of placed.filter(row => row.box.text && visible(row) && !hiddenFrom(row.path) && !row.box.pseudo && row.content && ['start', 'left'].includes(String(row.textAlign)) && row.direction !== 'rtl' && /^\d+(?:\.\d+)?px$/.test(String(row.lineHeight)))) {
     const own = layer(target), half = Number(String(target.lineHeight).slice(0, -2)) / 2;
-    const x = sum(target.origin.inline, scalar(target.content.left)), y = sum(sum(target.origin.block, scalar(target.content.top)), scalar(q(String(half))));
+    const x = sum(target.origin.inline, asAffine(target.content.left)), y = sum(sum(target.origin.block, asAffine(target.content.top)), scalar(q(String(half))));
     for (const cover of placed) {
       if (related(cover.path, target.path) || !visible(cover) || !cover.painted || !opaque(cover)) continue;
       if (!paintsAbove(cover, layer(cover), target, own)) continue;
@@ -739,7 +739,7 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
       const metrics = target.box.contract.textMetrics, lineHeight = q(String(target.lineHeight).slice(0, -2)), fontSize = px(target.paint.fontSize);
       const advance = metrics.kind === 'domain' ? null : metrics.width;
       if (advance === undefined || advance === null || fontSize === undefined) continue;
-      const x = sum(target.origin.inline, scalar(target.content.left)), y = sum(target.origin.block, scalar(target.content.top));
+      const x = sum(target.origin.inline, asAffine(target.content.left)), y = sum(target.origin.block, asAffine(target.content.top));
       const oneLine = target.box.contract.maxInlineSize !== undefined ? q(String(target.box.contract.maxInlineSize)) : null;
       const word = metrics.minContent !== undefined ? q(String(Math.ceil(metrics.minContent * 1e6) / 1e6)) : null;
       for (const cover of placed) {
@@ -805,7 +805,7 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
         let base = target.region;
         // Nothing overflows the other axis (it does not scroll there).
         let crossOk = target.region;
-        for (const other of inside) { crossOk = atMost(crossOk, sum(a.crossEnd(other), scalar(a.crossPad(s))), crossInnerEnd); if (!crossOk) break; }
+        for (const other of inside) { crossOk = atMost(crossOk, sum(a.crossEnd(other), asAffine(a.crossPad(s))), crossInnerEnd); if (!crossOk) break; }
         if (!crossOk) continue;
         // A box anywhere in the content (not only its end): scrolled to the end, the content moves by its end minus the
         // scrollport's end, so a box whose start is at or past the cover's start at offset 0, with no more than the
@@ -814,14 +814,14 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
         const middle = cover => {
           let r = atMost(atMost(atMost(crossOk, a.crossStart(cover), a.crossStart(target)), a.crossEnd(target), a.crossEnd(cover)), a.start(cover), a.start(target));
           if (r) r = atMost(r, innerEnd, a.end(cover));
-          for (const other of inside) { if (!r) break; r = atMost(r, sum(a.end(other), scalar(a.pad(s))), sum(a.start(target), diff(innerEnd, a.start(cover)))); }
+          for (const other of inside) { if (!r) break; r = atMost(r, sum(a.end(other), asAffine(a.pad(s))), sum(a.start(target), diff(innerEnd, a.start(cover)))); }
           return r;
         };
         // The target is the content's end on this axis.
         for (const other of inside) {
           if (!base) break;
           if (other !== target && !isAncestor(other.path, target.path)) base = atMost(base, a.end(other), a.end(target));
-          if (base) base = atMost(base, sum(a.crossEnd(other), scalar(a.crossPad(s))), crossInnerEnd);
+          if (base) base = atMost(base, sum(a.crossEnd(other), asAffine(a.crossPad(s))), crossInnerEnd);
         }
         if (!base) {
           for (const cover of placed) {
@@ -831,7 +831,7 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
           }
           continue;
         }
-        const contentEnd = sum(a.end(target), scalar(a.pad(s)));
+        const contentEnd = sum(a.end(target), asAffine(a.pad(s)));
         for (const cover of placed) {
           if (related(cover.path, s.path) || !visible(cover) || !cover.painted || !opaque(cover) || !cover.origin) continue;
           if (!paintsAbove(cover, layer(cover), s, layer(s))) continue;
@@ -840,17 +840,17 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
           // No overflow: the target stays where it is.
           const still = region && atMost(atMost(atMost(region, contentEnd, innerEnd), a.start(cover), a.start(target)), a.end(target), a.end(cover));
           // Overflow: scrolled to the end, the target ends at innerEnd − padding.
-          const lifted = diff(innerEnd, scalar(a.pad(s)));
+          const lifted = diff(innerEnd, asAffine(a.pad(s)));
           const scrolled = region && atMost(atMost(atMost(region, innerEnd, contentEnd), a.start(cover), diff(lifted, a.size(target))), lifted, a.end(cover));
           // Partly covered: the start of the first line of text (its first glyph) stays under a cover that reaches the
           // end of the scrollport, at the end of the scroll range and so at every offset (earlier offsets put the text
           // further into the cover or past the end): the text never shows its start. Block axis, ltr start-aligned text.
           if (!still && !scrolled && axisName === 'block' && target.box.text && target.content && /^\d+(?:\.\d+)?px$/.test(String(target.lineHeight)) && ['start', 'left'].includes(String(target.textAlign)) && target.direction !== 'rtl') {
-            const half = scalar(div(q(String(target.lineHeight).slice(0, -2)), q(2))), x = sum(target.origin.inline, scalar(target.content.left));
+            const half = scalar(div(q(String(target.lineHeight).slice(0, -2)), q(2))), x = sum(target.origin.inline, asAffine(target.content.left));
             const coversStart = r0 => atMost(atMost(atMost(r0, cover.origin.inline, x), sum(x, scalar(sliver)), right(cover)), innerEnd, a.end(cover));
-            const startAt = top => sum(sum(top, scalar(target.content.top)), half);
+            const startAt = top => sum(sum(top, asAffine(target.content.top)), half);
             const stillStart = coversStart(atMost(atMost(base, contentEnd, innerEnd), cover.origin.block, startAt(target.origin.block)));
-            const scrolledStart = coversStart(atMost(atMost(base, innerEnd, contentEnd), cover.origin.block, startAt(diff(diff(innerEnd, scalar(a.pad(s))), target.block))));
+            const scrolledStart = coversStart(atMost(atMost(base, innerEnd, contentEnd), cover.origin.block, startAt(diff(diff(innerEnd, asAffine(a.pad(s))), target.block))));
             for (const r of [stillStart, scrolledStart].filter(Boolean))
               report(findings, 'E_A11Y_SCROLL_END_COVERED', 'error', `the start of ${target.box.label}'s text, at the bottom of ${s.box.label}'s scrolling content, stays under ${cover.box.label} at every scroll offset, even scrolled to the bottom: its first words can never be read. Give ${s.box.label} a padding-bottom at least as tall as ${cover.box.label}`, target, r, { rule: 'scroll-end-covered', cover: cover.path, coverBox: cover.box.label, scroller: s.box.label, axis: axisName, part: 'text-start' });
           }

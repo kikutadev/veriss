@@ -1,10 +1,10 @@
 import { q, sub, div, mul } from './linear.mjs';
-import { scalar, sum, diff } from './region.mjs';
+import { scalar, asAffine, sum, diff, times } from './region.mjs';
 import { px } from './css.mjs';
 
 export const gapSize = (value, parent) => value === 'normal' ? parent?.gap ?? q(0) : px(value);
 export const trackArea = (values, gap, start, span) =>
-  sum(values.slice(start, start + span).reduce(sum, scalar(0)), scalar(mul(gap, q(Math.max(0, span - 1)))));
+  sum(values.slice(start, start + span).reduce(sum, scalar(0)), times(asAffine(gap), q(Math.max(0, span - 1))));
 
 /** A child borrows the actual track vector, never the parent's fr definitions. */
 export function trackSlice(values, gap, box, start, span) {

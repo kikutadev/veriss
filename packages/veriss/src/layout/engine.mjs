@@ -1,7 +1,7 @@
 import { q, add, sub, mul, cmp, div, exact, number } from './linear.mjs';
-import { scalar, width, height, sum, diff, times, evaluate, affine, sample, rectangle, clip, partition, projection, serialize } from './region.mjs';
+import { scalar, asAffine, width, height, sum, diff, times, evaluate, affine, sample, rectangle, clip, partition, projection, serialize } from './region.mjs';
 import { validateOptions } from './input.mjs';
-import { parseLayoutCSS, computeStyle, matches, px, setRootFontSize, setSafeArea, containsFixed, setUAProfile, setRegisteredProperties, animationsOf, transitionsOf, dependentProperty } from './css.mjs';
+import { parseLayoutCSS, computeStyle, matches, px, setRootFontSize, setSafeArea, containsFixed, setUAProfile, setRegisteredProperties, viewportLength, animationsOf, transitionsOf, dependentProperty } from './css.mjs';
 import { resolveUAProfile } from './ua-profile.mjs';
 import { parseCondition } from './conditions.mjs';
 import { tracks, tracks as gridTracks, place, parseAreas, expandTracks } from './grid.mjs';
@@ -27,7 +27,7 @@ import {phrasingTags} from '../tree.mjs';
 
 const zero = q(0), one = q(1), minusOne = q(-1);
 const total = values => values.reduce(sum, scalar(0));
-const trackStart = (values,gap,index) => sum(total(values.slice(0,index)),scalar(mul(gap,q(index))));
+const trackStart = (values,gap,index) => sum(total(values.slice(0,index)),times(asAffine(gap),q(index)));
 // Visually hidden (the "sr-only" pattern): clipped to nothing, or a box of at most 1px that hides its overflow. Its
 // content is meant not to be seen, so it is not judged for fit or clipping.
 const visuallyHiddenStyle = style => style['clip-path'] === 'empty' || style.clip === 'empty' || (['hidden', 'clip'].includes(style['overflow-x']) && /^\d+(?:\.\d+)?px$/.test(String(style['block-size'])) && Number(String(style['block-size']).slice(0, -2)) <= 1);
@@ -689,6 +689,21 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       }
       if (style.transform !== 'none' && !box.pseudo) { if (untransformed) style = { ...style, transform: 'none' }; else sawTransform = true; }
       return { region: r, style };
+    }).flatMap(entry => {
+      let pieces = [entry];
+      if (entry.style.display === 'none') return pieces;
+      const keys = ['padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+        ...(['grid', 'flex', 'inline-grid', 'inline-flex'].includes(entry.style.display) ? ['row-gap', 'column-gap'] : [])];
+      for (const key of keys) {
+        const value = entry.style[key];
+        if (!viewportLength(value)) continue;
+        if (key.startsWith('padding-') && !['block', 'grid', 'flex', 'inline-grid', 'inline-flex'].includes(entry.style.display))
+          throw Object.assign(new Error('Viewport-dependent padding on inline/other formatting contexts is not modeled'), {code:'U_LAYOUT_CSS', box});
+        pieces = bounded(pieces.flatMap(piece => lengthPieces(value, null, piece.region, piece.style).map(part => ({
+          region: part.region, style: { ...piece.style, $viewportLengths: { ...piece.style.$viewportLengths, [key]: { source: value, ...affine(part.value) } } }
+        }))));
+      }
+      return pieces;
     });
   }
   const maximum = (region, a, b) => {
@@ -930,6 +945,32 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     return true;
   }
 
+  function resolvedViewportLength(style, key, fallback) {
+    const fact = style.$viewportLengths?.[key];
+    if (!fact || fact.source !== style[key]) return fallback();
+    const rat = value => { const [n,d='1'] = String(value ?? '0').split('/'); return div(q(n),q(d)); };
+    const result = { x: rat(fact.coefficient), y: rat(fact.heightCoefficient), b: rat(fact.constant) };
+    return cmp(result.x, zero) || cmp(result.y, zero) ? result : result.b;
+  }
+  const resolvedGap = (style, key, parent) => resolvedViewportLength(style, key, () => gapSize(style[key], parent));
+  const padding = (style, side) => resolvedViewportLength(style, `padding-${side}`, () => px(style[`padding-${side}`]));
+  const edgeValue = (style, side) => sum(asAffine(padding(style, side)), scalar(px(style[`border-${side}`])));
+  const hasViewportPadding = style => ['top','right','bottom','left'].some(side => viewportLength(style[`padding-${side}`]));
+  const isZeroAffine = value => { const a = asAffine(value); return !cmp(a.x, zero) && !cmp(a.y, zero) && !cmp(a.b, zero); };
+  // Margin collapsing only needs the zero/positive distinction, not a constant.
+  // Re-evaluate within the actual caller region (some callers inspect descendants
+  // without carrying the style partition). Do not guess at a changing zero sign.
+  function positivePadding(style, side, region) {
+    const raw = style[`padding-${side}`];
+    if (!viewportLength(raw)) return cmp(raw === 'ua' ? zero : px(raw), zero) > 0;
+    const pieces = lengthPieces(raw, null, region, style);
+    const signs = pieces.flatMap(p => p.region.vertices.map(v => cmp(evaluate(p.value,v),zero) > 0));
+    if (signs.every(v=>v)) return true;
+    if (signs.every(v=>!v)) return false;
+    throw Object.assign(new Error('Margin collapsing with padding that can reach zero is not modeled'),{code:'U_LAYOUT_CSS'});
+  }
+  const positiveEdge = (style, side, region) => cmp(style[`border-${side}`] === 'ua' ? zero : px(style[`border-${side}`]),zero)>0 || positivePadding(style,side,region);
+  const scaleGap = (gap, count) => times(asAffine(gap), q(count));
   function flex(region, available, definitions, gap, bases, stretchAuto) {
     // Content-sized columns (Grid §12.5–12.7): each starts at its base; the free space (with fr tracks at their
     // minimum) is shared equally among them up to their growth limits (freezing each at its limit); fr tracks then
@@ -938,7 +979,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       if (definitions.some(t => t.autoTable || t.auto)) throw new Error('Content-sized columns with automatic table or auto row tracks are not modeled');
       const content = definitions.map((t, i) => t.content ? i : -1).filter(i => i >= 0);
       const frBase = (t, i) => t.min !== undefined ? scalar(t.min) : t.autoMin ? bases[i] : scalar(0);
-      const fixedTotal = definitions.reduce((acc, t, i) => t.content ? sum(acc, scalar(t.content.base)) : t.weight ? sum(acc, frBase(t, i)) : sum(acc, bases[i]), scalar(gap));
+      const fixedTotal = definitions.reduce((acc, t, i) => t.content ? sum(acc, scalar(t.content.base)) : t.weight ? sum(acc, frBase(t, i)) : sum(acc, bases[i]), asAffine(gap));
       const free0 = diff(available, fixedTotal);
       const out = [];
       const finish = (r, growth) => {
@@ -950,7 +991,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         }
         const stretching = content.filter(i => definitions[i].content.stretch);
         if (!stretching.length) { out.push({ region: r, values, required: fixedTotal }); return; }
-        const used = sum(scalar(gap), values.reduce((acc, v) => sum(acc, v), scalar(0)));
+        const used = sum(asAffine(gap), values.reduce((acc, v) => sum(acc, v), scalar(0)));
         for (const piece of clamp(r, diff(available, used))) out.push({ region: piece.region, values: values.map((v, i) => stretching.includes(i) ? sum(v, times(piece.value, div(one, q(String(stretching.length))))) : v), required: fixedTotal });
       };
       const grow = (r, frozen, depth) => {
@@ -980,19 +1021,19 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     if (definitions.some(t => t.autoTable)) {
       if (!definitions.every(t => t.autoTable)) throw new Error('Automatic table columns do not mix with other tracks');
       const mins = definitions.map(t => t.autoTable.min), tops = definitions.map(t => t.autoTable.max), fixed = definitions.map(t => Boolean(t.autoTable.fixed));
-      const S = diff(available, scalar(gap)), total = list => list.reduce(add, zero);
+      const S = diff(available, asAffine(gap)), total = list => list.reduce(add, zero);
       const A = total(mins), B = total(definitions.map((t, i) => fixed[i] ? tops[i] : mins[i])), C = total(tops);
       const autoMax = total(tops.filter((_, i) => !fixed[i])), autoCount = fixed.filter(f => !f).length;
       const out = [], within = (lo, hi) => region && clip(clip(region, diff(S, scalar(lo))), diff(scalar(hi), S), true);
       const under = clip(region, diff(scalar(A), S), true);
-      if (under) out.push({ region: under, values: mins.map(scalar), required: scalar(add(A, gap)) });
+      if (under) out.push({ region: under, values: mins.map(scalar), required: sum(scalar(A), asAffine(gap)) });
       const phase = (lo, hi, grows) => { const spread = sub(hi, lo); if (cmp(spread, zero) <= 0) return; const r = within(lo, hi); if (!r) return;
-        out.push({ region: r, values: definitions.map((t, i) => grows(i) ? sum(scalar(mins[i]), times(diff(S, scalar(lo)), div(sub(tops[i], mins[i]), spread))) : scalar(fixed[i] && lo === B ? tops[i] : mins[i])), required: scalar(gap) }); };
+        out.push({ region: r, values: definitions.map((t, i) => grows(i) ? sum(scalar(mins[i]), times(diff(S, scalar(lo)), div(sub(tops[i], mins[i]), spread))) : scalar(fixed[i] && lo === B ? tops[i] : mins[i])), required: asAffine(gap) }); };
       phase(A, B, i => fixed[i]);
       // Phase 3: px columns at px, auto columns grow.
-      { const spread = sub(C, B), r = cmp(spread, zero) > 0 ? within(B, C) : null; if (r) out.push({ region: r, values: definitions.map((t, i) => fixed[i] ? scalar(tops[i]) : sum(scalar(mins[i]), times(diff(S, scalar(B)), div(sub(tops[i], mins[i]), spread)))), required: scalar(gap) }); }
+      { const spread = sub(C, B), r = cmp(spread, zero) > 0 ? within(B, C) : null; if (r) out.push({ region: r, values: definitions.map((t, i) => fixed[i] ? scalar(tops[i]) : sum(scalar(mins[i]), times(diff(S, scalar(B)), div(sub(tops[i], mins[i]), spread)))), required: asAffine(gap) }); }
       const over = clip(region, diff(S, scalar(C)));
-      if (over) out.push({ region: over, values: definitions.map((t, i) => fixed[i] ? scalar(tops[i]) : sum(scalar(tops[i]), times(diff(S, scalar(C)), cmp(autoMax, zero) > 0 ? div(tops[i], autoMax) : div(one, q(autoCount))))), required: scalar(gap) });
+      if (over) out.push({ region: over, values: definitions.map((t, i) => fixed[i] ? scalar(tops[i]) : sum(scalar(tops[i]), times(diff(S, scalar(C)), cmp(autoMax, zero) > 0 ? div(tops[i], autoMax) : div(one, q(autoCount))))), required: asAffine(gap) });
       return out;
     }
     // minmax(L, fr) tracks (css-grid-1 §12.7.1, find the size of an fr): each flexible track takes its share of the
@@ -1001,7 +1042,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     if (definitions.some(t => t.min !== undefined || t.autoMin)) {
       // (Auto tracks keep their measured base: the fr tracks take all the free space, none is left to stretch them.)
       if (definitions.some(t => t.autoTable) || (definitions.some(t => t.auto) && definitions.some(t => t.min !== undefined))) throw new Error('minmax(px, fr) tracks with auto tracks are not modeled');
-      const fixedTotal = sum(definitions.reduce((acc, t, i) => t.weight ? acc : sum(acc, bases[i]), scalar(0)), scalar(gap));
+      const fixedTotal = sum(definitions.reduce((acc, t, i) => t.weight ? acc : sum(acc, bases[i]), scalar(0)), asAffine(gap));
       const out = [];
       let pieces = [{ region, mins: definitions.map((t, i) => t.min !== undefined ? scalar(t.min) : t.autoMin ? bases[i] : t.weight ? scalar(0) : null) }];
       for (const L of [...new Set(definitions.filter(t => t.minCap).map(t => exact(t.min)))]) pieces = pieces.flatMap(piece => {
@@ -1025,7 +1066,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       for (const piece of pieces) resolve(piece.region, piece.mins, new Set(), 0);
       return out;
     }
-    const overhead = sum(total(bases), scalar(gap));
+    const overhead = sum(total(bases), asAffine(gap));
     return clamp(region, diff(available, overhead)).map(({ region, value: free }) => {
       const weights = definitions.filter(t => t.weight).map(t => t.weight).reduce(add, zero);
       const denominator = cmp(weights, one) < 0 ? one : weights;
@@ -1048,7 +1089,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const capped = item => item.maximum && constantLess(item.maximum, item.base) ? item.maximum : item.base;
     // (baseAtLeastMinimum: an affine base already checked to be at least the minimum, a percentage flex-basis.)
     const hypothetical = items.map(item => item.baseBelowMinimum ? item.minimum : (item.minimum === item.base || item.baseAtLeastMinimum) && !item.maximum ? item.base : maximumConstant(capped(item), item.minimum));
-    const sumHypothetical = sum(total(hypothetical), scalar(gap));
+    const sumHypothetical = sum(total(hypothetical), asAffine(gap));
     const modes = partition(region, diff(available, sumHypothetical), '>');
     const results = [];
     for (const [mode, regions] of [['grow', modes.yes], ['shrink', modes.no]]) for (const start of regions) {
@@ -1066,7 +1107,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         for (const state of states) {
           const unfrozen = items.map((_, index) => index).filter(index => !state.frozen.has(index));
           const used = items.map((item, index) => state.frozen.get(index) ?? item.base);
-          const free = diff(available, sum(total(used), scalar(gap)));
+          const free = diff(available, sum(total(used), asAffine(gap)));
           const factors = unfrozen.map(index => mode === 'grow' ? items[index].grow : items[index].shrink);
           const factorSum = factors.reduce(add, zero);
           // §9.7 step 4b scales by the initial free space when factors sum below 1; only the first round without freezing is modeled.
@@ -1105,7 +1146,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
             }));
           }
           for (const part of parts) {
-            if (!part.under.length && !part.over.length) { results.push({ region: part.region, values: targets, free: diff(available, sum(total(targets), scalar(gap))), mode }); continue; }
+            if (!part.under.length && !part.over.length) { results.push({ region: part.region, values: targets, free: diff(available, sum(total(targets), asAffine(gap))), mode }); continue; }
             const clampOf = index => part.under.includes(index) ? items[index].minimum : items[index].maximum;
             if (!part.over.length || !part.under.length) { next.push({ region: part.region, frozen: new Map([...state.frozen, ...[...part.under, ...part.over].map(index => [index, clampOf(index)])]) }); continue; }
             const violation = [...part.under, ...part.over].map(index => diff(clampOf(index), targets[index])).reduce((a, b) => sum(a, b));
@@ -1140,7 +1181,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           const line = [...Array(p.end - state.start).keys()].map(k => state.start + k);
           if (p.end >= n) { next.push({ region: p.region, start: n, lines: [...state.lines, line] }); continue; }
           // Sizes may be affine in the viewport (a percentage flex-basis): the break is then a width threshold too.
-          const need = sum(hypothetical.slice(state.start, p.end + 1).map(h => h && typeof h === 'object' && 'b' in h ? h : scalar(h)).reduce(sum, scalar(zero)), scalar(mul(gap, q(p.end - state.start))));
+          const need = sum(hypothetical.slice(state.start, p.end + 1).map(h => h && typeof h === 'object' && 'b' in h ? h : scalar(h)).reduce(sum, scalar(zero)), scaleGap(gap, p.end - state.start));
           const split = partition(p.region, diff(available, need), '>=');
           for (const r of split.yes) pending.push({ region: r, end: p.end + 1 });
           for (const r of split.no) next.push({ region: r, start: p.end, lines: [...state.lines, line] });
@@ -1159,7 +1200,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       values.forEach((value, i) => {
         if (flags[i].autoStart) position = sum(position, margin);
         starts.push(position);
-        position = sum(sum(position, value), sum(scalar(gap), extra));
+        position = sum(sum(position, value), sum(asAffine(gap), extra));
         if (flags[i].autoEnd) position = sum(position, margin);
       });
       return starts;
@@ -1175,9 +1216,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   function layoutFlex({ box, style, region, inline, contentInline, knownBlock, blockEdges, available, parents, ancestors, contentOrigin, collect, emit }) {
     const out = [], { main, wrap } = validateFlexContainer(style);
     const fitInline = (box.contract?.overflow ?? 'fit') === 'fit', fitBlock = (box.contract?.overflowBlock ?? 'fit') === 'fit';
-    const mainGap = gapSize(style[main === 'inline' ? 'column-gap' : 'row-gap']), crossGap = gapSize(style[main === 'inline' ? 'row-gap' : 'column-gap']);
+    const mainGap = resolvedGap(style, main === 'inline' ? 'column-gap' : 'row-gap'), crossGap = resolvedGap(style, main === 'inline' ? 'row-gap' : 'column-gap');
     const explainTracks = axis => () => explanation(sizeChain([...parents, { box, style }], axis, { hostInset: options.hostInset }), trackProperties(axis).map(property => fact(box, style, property)));
-    const gaps = (gap, count) => mul(gap, q(Math.max(0, count - 1)));
+    const gaps = (gap, count) => scaleGap(gap, Math.max(0, count - 1));
     // Checklist D2: in a column whose height is declared and one constant, the items' percentage heights and bases
     // (and min/max heights) are shares of it: written as px before the items are modeled.
     const columnBasis = main === 'block' && style['block-size'] !== 'auto' && knownBlock && cmp(knownBlock.x, zero) === 0 && cmp(knownBlock.y, zero) === 0 ? knownBlock.b : null;
@@ -1198,6 +1239,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       if (columnBasis) state.children = state.children.map(columnShares);
       const model = state.children.map(child => {
         try {
+          if (hasViewportPadding(child.style)) throw flexUnknown('Viewport-dependent padding on a flex item is not modeled');
           const align = crossAlignment(style['align-items'], child.style['align-self']);
           // A column item that is not stretched is as wide as its own px width.
           if (main === 'block' && align !== 'stretch' && !/^\d+(?:\.\d+)?px$/.test(child.style['inline-size'])) throw flexUnknown('A column item that is not stretched (align) shrink-wraps its content; give it a px width');
@@ -1282,7 +1324,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
               .map(m => ({ region: m.region, lines: [...c.lines, { indices, values: r.values, starts: m.starts }] })))));
           for (const combo of combos) {
             // The last item's end margin may stick out (it hides nothing; measured for grid and flex items).
-            for (const line of combo.lines) if (emit) obligation(contentInline, diff(sum(total(line.values), scalar(gaps(mainGap, line.indices.length))), scalar(line.indices.length ? model[line.indices.at(-1)].margins.right : zero)), box, combo.region, 'E_LAYOUT_TRACKS', 'inline', fitInline && !scrolls(style, 'x'), explainTracks('inline'), () => ({ layout: 'flex' }));
+            for (const line of combo.lines) if (emit) obligation(contentInline, diff(sum(total(line.values), gaps(mainGap, line.indices.length)), scalar(line.indices.length ? model[line.indices.at(-1)].margins.right : zero)), box, combo.region, 'E_LAYOUT_TRACKS', 'inline', fitInline && !scrolls(style, 'x'), explainTracks('inline'), () => ({ layout: 'flex' }));
             if (!block) {
               let endings = [combo.region];
               for (const line of combo.lines) line.indices.forEach((i, k) => { endings = bounded(endings.flatMap(r => solve(model[i].child.box, itemAvailable(model[i], { inline: line.values[k], fitInline }), r, ancestors, inheritedOf(model[i]), emit).map(result => result.region))); });
@@ -1300,7 +1342,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
             }));
             else measured = [{ region: combo.region, sizes: [knownBlock] }];
             for (const m of measured) {
-              const crossGaps = scalar(gaps(crossGap, combo.lines.length)), used = sum(total(m.sizes), crossGaps);
+              const crossGaps = gaps(crossGap, combo.lines.length), used = sum(total(m.sizes), crossGaps);
               let stretched = [{ region: m.region, sizes: m.sizes }];
               if (wrap && knownBlock && ['normal', 'stretch'].includes(style['align-content'])) stretched = clamp(m.region, diff(knownBlock, used)).map(({ region: r, value: extra }) => ({ region: r, sizes: m.sizes.map(v => sum(v, times(extra, div(one, q(combo.lines.length))))) }));
               for (const st of stretched) {
@@ -1313,7 +1355,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     const origin = line.starts ? offset(contentOrigin, line.starts[k], top) : null;
                     endings = bounded(endings.flatMap(r => solve(model[i].child.box, itemAvailable(model[i], { inline: line.values[k], block: st.sizes[l], origin, fitInline, fitBlock }), r, ancestors, inheritedOf(model[i]), emit).map(result => result.region)));
                   });
-                  lineStart = sum(sum(lineStart, st.sizes[l]), scalar(crossGap));
+                  lineStart = sum(sum(lineStart, st.sizes[l]), asAffine(crossGap));
                 });
                 for (const r of endings) out.push(finish(box, style, r, inline, contentInline, blockSize, contentBlock, available, parents, emit));
               }
@@ -1352,7 +1394,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           lines = [{ region: m.region, values, free: scalar(0) }];
         }
         for (const line of lines) for (const placed of mainStarts(line.region, line.values, line.free, m.items, mainGap, main, style['justify-content'])) {
-          const used = sum(total(line.values), scalar(gaps(mainGap, line.values.length)));
+          const used = sum(total(line.values), gaps(mainGap, line.values.length));
           const contentBlock = knownBlock ?? used, blockSize = sum(contentBlock, blockEdges);
           // The last item's bottom margin may stick out (it hides nothing).
           if (emit && knownBlock) obligation(knownBlock, diff(used, scalar(model.length ? model.at(-1).margins.bottom : zero)), box, placed.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' }));
@@ -1425,13 +1467,13 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     if (!(metrics.kind === 'content' && ['nowrap', 'one-line'].includes(leaf.contract.wrap)) && metrics.kind !== 'lines') return null;
     const entry = Object.entries(metrics.inline).find(([selector]) => matches(compileSelector(selector), child));
     if (!entry) return null;
-    const x = sum(leafRow.origin.inline, scalar(leafRow.content.left));
+    const x = sum(leafRow.origin.inline, asAffine(leafRow.content.left));
     // A table cell aligns its lines by vertical-align within its (stretched) content box (measured: middle by default).
     const L = leaf.contract.font?.lineHeight, align = leaf.tableCell ? leafStyle['vertical-align'] : 'top';
     if (!['top', 'middle', 'bottom'].includes(align) || (align !== 'top' && (!leafRow.block || !L))) return null;
-    const contentBlock = leafRow.block && diff(leafRow.block, scalar(['top', 'bottom'].map(side => add(px(leafStyle[`padding-${side}`]), px(leafStyle[`border-${side}`]))).reduce(add, zero)));
+    const contentBlock = leafRow.block && diff(leafRow.block, sum(edgeValue(leafStyle,'top'),edgeValue(leafStyle,'bottom')));
     const shift = lines => align === 'top' ? scalar(zero) : times(diff(contentBlock, scalar(mul(q(String(L)), q(lines)))), align === 'middle' ? div(q(1), q(2)) : q(1));
-    let y = sum(leafRow.origin.block, scalar(leafRow.content.top));
+    let y = sum(leafRow.origin.block, asAffine(leafRow.content.top));
     // The inline box's vertical padding and border do not move the line but extend its box (painted and hit) above and
     // below the content area (measured: padding: 4px 0 makes a 19px link 27px tall).
     const vertical = side => { const v = ['padding', 'border'].map(k => String(childStyle[`${k}-${side}`] ?? '0')); return v.every(x => /^(?:0|\d+(?:\.\d+)?px)$/.test(x)) ? v.map(x => x === '0' ? zero : px(x)).reduce(add, zero) : null; };
@@ -1953,13 +1995,13 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         borders: Object.fromEntries(['left','right','top','bottom'].map(side => [side, px(style[`border-${side}`])])),
         // Content aligned towards the end (center, end): overflowing content may lie before the start edge.
         ...(['justify-content', 'align-content', 'align-items'].some(key => /^(?:center|end|flex-end|unsafe\b)/.test(String(style[key] ?? ''))) ? { alignsContent: true } : {}),
-        ...(/^(?:0|\d+(?:\.\d+)?px)$/.test(String(style['padding-bottom'])) ? { paddingBlockEnd: px(String(style['padding-bottom']) === '0' ? '0px' : style['padding-bottom']) } : {}),
-        ...(/^(?:0|\d+(?:\.\d+)?px)$/.test(String(style['padding-right'])) ? { paddingInlineEnd: px(String(style['padding-right']) === '0' ? '0px' : style['padding-right']) } : {}),
+        ...((/^(?:0|\d+(?:\.\d+)?px)$/.test(String(style['padding-bottom'])) || viewportLength(style['padding-bottom'])) ? { paddingBlockEnd: padding(style, 'bottom') } : {}),
+        ...((/^(?:0|\d+(?:\.\d+)?px)$/.test(String(style['padding-right'])) || viewportLength(style['padding-right'])) ? { paddingInlineEnd: padding(style, 'right') } : {}),
         // overflow: clip clips without scrolling (hidden still scrolls a focused descendant into view).
         clipAxes: { inline: style['overflow-x'] === 'clip', block: style['overflow-y'] === 'clip' },
         overflow: ['hidden','clip'].includes(overflowValue) ? 'clip' : ['auto','scroll'].includes(overflowValue) ? 'scroll' : 'visible', overflowValue,
         // Where a single line of text starts inside the box (font-derived text extents).
-        content: { left: add(px(style['border-left']), px(style['padding-left'])), top: add(px(style['border-top']), px(style['padding-top'])), inline: contentInline },
+        content: { left: edgeValue(style, 'left'), top: edgeValue(style, 'top'), inline: contentInline },
         textAlign: style['text-align'], lineHeight: style['line-height'], direction: style.direction, overflowX: style['overflow-x'], painted: paints(style),
         // z-index applies to positioned boxes and to grid/flex items.
         zIndex: style['z-index'] !== 'auto' && (style.position !== 'static' || ['grid', 'flex'].includes(parents.at(-1)?.style.display)) ? Number(style['z-index']) : null,
@@ -2001,7 +2043,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       // rtl: the container places its children mirrored in its content box (each child's subtree moves; its own
       // interior follows its own direction). Absolute descendants use physical insets, so they are not modeled here.
       if (style.direction === 'rtl' && box.children.length && origin && box.$starts) {
-        const L = sum(origin.inline, scalar(add(px(style['border-left']), px(style['padding-left'])))), R = diff(sum(origin.inline, inline), scalar(add(px(style['border-right']), px(style['padding-right']))));
+        const L = sum(origin.inline, edgeValue(style,'left')), R = diff(sum(origin.inline, inline), edgeValue(style,'right'));
         const childOf = path => path.slice(0, path.lastIndexOf('/')) === box.path;
         const rows = geometry.slice(box.$starts.geometry), sizeRows = sizes.slice(box.$starts.sizes);
         // An absolute child is placed by physical insets: the container does not mirror it.
@@ -2174,7 +2216,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       if (style[`${axis}-size`] !== 'auto') throw subgridError('Checked subgrids require auto size in their shared axis', box, region, axis);
       if (style[`min-${axis}-size`] !== 'auto' && cmp(px(style[`min-${axis}-size`]), zero) !== 0) throw subgridError('Minimum size on a shared subgrid axis is outside the checked subset', box, region, axis);
       const insets = sides.map(side => add(px(style[`padding-${side}`]), px(style[`border-${side}`])));
-      const gap = gapSize(style[gapProperty], parent), values = inheritTracks(parent, gap, ...insets);
+      const gap = resolvedGap(style, gapProperty, parent);
+      if (gap.x !== undefined || parent.gap.x !== undefined) throw subgridError('Viewport-varying subgrid gaps are not modeled', box, region, axis);
+      const values = inheritTracks(parent, gap, ...insets);
       axes[axis] = { ...parent, gap, values, insets };
       for (const value of values) geometryRegions = bounded(geometryRegions.flatMap(region => {
         const parts = partition(region, value, '>=');
@@ -2934,8 +2978,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         if (block && ['grid', 'inline-grid', 'flex', 'inline-flex'].includes(style.display) && !['auto', '0', '0px'].includes(String(style['min-block-size'])) && style['block-size'] === 'auto'
           // (Also an aligned item of a flex row: its cross size is its content raised to the minimum, like a grid item's.)
           && !available.$minNatural && !available.$minRaised && !available.root && !(available.flexItem && !(available.flexItem.main === 'inline' && available.alignBlock !== undefined)) && !available.flexBlockMinimum && !(available.block && available.alignBlock === undefined)) {
-          const edge = key => style[key] === 'ua' ? zero : px(style[key]);
-          const edges = scalar(['padding-top', 'padding-bottom', 'border-top', 'border-bottom'].map(edge).reduce(add, zero));
+          const edges = ['top', 'bottom'].map(side => sum(style[`padding-${side}`] === 'ua' ? scalar(zero) : asAffine(padding(style, side)), scalar(style[`border-${side}`] === 'ua' ? zero : px(style[`border-${side}`])))).reduce(sum, scalar(zero));
           for (const natural of solve(box, { ...available, $minNatural: true }, state.region, parents, inherited, false)) {
             if (!natural.block) throw new Error('CSS min-block-size on a container whose height is not known is not modeled');
             for (const m of lengthPieces(style['min-block-size'], available.percentBlock ?? available.block, natural.region, style)) {
@@ -2948,6 +2991,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           }
           continue;
         }
+        if (hasViewportPadding(style) && (available.flexItem || box.tablePart || ['table','td','th','caption','fieldset','legend','input','textarea','select','button','img','svg','canvas','iframe','video','audio'].includes(box.tag) || style.position === 'absolute' || style['grid-template-columns'] === 'subgrid' || style['grid-template-rows'] === 'subgrid'))
+          throw Object.assign(new Error('Viewport-dependent padding on intrinsic/positioned/flex-item/shared-track boxes is not modeled'), {code:'U_LAYOUT_CSS',box});
         if (!validate(style, box, state.region, emit, available, parents.at(-1)?.style ?? null)) continue;
         // A fieldset's first legend is rendered in its block-start border (HTML §15.3.13): it is not a
         // layout child, and the fieldset's effective border-top is max(border-top, legend height).
@@ -2961,7 +3006,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         // Root scrollbars reduce the viewport; local scrollbars reduce the content box.
         const available=box.documentRoot ? {...incoming,inline:diff(incoming.inline,scalar(frame.inlineSize)),block:incoming.block ? diff(incoming.block,scalar(frame.blockSize)) : null,scrollbarFrame:active} : {...incoming,scrollbarFrame:active};
         if(emit && (active || ['auto','scroll'].includes(style['overflow-x']) || ['auto','scroll'].includes(style['overflow-y']))) scrollbars.push({box:box.label,path:box.path,...frame,viewport:Boolean(box.documentRoot),...ranges(state.region)});
-        const edge = sides => scalar(sides.map(side => add(px(style[`padding-${side}`]), px(style[`border-${side}`]))).reduce(add, zero));
+        const edge = sides => sides.map(side => edgeValue(style, side)).reduce(sum, scalar(zero));
         const cssInlineEdges=edge(['left','right']),cssBlockEdges=edge(['top','bottom']);
         const inlineEdges = sum(cssInlineEdges,scalar(box.documentRoot ? 0 : frame.inlineSize)), blockEdges = sum(cssBlockEdges,scalar(box.documentRoot ? 0 : frame.blockSize));
         // The preferred width (a viewport unit or calc() may split the region), as a border-box size.
@@ -3209,7 +3254,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                 const [track] = tracks(autoRepeat[2].trim());
                 const size = track.fixed ?? track.min;
                 if (!size || cmp(size, zero) <= 0) throw Object.assign(new Error(`repeat(auto-fill, ${autoRepeat[2].trim()}) needs a px or minmax(px, fr) track`), { code: 'U_LAYOUT_CSS' });
-                const gapPx = gapSize(style['column-gap']), step = add(size, gapPx);
+                const gapPx = resolvedGap(style, 'column-gap');
+                if (gapPx.x !== undefined) throw Object.assign(new Error('Viewport-varying auto-repeat gaps are not modeled'), {code:'U_LAYOUT_CSS'});
+                const step = add(size, gapPx);
                 const widest = Math.max(...geometryRegion.vertices.map(v => Number(number(evaluate(contentInline, v)))));
                 const most = Math.min(64, Math.max(1, Math.floor((widest + Number(number(gapPx))) / Number(number(step)))));
                 plans = [];
@@ -3224,15 +3271,15 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                 style['grid-template-columns'] === 'none' ? [] : tracks(style['grid-template-columns'] ?? 'none') }];
               for (const plan of plans) {
               const columns = plan.columns;
-              const columnGap = gapSize(style['column-gap'], sharedColumns);
+              const columnGap = resolvedGap(style, 'column-gap', sharedColumns);
               const columnBases = columns.map(track => scalar(track.fixed ?? track.edges ?? zero));
               const columnLayouts = sharedColumns ? [{ region: plan.region, values: sharedColumns.values, required: trackArea(sharedColumns.values, columnGap, 0, columns.length) }] :
-                flex(plan.region, contentInline, columns, mul(columnGap, q(Math.max(0, columns.length - 1))), columnBases, false);
+                flex(plan.region, contentInline, columns, scaleGap(columnGap, Math.max(0, columns.length - 1)), columnBases, false);
               // justify-content distributes free space between tracks (positions only).
               const justified = columnLayouts.flatMap(cs => {
                 const d = sharedColumns ? { lead: zero, extra: zero, negative: 'start' } : distribution(style['justify-content'], 'inline', columns.length);
                 if (cmp(d.lead, zero) === 0 && cmp(d.extra, zero) === 0) return [{ ...cs, shift: { lead: scalar(0), extra: scalar(0) } }];
-                const free = diff(contentInline, sum(total(cs.values), scalar(mul(columnGap, q(Math.max(0, columns.length - 1))))));
+                const free = diff(contentInline, sum(total(cs.values), scaleGap(columnGap, Math.max(0, columns.length - 1))));
                 const split = partition(cs.region, free, '>=');
                 return [...split.yes.map(region => ({ ...cs, region, shift: { lead: times(free, d.lead), extra: times(free, d.extra) } })),
                   ...split.no.map(region => ({ ...cs, region, shift: d.negative === 'start' ? { lead: scalar(0), extra: scalar(0) } : null }))];
@@ -3282,7 +3329,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     // (last) child's top (bottom) margin collapse through it: its own margin becomes the larger of the
                     // two, and it lays that grandchild out without it (collapsedTop / collapsedBottom). The grandchild's
                     // style must be the same across this region.
-                    const zeroEdge = (st, side) => cmp(add(px(st[`padding-${side}`] === 'ua' ? '0' : st[`padding-${side}`]), px(st[`border-${side}`] === 'ua' ? '0' : st[`border-${side}`])), zero) === 0;
+                    const zeroEdge = (st, side) => !positiveEdge(st, side, children.region);
                     const plainBlock = st => st.display === 'block' && !['hidden', 'auto', 'scroll'].includes(String(st['overflow-x'])) && !['hidden', 'auto', 'scroll'].includes(String(st['overflow-y'])) && st.position === 'static';
                     flow.forEach((child, k) => {
                       if (!plainBlock(child.style) || child.box.text || !(child.box.children ?? []).length) return;
@@ -3343,7 +3390,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     if (available.collapsedTop && flow.length) { const index = children.children.indexOf(flow[0]); children.children[index] = { ...flow[0], style: { ...flow[0].style, 'margin-top': '0' } }; flow[0] = children.children[index]; }
                     if (available.collapsedBottom && flow.length) { const index = children.children.indexOf(flow.at(-1)); children.children[index] = { ...flow.at(-1), style: { ...flow.at(-1).style, 'margin-bottom': '0' } }; flow[flow.length - 1] = children.children[index]; }
                     if (flow.some(child => cmp(add(mv(child, 'top'), mv(child, 'bottom')), zero) > 0)) {
-                      const edge = side => cmp(add(px(style[`padding-${side}`] === 'ua' ? '0' : style[`padding-${side}`]), px(style[`border-${side}`] === 'ua' ? '0' : style[`border-${side}`])), zero) > 0;
+                      const edge = side => positiveEdge(style, side, children.region);
                       const unknownCollapse = why => { throw Object.assign(new Error(`${box.label}: ${why}; that margin collapsing is not modeled`), { code: 'U_LAYOUT_CSS', box, region: children.region }); };
                       // A container that establishes a formatting context (a grid or flex item, overflow hidden/auto/
                       // scroll, absolute) keeps its children's margins inside it (measured): nothing collapses through.
@@ -3352,7 +3399,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                       const formattingRoot = (!parents.length && box.documentRoot) || (parentStyle && ['grid', 'flex', 'inline-grid', 'inline-flex'].includes(parentStyle.display) && !parentStyle.$blockFlow) || ['hidden', 'auto', 'scroll'].includes(String(style['overflow-x'])) || ['hidden', 'auto', 'scroll'].includes(String(style['overflow-y'])) || style.position === 'absolute';
                       if (flow.length && cmp(mv(flow[0], 'top'), zero) > 0 && !edge('top') && !formattingRoot) unknownCollapse(`the top margin of ${flow[0].box.label} collapses through its container (no padding or border on top)`);
                       if (flow.length && cmp(mv(flow.at(-1), 'bottom'), zero) > 0 && !edge('bottom') && style['block-size'] === 'auto' && !formattingRoot) unknownCollapse(`the bottom margin of ${flow.at(-1).box.label} collapses through its container (no padding or border below, auto height)`);
-                      for (const child of flow) if (cmp(add(mv(child, 'top'), mv(child, 'bottom')), zero) > 0 && !(child.box.children ?? []).length && !child.box.text && child.style['block-size'] === 'auto' && !['top', 'bottom'].some(side => cmp(px(child.style[`padding-${side}`] === 'ua' ? '0' : child.style[`padding-${side}`]), zero) > 0))
+                      for (const child of flow) if (cmp(add(mv(child, 'top'), mv(child, 'bottom')), zero) > 0 && !(child.box.children ?? []).length && !child.box.text && child.style['block-size'] === 'auto' && !['top', 'bottom'].some(side => positivePadding(child.style, side, children.region)))
                         unknownCollapse(`${child.box.label} may be empty, so its own margins would collapse together`);
                       for (let i = 1; i < flow.length; i++) {
                         const previous = mv(flow[i - 1], 'bottom'), top = mv(flow[i], 'top'), adjusted = cmp(top, previous) > 0 ? sub(top, previous) : zero;
@@ -3485,7 +3532,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                   const implicit = sharedRows ? [] : tracks(style['grid-auto-rows'], true);
                   while (rows.length < rowCount) rows.push(implicit[(rows.length - explicitRowCount) % implicit.length]);
                   if (rows.length > 2048) throw new Error('Grid row limit exceeded');
-                  const rowGap = gapSize(style['row-gap'], sharedRows), gaps = mul(rowGap, q(Math.max(0, rows.length - 1)));
+                  const rowGap = resolvedGap(style, 'row-gap', sharedRows), gaps = scaleGap(rowGap, Math.max(0, rows.length - 1));
                   for (const item of placed) if (rows.slice(item.row, item.row + item.rowSpan).some(row => row.auto || (!knownBlock && row.weight)) &&
                     (item.rowSpan > 1 || item.style['grid-template-rows'] === 'subgrid')) {
                     throw subgridError('Intrinsic row contributions across subgrids or row spans are not modeled; use independently sized parent rows', item.box, children.region, 'block');
@@ -3513,7 +3560,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     }
                     const layouts = sharedRows ? [{ region: m.region, values: sharedRows.values, required: trackArea(sharedRows.values, rowGap, 0, rows.length) }] : knownBlock ? flex(m.region, knownBlock, rows, gaps, m.bases, !['start', 'center', 'end'].includes(style['align-content'])) : fractions.map(f => {
                       const values = rows.map((row, i) => row.weight ? times(f.value, row.weight) : m.bases[i]);
-                      return { region: f.region, values, required: sum(total(values), scalar(gaps)) };
+                      return { region: f.region, values, required: sum(total(values), gaps) };
                     });
                     // A block-flow container raised by min-block-size: its rows stay at the top (align-content: start).
                     for (const rs of layouts.flatMap(rs => minBlock && !knownBlock && style.$blockFlow ? minBlock(rs.region).flatMap(m => maximum(m.region, rs.required, m.value).map(x => ({ ...rs, region: x.region, raised: x.value }))) : [rs])) {
@@ -3536,7 +3583,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                       // align-content center/end (unstretched rows in a known height): the rows move by part of the free space.
                       // The free space is what the resolved rows leave (fr rows take it all, so they do not move; measured), not the
                       // rows' required minimum.
-                      const rowsUsed = rs.values ? sum(total(rs.values), scalar(gaps)) : rs.required;
+                      const rowsUsed = rs.values ? sum(total(rs.values), gaps) : rs.required;
                       const blockLead = knownBlock && ['center', 'end'].includes(style['align-content']) ? times(diff(knownBlock, rowsUsed), style['align-content'] === 'center' ? div(one, q(2)) : one) : scalar(zero);
                       for (const item of placed) endings = bounded(endings.flatMap(r0 => autoOffsets(item, r0)).flatMap(({ region: r, offset: autoLead, inline: alignedInline, justified }) => solve(item.box, { inline: alignedInline ?? itemInline(item), ...(justified ? { justifyHandled: true } : {}), block: diff(trackArea(rs.values, rowGap, item.row, item.rowSpan), scalar(marginBlock(item))), ...gridAlign(item), percentInline: areaInline(item), ...(style.$blockFlow ? (blockFlowPercent ? { percentBlock: blockFlowPercent } : {}) : { percentBlock: trackArea(rs.values, rowGap, item.row, item.rowSpan) }), gridItem: true, ...(style.$blockFlow ? { blockFlowChild: true, ...(item.style.$collapsedTop ? { collapsedTop: true } : {}), ...(item.style.$collapsedBottom ? { collapsedBottom: true } : {}) } : {}), autoMargins: autoMargins(item), marginEnd: { inline: marginOf(item, 'right'), block: marginOf(item, 'bottom') },
                         origin:cs.shift ? offset(contentOrigin,sum(sum(sum(sum(trackStart(cs.values,columnGap,item.start),cs.shift.lead),times(cs.shift.extra,q(item.start))),scalar(marginOf(item, 'left'))),autoLead),sum(sum(trackStart(rs.values,rowGap,item.row),blockLead),scalar(marginOf(item, 'top')))) : null,
@@ -3949,7 +3996,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   if (block && hovered === undefined && !options.$animationFrame && !options.$slideVariant) for (const row of geometry.filter(row => row.sticky?.parent && row.origin && row.block)) {
     const parent = geometry.find(other => other.path === row.sticky.parent && other.origin && other.contentBlockSize && intersect(other.region, row.region));
     if (!parent || layoutWarnings.some(w => w.code === 'W_LAYOUT_STICKY_INERT' && w.path === row.path)) continue;
-    const room = diff(sum(sum(parent.origin.block, scalar(parent.content.top)), parent.contentBlockSize), sum(row.origin.block, row.block));
+    const room = diff(sum(sum(parent.origin.block, asAffine(parent.content.top)), parent.contentBlockSize), sum(row.origin.block, row.block));
     const shared = intersect(row.region, parent.region);
     if (!shared || clip(shared, room, true)) continue;
     layoutWarnings.push({ code: 'W_LAYOUT_STICKY_INERT', severity: 'warning', box: row.box.label, path: row.path, parent: parent.box.label,
@@ -4049,7 +4096,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // differs from the picture's (by more than 2%) draws it stretched. Boxes with padding or borders are not judged.
   if (hovered === undefined && !options.$animationFrame && !options.$slideVariant) for (const row of geometry.filter(row => row.imageRatio && !row.imageRatio.follows && row.paint?.objectFit === 'fill' && row.inline && row.block && !row.box.pseudo)) {
     if (layoutWarnings.some(w => w.code === 'W_LAYOUT_IMAGE_DISTORTED' && w.path === row.path)) continue;
-    if (['left', 'right', 'top', 'bottom'].some(side => cmp(row.borders?.[side] ?? zero, zero) !== 0) || cmp(row.content.left, zero) !== 0 || cmp(row.content.top, zero) !== 0) continue;
+    if (['left', 'right', 'top', 'bottom'].some(side => cmp(row.borders?.[side] ?? zero, zero) !== 0) || !isZeroAffine(row.content.left) || !isZeroAffine(row.content.top)) continue;
     const { width: w, height: h } = row.imageRatio;
     // inline·h vs block·w: wider when inline·h·50 > block·w·51, taller when inline·h·51 < block·w·50.
     const wide = clip(row.region, diff(times(row.inline, q(String(h * 50))), times(row.block, q(String(w * 51)))), true);
