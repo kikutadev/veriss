@@ -2,6 +2,9 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_SIZE_BROWSER_DEPENDENT: note => ({ code: 'W_CSS_SIZE_BROWSER_DEPENDENT', severity: 'warning', selector: note.selector, property: note.property, browsers: note.used,
+    css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { ${note.property} }: ${note.keywords.join(', ')} ${note.keywords.length === 1 ? 'is' : 'are'} not taken by every browser, so the ${note.property} differs (${Object.entries(note.used).map(([b, v]) => `${({ chromium: 'Chrome', firefox: 'Firefox', webkit: 'Safari' })[b]}: ${v ?? 'the earlier rule'}`).join(', ')}). ${/fit/.test(note.keywords.join()) ? 'Write fit-content, which every browser takes' : `Write ${note.property}: -webkit-fill-available; ${note.property}: stretch (Firefox takes the first, Chrome and Safari the second)`}` }),
   W_CSS_BACKGROUND_INVALID: note => ({ code: 'W_CSS_BACKGROUND_INVALID', severity: 'warning', selector: note.selector, property: 'background', css: [{ property: 'background', file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { background: ${note.value} }: ${note.problem}, so the browser drops the whole declaration (no image and no color from it). Write image position / size repeat color, with the color in the last layer` }),
   W_CSS_TIMING_INVALID: note => ({ code: 'W_CSS_TIMING_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],

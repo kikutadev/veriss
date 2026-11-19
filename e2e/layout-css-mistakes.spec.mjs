@@ -1425,3 +1425,16 @@ test('F121: font-size, padding, width and height on the options leave a drop-dow
   }
   expect(await size('select{font-size:40px}')).not.toEqual(plain);
 });
+
+test('F122: stretch, -moz-available, -webkit-fit-content and intrinsic are taken by some browsers only; the fallbacks make them agree', async ({page, browserName}) => {
+  const takes = { stretch: ['chromium', 'webkit'], '-webkit-fill-available': ['chromium', 'firefox', 'webkit'], '-moz-available': ['firefox'], 'fit-content': ['chromium', 'firefox', 'webkit'], '-webkit-fit-content': ['chromium', 'webkit'], '-moz-fit-content': ['firefox'], intrinsic: ['webkit'] };
+  for (const [value, taken] of Object.entries(takes)) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.a{width:50px;width:${value}}</style><div class="a">x</div>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).width) !== '50px', value).toBe(taken.includes(browserName));
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;width:50px;width:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SIZE_BROWSER_DEPENDENT'), value).toBe(taken.length < 3);
+  }
+  // The usual fallback chain: every browser ends on a stretch value.
+  await page.setContent(`<!doctype html><style>*{margin:0}.p{width:300px}.a{display:inline-block;width:50px;width:-webkit-fill-available;width:stretch}</style><div class="p"><div class="a">x</div></div>`);
+  expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().width)).toBe(300);
+});

@@ -1334,3 +1334,12 @@ test('F121: sizes and spacing on the options of a drop-down do not change the se
   assert.match(hit('option{height:80px}')[0].message, /height: 80px does not change the size of \.s: it is a drop-down/);
   for (const [css, attrs] of [['option{padding:30px}', 'multiple'], ['option{padding:30px}', 'size="4"'], ['select{font-size:20px}', ''], ['option{color:red}', ''], ['option{padding:0}', '']]) assert.equal(hit(css, attrs).length, 0, `${css} ${attrs}`);
 });
+
+test('F122: a size keyword some browsers drop, without a fallback they take, is reported with what each browser uses', () => {
+  const hit = css => codes(run(css), 'W_CSS_SIZE_BROWSER_DEPENDENT');
+  const [w] = hit('.a{width:50px;width:stretch}');
+  assert.deepEqual(w.browsers, { chromium: 'stretch', firefox: '50px', webkit: 'stretch' });
+  assert.match(w.message, /width: -webkit-fill-available; width: stretch/);
+  assert.match(hit('.a{max-width:-webkit-fit-content}')[0].message, /Write fit-content/);
+  for (const css of ['.a{width:-webkit-fill-available;width:stretch}', '.a{width:fit-content}', '.a{width:-moz-fit-content;width:fit-content}']) assert.equal(hit(css).length, 0, css);
+});

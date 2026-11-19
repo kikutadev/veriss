@@ -3,6 +3,7 @@ import { calcOperatorProblem } from './calc-syntax.mjs';
 import { drop } from './dropped.mjs';
 import { colorSyntaxProblem, parseColor } from '../color/index.mjs';
 import { backgroundProblem } from './background-syntax.mjs';
+import { sizeKeywordSplits } from './size-keyword-syntax.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import { keywordProblem } from './keyword-syntax.mjs';
@@ -984,6 +985,11 @@ export function parseLayoutCSS(sheets, diagnostic) {
             related:[{css:location(conflict.earlier),message:`Earlier ${conflict.properties[0]} declaration`}]});
       }
       if(conflicts.length) continue;
+      // F122: a size keyword some browsers drop (stretch, -moz-available, -webkit-fit-content, intrinsic) without a value
+      // the others take: each browser ends on a different value (measured in Chromium, Firefox and WebKit). Reported;
+      // the layout stays Unknown on these keywords.
+      for (const split of sizeKeywordSplits(node.nodes.filter(d => d.type === 'decl').map(d => ({ prop: d.prop, value: d.value }))))
+        note('W_CSS_SIZE_BROWSER_DEPENDENT', { ...split, selector: node.selector, file: filename, line: node.nodes.findLast(d => d.type === 'decl' && d.prop.toLowerCase() === split.property).source.start.line });
       for (const declaration of node.nodes) {
         if (declaration.type === 'comment') continue;
         if (declaration.type !== 'decl') { problem('U_LAYOUT_CSS', 'Nested CSS rules are outside the subset', declaration.source.start.line); continue; }

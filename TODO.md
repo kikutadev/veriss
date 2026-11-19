@@ -23,10 +23,10 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 5. テキストと折り返し | 9 / 9 | 済 |
 | 6. リスト・マーカー・カウンター | 4 / 5 | ほぼ済(1 つ保留) |
 | 7. transform・重なり・描画 | 5 / 6 | ほぼ済 |
-| 8. フォーム部品・置換要素 | 6 / 8 | 進行中 |
+| 8. フォーム部品・置換要素 | 7 / 8 | ほぼ済 |
 | 9. セレクタ × DOM(状態・構造) | 8 / 8 | 済 |
-| 10. ブラウザで結果が違うもの | 2 / 5 | 進行中 |
-| 合計 | 72 / 79(91%) | |
+| 10. ブラウザで結果が違うもの | 4 / 5 | ほぼ済 |
+| 合計 | 75 / 79(95%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -118,7 +118,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [ ] `select` / `input` の `padding`・`text-align` のブラウザ差(実測では 3 ブラウザとも効いた。差の出る条件を探す)
 - [x] `<option>` のスタイル(F121。ドロップダウンでは大きさ・余白が select に効かない。開いたメニューの描画は測っていない)
 - [x] `<br>` の `margin`(Firefox だけ効く)(F120。`line-height` は WebKit だけ、ほかはどこでも効かない)
-- [ ] `<img>` / `<video>` の `width` / `height` 属性と CSS の優先
+- [x] `<img>` / `<video>` の `width` / `height` 属性と CSS の優先(実測: CSS の width だけ、または max-width: 100% だけだと高さは属性のまま残り比率が崩れる。`height: auto` で保たれる。既存の `W_LAYOUT_IMAGE_DISTORTED` が属性の比率と描く大きさの差として報告する)
 
 ### 9. セレクタ × DOM
 
@@ -136,8 +136,8 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] block レイアウトの `justify-self` / `justify-items`(F105)
 - [x] `<br>` の `margin`(カテゴリ 8 と同じ、F120)
 - [ ] `::-webkit-scrollbar` と `scrollbar-width` / `scrollbar-color`(重ねて描くスクロールバーのヘッドレスでは測れない。測り方を決める)
-- [ ] `-webkit-` だけの書き方(`-webkit-line-clamp` 以外)
-- [ ] フォーム部品の既定の大きさ(UA プロファイルと突き合わせる)
+- [x] `-webkit-` だけの書き方(`-webkit-line-clamp` 以外): 大きさのキーワード(F122)。`-webkit-box-reflect` などの描画だけのものは測れていない
+- [x] フォーム部品の既定の大きさ(UA プロファイル `ua-profile.mjs` が Chromium・Firefox・WebKit ごとに持ち、cross-browser lint が差を報告する)
 
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
@@ -201,6 +201,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F122. 一部のブラウザーしか受け付けない大きさのキーワード
 - F121. ドロップダウンの `<option>` の大きさ・余白
 - F120. `<br>` に書いたスタイル
 - F119. `white-space: nowrap` の後の `text-wrap: balance`
