@@ -2,7 +2,7 @@
 // component into its template states — { html, choices } with the conditions each takes — plus its CSS; this module
 // analyses every state with the generic core and reports what holds per state. The core knows nothing of components.
 import { analyzeHTML, phrasingTags } from '@mizchi/veriss/html';
-import { parseFragment, serialize } from 'parse5';
+import { parse, parseFragment, serialize } from 'parse5';
 import { noShift } from './noshift.mjs';
 
 /** Choices of two variants merge unless they take one condition both ways (that combination cannot happen). */
@@ -211,6 +211,56 @@ export function analyzeStates(component, allOptions = {}) {
     coverage: { ...base.coverage, assumptions: [...base.coverage.assumptions, `form controls checked with the UA profiles of ${uas.join(', ')}`] } };
 }
 
+/**
+ * Analyse explicit post-JavaScript document states against one complete author stylesheet.
+ * The caller, not the adapter, is responsible for state enumeration and stylesheet completeness.
+ */
+export function analyzeSnapshots({states, css}, options = {}) {
+  if (!Array.isArray(states) || !states.length || states.length > 64 || typeof css !== 'string')
+    throw new TypeError('Expected 1–64 document snapshots and a complete CSS string');
+  if (options.assumeText || options.textMetrics || options.textResize)
+    throw new TypeError('Document snapshots do not support inferred text contracts; supply explicit boxes');
+  const unknowns = [], marks = new Map(), seen = new Set();
+  for (const state of states) {
+    if (!state || typeof state.html !== 'string' || !/^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype html>\s*)?<html[\s>]/i.test(state.html) ||
+        !state.choices || Object.getPrototypeOf(state.choices) !== Object.prototype ||
+        Object.values(state.choices).some(v => !(v === null || ['string','boolean'].includes(typeof v) || Number.isFinite(v))))
+      throw new TypeError('Each snapshot needs a full HTML document and scalar choices');
+    const key = JSON.stringify(Object.entries(state.choices).sort(([a],[b]) => a.localeCompare(b)));
+    if (seen.has(key)) throw new TypeError('Duplicate snapshot choices');
+    seen.add(key);
+    const local = new Set();
+    const visit = node => {
+      const attr = name => node.attrs?.find(a => a.name === name)?.value;
+      const label = attr('data-noshift');
+      if (label !== undefined) {
+        if (!label.trim() || local.has(label) || node.tagName === 'html')
+          unknowns.push({code:'U_SNAPSHOT_CONTRACT',message:'snapshot data-noshift requires a unique nonempty name on a non-root element: '+label});
+        local.add(label);
+        if (!marks.has(label)) marks.set(label, []);
+        marks.get(label).push({choices:state.choices,on:(attr('data-noshift-on') ?? '').split(/\s+/).filter(Boolean)});
+      }
+      for (const child of node.childNodes ?? []) visit(child);
+    };
+    visit(parse(state.html));
+  }
+  for (const [label, entries] of marks) {
+    const eligible = entries.some((a,i) => entries.slice(i+1).some(b => {
+      const on = new Set([...a.on,...b.on]);
+      return !on.size || Object.keys({...a.choices,...b.choices}).every(k=>a.choices[k]===b.choices[k] || on.has(k));
+    }));
+    if (!eligible) unknowns.push({code:'U_SNAPSHOT_CONTRACT',message:'data-noshift='+label+' has no comparable supplied state pair'});
+  }
+  // The existing noShift checker is width-based. Do not extend its guarantee to
+  // variable-height regions or cross-profile comparisons without coverage proofs.
+  if (marks.size && (!options.viewport?.height || options.viewport.height.min !== options.viewport.height.max ||
+      (options.scrollbars?.length ?? 0)>1 || (options.devicePixelRatios?.length ?? 0)>1))
+    unknowns.push({code:'U_SNAPSHOT_CONTRACT',message:'snapshot data-noshift currently requires one fixed viewport height and one scrollbar/DPR profile'});
+  const assumptions = ['Only the supplied DOM snapshots are covered; completeness of application states, viewport-dependent JavaScript, and author CSS are caller obligations. Scripts are not executed.'];
+  return analyzeStates({states,css,unknowns,assumptions}, {...options,page:html=>html,documentSnapshots:true,
+    skipNoShift:unknowns.length>0, scripting:'enabled'});
+}
+
 function analyzeOneProfile(component, allOptions = {}) {
   const result = analyzeStatesOnce(component, allOptions);
   // textResize (with defaultFontSize and measured fonts): the component analysed again with the default font size
@@ -228,7 +278,7 @@ function analyzeOneProfile(component, allOptions = {}) {
   return result;
 }
 
-function analyzeStatesOnce({ states, css, unknowns = [], assumptions = [], scope }, { pageCSS = '', page: wrap = page, name = 'Component', assumeText, textMetrics, fonts = {}, textResize, ...options } = {}) {
+function analyzeStatesOnce({ states, css, unknowns = [], assumptions = [], scope }, { pageCSS = '', page: wrap = page, name = 'Component', assumeText, textMetrics, fonts = {}, textResize, documentSnapshots = false, skipNoShift = false, ...options } = {}) {
   // unmeasured: text boxes (markers the analysis laid out as text) left at the assumed size; null until fonts were reported.
   let assumedTexts = 0, measuredTexts = 0, unmeasured = null;
   // The font files given to the lint are known to be there (the font-family fallback rule does not report them).
@@ -240,7 +290,7 @@ function analyzeStatesOnce({ states, css, unknowns = [], assumptions = [], scope
   const scopeOption = scope ? { mode: scope.mode, ...(scope.ancestors ? { ancestors: scope.ancestors } : {}), ...(scope.owned ? { owned: scope.owned } : {}), firstLine: pageCSS.split('\n').length + 1 } : null;
   const results = states.map(state => {
     let html = state.html, boxes = options.boxes;
-    if (wrapsSafely(css)) html = wrapTextRuns(html).html;
+    if (!documentSnapshots && wrapsSafely(css)) html = wrapTextRuns(html).html;
     if (assumeText) {
       const marked = markText(html);
       html = marked.html; assumedTexts = Math.max(assumedTexts, marked.count);
@@ -354,7 +404,7 @@ function analyzeStatesOnce({ states, css, unknowns = [], assumptions = [], scope
   for (const [label, reason] of unmeasurable) { const message = `${label}: ${reason}; its text is only assumed to fit, so its overflow is not checked`; if (!unknowns.some(u => u.message === message)) unknowns.push({ code: 'U_TEXT_NOT_MEASURED', message }); }
   // data-noshift contracts the component declares on its own elements, compared between its states.
   let finalStatus = [...grouped.values()].some(f => /^E_SCOPE_/.test(f.code)) ? 'violated' : unmeasurable.size && status === 'verified' ? 'unknown' : status, allUnknowns = unknowns;
-  if (results.some(r => /data-noshift/.test(r.html))) {
+  if (!skipNoShift && results.some(r => /data-noshift/.test(r.html))) {
     const shift = noShift(results, { wrap, name, viewport: options.viewport });
     for (const f of shift.findings) grouped.set(`${f.code}\u0000${f.box}`, f);
     if (shift.findings.length) finalStatus = 'violated';

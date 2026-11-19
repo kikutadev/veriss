@@ -170,3 +170,31 @@ console.log(formatText(lint(result, {file: 'Card.vue', source})));
 ```
 
 テストは `packages/adapter-core/test/lint.test.mjs`（CLI を含む）にあります。
+
+## JavaScript 実行後の HTML スナップショット
+
+フレームワークのテンプレートがないゲームなどでは、別の QA で得た DOM を
+完全な HTML 文書（html/body の属性を含む）として状態ごとに保存し、共有の完全な author CSS と渡す。
+実行スクリプト、読み込み済みの style/link は、除去しても DOM/CSS の意味が変わらないと確認したものだけ取り除く。
+CSS の cascade 順序を保持する。検査器は JS を実行せず、CSS ファイルを自動取得しない。
+
+```json
+{"states":[{"file":"battle.html","choices":{"paused":false}},
+           {"file":"paused.html","choices":{"paused":true}}]}
+```
+
+```bash
+node tools/css-lint.mjs --snapshots --css game.css --viewport 320-1920 --height 844-844 --fail-on-unknown states.json
+```
+
+- manifest の HTML パスは manifest からの相対パス。1〜64 状態と一意の choices を指定する。
+- スナップショットは変形せず解析し、コンポーネント用 reset や仮の文字幅を自動で追加しない。
+  CLI の --font はこのモードでは未対応。API の明示的な boxes に文字寸法の契約を渡せる。
+- 既存の data-noshift と data-noshift-on を利用できる。スナップショットでは一意の非空の名前と比較可能な状態の組が必要。
+  現時点では固定 viewport 高さ・単一 scrollbar/DPR profile のみ。この条件を満たさない契約は Unknown。
+- 状態列挙の完全性、viewport 依存 JS、CSS の完全性は呼び出し元の責任である。Canvas 内部は対象外。
+  この結果は与えた DOM に対するもので、実行時の全状態の証明ではない。
+- --fail-on-unknown は通常のコンポーネント lint でも使える。エラーなら 1、未検査があれば 2、
+  それ以外は 0。既定は従来通り error のみ終了コード 1。明示的な環境仮定そのものは Unknown ではない。
+
+API: `analyzeSnapshots({states: [{html, choices}], css}, options)` (adapter-core)。

@@ -266,3 +266,56 @@ test('uas: a finding that holds in some browsers only says which (a button label
   const m = lint(result, {file: 'B.svelte'}).find(m => m.code === 'E_LAYOUT_CONTENT');
   assert.match(m.message, /\(in chromium, webkit; not in firefox\)$/);
 });
+
+test('document snapshots preserve html/body attributes and compare declared state contracts', async () => {
+  const {analyzeSnapshots} = await import('../src/index.mjs');
+  const css = '*{box-sizing:border-box;margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}main{display:grid;grid-template-columns:minmax(0,1fr)}.hud{height:48px}html[data-mode=shift] .hud{margin-top:12px}';
+  const snapshot = (mode, extra='') => ({choices:{mode},html:'<!doctype html><html lang="ja" data-mode="'+mode+'"><head><title>Game</title></head><body><main><div class="hud" data-noshift="hud"></div>'+extra+'</main></body></html>'});
+  const options = {viewport:{min:320,max:800,height:{min:600,max:600}}};
+  const stable = analyzeSnapshots({css,states:[snapshot('normal'),snapshot('paused')]},options);
+  assert.equal(stable.status,'verified',JSON.stringify(stable));
+  const moved = analyzeSnapshots({css,states:[snapshot('normal'),snapshot('shift')]},options);
+  assert.equal(moved.status,'violated');
+  assert.ok(moved.findings.some(f=>f.code==='E_LAYOUT_NOSHIFT'));
+  assert.match(moved.coverage.assumptions.join(' '),/supplied DOM snapshots/);
+  assert.throws(()=>analyzeSnapshots({css,states:[]},options),/snapshot/i);
+  const untested = analyzeSnapshots({css,states:[snapshot('normal')]},options);
+  assert.equal(untested.status,'unknown');
+  assert.ok(untested.unknowns.some(f=>f.code==='U_SNAPSHOT_CONTRACT'));
+  const duplicate = analyzeSnapshots({css,states:[snapshot('normal','<div data-noshift="hud"></div>'),snapshot('paused')]},options);
+  assert.equal(duplicate.status,'unknown');
+  assert.ok(duplicate.unknowns.some(f=>f.code==='U_SNAPSHOT_CONTRACT'));
+});
+
+test('css-lint strict mode fails on unsupported input rather than a silent pass', () => {
+  const cli=fileURLToPath(new URL('../../../tools/css-lint.mjs',import.meta.url));
+  const file=fileURLToPath(new URL('../../../README.md',import.meta.url));
+  assert.throws(()=>execFileSync('node',[cli,'--fail-on-unknown',file],{stdio:'pipe'}),e=>e.status===2 && /UNSUPPORTED_FILE/.test(String(e.stdout)));
+});
+
+test('snapshot CLI verifies explicit DOM states and reports violations and incomplete contracts', async () => {
+  const {mkdtempSync,writeFileSync,rmSync} = await import('node:fs');
+  const {tmpdir} = await import('node:os');
+  const {join} = await import('node:path');
+  const dir=mkdtempSync(join(tmpdir(),'veriss-snapshot-test-'));
+  try {
+    const cli=fileURLToPath(new URL('../../../tools/css-lint.mjs',import.meta.url));
+    const manifest=join(dir,'states.json'), css=join(dir,'game.css');
+    writeFileSync(css,'*{box-sizing:border-box;margin:0}html,body,main{display:grid;grid-template-columns:minmax(0,1fr)}.hud{height:48px}html[data-mode=shift] .hud{margin-top:12px}');
+    for(const mode of ['normal','paused','shift']) writeFileSync(join(dir,mode+'.html'),'<!doctype html><html lang="ja" data-mode="'+mode+'"><head><title>Game</title></head><body><main><div class="hud" data-noshift="hud"></div></main></body></html>');
+    const run=(modes,height='600-600')=>{
+      writeFileSync(manifest,JSON.stringify({states:modes.map(mode=>({file:mode+'.html',choices:{mode}}))}));
+      const args=[cli,'--snapshots','--fail-on-unknown','--format','json','--viewport','320-800','--height',height,'--css',css,manifest];
+      try{return {status:0,rows:JSON.parse(execFileSync('node',args,{encoding:'utf8',stdio:'pipe'}))}}catch(e){return {status:e.status,rows:JSON.parse(e.stdout)}}
+    };
+    const pass=run(['normal','paused']);
+    assert.equal(pass.status,0,JSON.stringify(pass));
+    const fail=run(['normal','shift']);
+    assert.equal(fail.status,1);
+    assert.ok(fail.rows.some(r=>r.code==='E_LAYOUT_NOSHIFT'));
+    const unknown=run(['normal']);
+    assert.equal(unknown.status,2);
+    assert.ok(unknown.rows.some(r=>r.code==='U_SNAPSHOT_CONTRACT'));
+    assert.equal(run(['normal','paused'],'480-900').status,2);
+  } finally {rmSync(dir,{recursive:true,force:true})}
+});
