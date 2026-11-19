@@ -1325,3 +1325,13 @@ test('F114: invalid transition and animation values are dropped by the browser, 
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_TIMING_INVALID'), `${prop}: ${value}`).toBe(dropped);
   }
 });
+
+test('F115: an invalid background shorthand is dropped by the browser, and reported', async ({page}) => {
+  for (const [value, dropped] of [['url(a b.png)', true], ['url(x.png) / cover center', true], ['url(x.png) cover', true], ['red url(x.png), blue', true], ['url("a b.png")', false], ['url(x.png) center / cover', false],
+    ['url(x.png) no-repeat center / 50% auto', false], ['url(x.png), red', false], ['white', false]]) {
+    await page.setContent(`<!doctype html><html lang="en"><head><style>.a{background:rgb(1,2,3)}.a{background:${value}}</style></head><body><div class="a">x</div></body></html>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).backgroundColor) === 'rgb(1, 2, 3)', value).toBe(dropped);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}.a{background:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BACKGROUND_INVALID'), value).toBe(dropped);
+  }
+});
