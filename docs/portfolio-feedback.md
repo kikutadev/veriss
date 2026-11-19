@@ -103,5 +103,46 @@ Chromium / Firefox / WebKit 333 E2E passed、監督ランナー exit=0、605 PID
 違反34件の witness の独立面積計算と、verified 146件の計64,386点サンプリングに不一致なし。
 サンプリングは補助検査であり、連続領域の証明の代用ではない。
 
-### Portfolio layout coverage (再開)
-目標: ポートフォリオの実CSSから独立して成立する幾何契約を抽出し、幅・高さ範囲の証明と反例を得る。全ページカスケードは別判定として残す。まず現在のmainで再測定、値・セレクターの未対応を安全に縮め、次に実DOMに対応する局所契約を検証、3ブラウザー照合、全gate、fork main統合。数値を合わせただけのモデル・未対応の黙殺は禁止。
+### 残り2作品の局所モデル評価
+
+目的: Game UI model v1 の独立幾何証拠を墨ノ太刀の戦闘操作と「また村人から。」の初期冒険画面に適用し、実装由来の条件付き証明、実測、未検査を区別する。既存配信コードは変更しない。既知のビルドCSSハッシュで局所式を固定し、異なるCSSは拒否する。境界値を含む複数viewportで操作と矩形を照合し、再実行スクリプトを保存する。実測と局所式の不一致は隠さない。既存のライブラリ・ゲート対象の差分がないことを確認した上で、検証記録とスクリプトを統合する。
+
+実行結果（2026-11-20、base 97c5a3f）:
+`tools/eval-game-ui-remaining.mjs sumi-no-tachi|rpgsim [dist]` を既存の QA supervisor 下で実行する。
+対象ビルドの CSS SHA-256 と実ロード順が一致する場合だけ、レビュー済みの区分アフィン式を利用する。
+両作品共 WebKit、DPR 1、overlay、safeArea 0、外部通信なし、viewport 320–1920 × 320–1080 CSS px。
+実測は境界点を含む墨ノ太刀10点・また村人から。8点、各3状態（初期画面、プレイ/冒険開始、ポーズ）。
+契約の保証は指定された抽象状態・CSS・独立モデルの前提に限る。点観測は前提の全面的な証明ではない。
+
+| 作品 | verified | violated | unknown | 幾何照合 | 操作到達 |
+|---|---:|---:|---:|---:|---:|
+| 墨ノ太刀 | 13 | 1 | 3 | 140/140 | 30/30 |
+| また村人から。 | 5 | 0 | 5 | 80/80 | 24/24 |
+
+墨ノ太刀: Canvas 2枚の game 内収容、pause 端点での画面安定、pad/slash/dodge/iai の viewport 内収容と44px最小寸法、移動パッドと攻撃操作群の分離、4つの操作矩形の HUD 占有率1/3以下を条件付き証明。
+slash/iai の外接矩形分離は violated（反例330×390、10実測点でも重なり）。320×568では slash (226,458,82,82)、iai (247,412,56,56)。
+円形等の描画・実ヒット領域を判定した結果ではなく、実際の操作干渉を断定しない。
+また村人から。: shell の viewport 内収容、toolbar の shell 内収容、初期冒険 canvas の stage 内収容、toolbar と stage の分離、pause端点の canvas 安定を条件付き証明。
+pause/skip の非重複は実測16/16成立・形式証明 Unknown。pause の44px実験契約は実測16/16不成立（30×34px）・形式証明 Unknown。44px と HUD 占有率は評価用の仮条件であり製品要件とはしない。
+操作はいずれも開始、ポーズ、再開を実行し全54件成功。action の静的証明は対象外。ゲーム全体の DOM/CSS、全状態、任意のビルドの自動分離は未証明。
+
+最終版の両評価スクリプト exit=0（評価の実行成功であり契約違反がないという意味ではない）、QA supervisor 残留0。game-ui 単体7件再実行成功。base 97c5a3f の全 gate（6群、eval 4回、3ブラウザー333件）は変更のない対象ソースに対する結果を採用し、今回の追加評価コードは実ゲーム再実行で検証した。ゲーム本体の変更なし。
+
+### Portfolio layout coverage (2026-11-20)
+
+フォークの 97c5a3f を基準に、viewport-fixed の純粋な translation の画面収容を描画座標で判定するよう修正。元の layout 座標は保持する。完全に左へ退避したドロワーと visibility:hidden は従来の配置義務を保持し、フォーカスの問題はアクセシビリティ検査へ委ねる。初回 gate で発生した drawer 評価3件の差を再現して修正し、評価を変更せず解消した。rotate(0) と固定 viewport 条件の row flex-basis の svh/lvh/dvh 等も追加。ブラウザーのツールバーの動的変化は仮定の外。
+
+同じ入力・scripting enabled の全ページ再検査 (a09df13): HOME 63→62、ABOUT 49→48、WORKS 49→48、ARTICLES 49→48、GALLERY 36→35 Unknown。全ページ status=unknown / checks=0。CSS shorthand conflict は4/3/3/3/8件で変化なし。padding/gap の可変 clamp、状態を持つ祖先セレクター、View Transition、外部フォント・描画機能等は未対応。全ページ証明の成功とは扱わない。
+
+別途、実入力4件の HTML/CSS SHA-256 を固定し、ナビゲーション外枠の横方向だけを独立モデル化。`portfolio/scripts/verify-veriss-island.mjs` (portfolio の veriss-audit ブランチ b21f46e) で再現する。実行: portfolio で `python3 scripts/verify-veriss-gate.py 120 node scripts/verify-veriss-island.mjs --snapshot qa/evidence/veriss-trial --live`。スナップショットは以前の捕捉済み入力を利用、変更時は再レビュー必須（改変入力の拒否を実測）。CSS 原本から規則を抽出し、幅320–1920、高さ320–1080、固定 containing block=viewport、scrollbar gutter=0、左右 safe area=0、可視の開閉2状態を前提とする。高さ2px・内容空の横方向投影であり、元の高さや内部レイアウトを証明したものではない。
+
+| 対象 | 結果 |
+| --- | --- |
+| 4ページ×開閉2状態 | 8/8 Z3 UNSAT (条件付き verified)、計356 enforced/non-enforced checks |
+| 3ブラウザー×4ページ×9幅×3高さ×2状態の原CSS・原DOM | 648/648 横方向一致、同じ点で縦方向外枠収容も648/648 |
+| 本番JSの実操作 (第三者通信のみQA側で遮断、reduced motion、HOME は Works へスクロール) | 3ブラウザー×4ページ×4幅×2状態=96/96 寸法一致、Escapeで閉じる |
+| transform を外した対照 | 4/4 SMT witness、12/12 実ブラウザーの右側はみ出し |
+
+結果は証拠ディレクトリの island-proof.json と coverage-final.json に保存。本番サイト変更なし。連続領域の縦方向・内側の配置・アニメーション途中・全状態・全ページ CSS の証明は未達。
+
+最終 gate (a09df13): 6単体テスト群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 339 E2E passed、監督ランナー exit=0、619 PID追跡・残留0。ゲート対象のソースが同一であることを確認して並行作業の main へ統合する。
