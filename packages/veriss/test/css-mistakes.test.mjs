@@ -862,3 +862,13 @@ test('F78: var() in a media query is invalid: the rule never applies', () => {
   // A query list keeps its other queries: not judged.
   assert.equal(codes(run('.a{height:20px}@media print, (min-width: var(--bp)){.a{height:40px}}'), 'W_CSS_MEDIA_VAR').length, 0);
 });
+
+test('F79: a media query with a unitless length (600) or a space before the unit never matches', () => {
+  for (const q of ['(min-width: 600)', '(width >= 600)', '(min-width: 600 px)', '(min-width: 300px) and (max-width: 2000)']) {
+    const r = run(`.a{height:20px}@media ${q}{.a{height:40px}}`);
+    assert.equal(r.status, 'verified', q);
+    assert.ok(codes(r, 'W_CSS_MEDIA_INVALID_LENGTH').length === 1, q);
+    assert.equal(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), 20, q);
+  }
+  assert.equal(codes(run('.a{height:20px}@media (min-width: 600px){.a{height:40px}}'), 'W_CSS_MEDIA_INVALID_LENGTH').length, 0);
+});

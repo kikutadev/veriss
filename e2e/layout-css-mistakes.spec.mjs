@@ -897,3 +897,17 @@ test('F78: a media query with var() never matches', async ({page}) => {
   expect(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant)).toBe(20);
   expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_VAR')).toBe(true);
 });
+
+test('F79: a media query with a unitless or spaced length never matches', async ({page}) => {
+  await page.setViewportSize({width: 800, height: 300});
+  for (const q of ['(min-width: 600)', '(width >= 600)', '(min-width: 600 px)']) {
+    const css = `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}@media ${q}{.a{height:40px}}`;
+    await page.setContent(`<!doctype html><html lang="en"><head><style>${css}</style></head><body><div class="a"></div></body></html>`);
+    expect(await page.evaluate(() => document.querySelector('.a').getBoundingClientRect().height), q).toBe(20);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect(r.status, q).toBe('verified');
+    expect(Number(r.sizes.find(s => s.box === '.a').rect.blockSize.constant), q).toBe(20);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_INVALID_LENGTH'), q).toBe(true);
+  }
+  expect(await page.evaluate(() => matchMedia('(min-width: 0)').matches)).toBe(true);
+});

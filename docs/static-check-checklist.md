@@ -358,6 +358,7 @@
   の箱の float は none に計算される(CSS 2.2 §9.7。3 つのブラウザーで計算値が none、位置も同じ)。解析も none として扱い、
   書いた float が何もしないと報告する。
 - [x] **F78. media query の `var()`**(`W_CSS_MEDIA_VAR`、以前は Unknown): custom property は media query の中では置き換わらない
+- [x] **F79. media query の単位なし長さ・単位前の空白**(`W_CSS_MEDIA_INVALID_LENGTH`、以前は Unknown): `(min-width: 600)` や `(min-width: 600 px)` は不正な query で決して一致しない。`0` だけは単位なしで有効
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

@@ -626,7 +626,7 @@ function flexShorthand(value) {
 }
 
 export function parseLayoutCSS(sheets, diagnostic) {
-  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  const duplicateDeclarations = [], noDurationTransitions = [], dependentDeclarations = [], visitedIgnored = [], markerIgnored = [], markerSizing = [], firstPseudo = [], selectionIgnored = [], placeholderIgnored = [], gridAreasInvalid = [], radiusRules = [], contentRules = [], mediaVar = [], mediaBadLength = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], transitionNotes = [], keyframeImportant = [], importIgnored = [], registered = new Map(), defaultNamespace = [], startingRules = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const visit = (nodes, contexts, layer, filename, depth = 0, preferences = []) => {
@@ -757,6 +757,15 @@ export function parseLayoutCSS(sheets, diagnostic) {
         if (!['media', 'container'].includes(node.name.toLowerCase()) || !node.nodes) { problem('U_LAYOUT_CSS', `Unsupported @${node.name}`, node.source.start.line); continue; }
         // F78: var() is not substituted in a media query: the query is invalid and never matches (measured in Chromium,
         // Firefox and WebKit), so its rules never apply. A query list keeps its other queries: left to parseCondition.
+        // F79: a width / height value that is a bare number other than 0 (600) or has a space before its unit (600 px) is
+        // not a length: the query is malformed and never matches (measured in Chromium, Firefox and WebKit).
+        if (node.name.toLowerCase() === 'media' && !postcss.list.comma(node.params).slice(1).length) {
+          const values = [...node.params.matchAll(/\(\s*(?:min-|max-)?(?:width|height)\s*:\s*([^)]+)\)/gi)].map(m => m[1])
+            .concat([...node.params.matchAll(/\(\s*(?:width|height)\s*(?:<=|>=|<|>|=)\s*([^)<>=]+?)\s*\)/gi)].map(m => m[1]))
+            .concat([...node.params.matchAll(/\(\s*([^()<>=]+?)\s*(?:<=|>=|<|>|=)\s*(?:width|height)\s*\)/gi)].map(m => m[1]));
+          const bad = values.find(v => /^\s*(?:\d*\.)?\d+\s*$/.test(v) && Number(v) !== 0 || /^\s*(?:\d*\.)?\d+\s+[a-z%]+\s*$/i.test(v));
+          if (bad) { mediaBadLength.push({ params: node.params.trim(), value: bad.trim(), file: filename, line: node.source.start.line }); continue; }
+        }
         if (node.name.toLowerCase() === 'media' && /var\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) {
           mediaVar.push({ params: node.params.trim(), file: filename, line: node.source.start.line });
           continue;
@@ -940,7 +949,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
     if (!missingKeyframes.some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) missingKeyframes.push({ name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
+  return { rules, layers, keyframes, missingKeyframes, duplicateDeclarations, noDurationTransitions, dependentDeclarations, visitedIgnored, markerIgnored, markerSizing, firstPseudo, selectionIgnored, placeholderIgnored, gridAreasInvalid, radiusRules, contentRules, mediaVar, mediaBadLength, userSelectNone, keyframeFrames, fontFaces, transitionNotes, keyframeImportant, importIgnored, registered, defaultNamespace, startingRules };
 }
 
 // The UA default family and the user's default font size are not author
