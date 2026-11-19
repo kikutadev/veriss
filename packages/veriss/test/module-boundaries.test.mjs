@@ -11,7 +11,7 @@ const files = dir => readdirSync(join(src, dir), {withFileTypes: true}).flatMap(
 const importsOf = file => [...readFileSync(join(src, file), 'utf8').matchAll(/(?:^|\n)\s*(?:import|export)\b[^'"]*?from\s*['"](\.[^'"]+)['"]/g)].map(m => relative(src, resolve(dirname(join(src, file)), m[1])));
 
 // Pure tools: they import nothing of veriss.
-const pure = ['color/index.mjs', 'layout/linear.mjs', 'layout/calc-syntax.mjs', 'layout/font-syntax.mjs', 'layout/grid-syntax.mjs', 'layout/smt.mjs', 'layout/easing.mjs', 'layout/simple-selector.mjs'];
+const pure = ['color/index.mjs', 'layout/dropped.mjs', 'layout/linear.mjs', 'layout/calc-syntax.mjs', 'layout/font-syntax.mjs', 'layout/grid-syntax.mjs', 'layout/smt.mjs', 'layout/easing.mjs', 'layout/simple-selector.mjs'];
 
 test('pure tools import nothing of veriss', () => {
   for (const file of pure) assert.deepEqual(importsOf(file), [], file);
@@ -34,4 +34,8 @@ test('rules/ reads facts only: it imports no stage (layout/) module', () => {
 test('the syntax stage hands its findings over as one list of notes (M3): no warning-only array is destructured by the engine', () => {
   const engine = readFileSync(join(src, 'layout/engine.mjs'), 'utf8');
   for (const name of ['mediaVar', 'fontInvalid', 'counterUnused', 'calcSpacing', 'importIgnored', 'duplicateDeclarations']) assert.ok(!new RegExp(`\\b${name}\\b`).test(engine), name);
+});
+
+test('the style stage records dropped declarations in one list (M4): no per-case $...Inert mark is left', () => {
+  for (const file of files('.')) assert.deepEqual(readFileSync(join(src, file), 'utf8').match(/\$[a-zA-Z]+Inert\b/g) ?? [], [], file);
 });

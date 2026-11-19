@@ -1,5 +1,6 @@
 import postcss from 'postcss';
 import { calcOperatorProblem } from './calc-syntax.mjs';
+import { drop } from './dropped.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import {findCSSWriteConflicts,cssWriteConflictMessage} from '../css-writes.mjs';
@@ -1241,7 +1242,7 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   if (values.position === 'fixed') { values.position = 'absolute'; values.$fixed = true; }
   // F77: float computes to none on an absolutely positioned (or fixed) box (CSS 2.2 §9.7; measured in Chromium, Firefox and
   // WebKit: computed none, same position). Recorded for a warning.
-  if (values.position === 'absolute' && !['none', undefined].includes(values.float)) { if (sources.float) values.$floatInert = values.float; values.float = 'none'; }
+  if (values.position === 'absolute' && !['none', undefined].includes(values.float)) { if (sources.float) drop(values, 'float-absolute', 'float', values.float); values.float = 'none'; }
   // template { display: none } (UA): its content is a fragment, never rendered; an author display would draw an empty
   // box (not measured), so it is left Unknown.
   // datalist { display: none } (UA, measured in Chromium, Firefox and WebKit): its options show only in the field's
@@ -1353,13 +1354,13 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   const blockified = ['absolute', 'fixed'].includes(String(values.position)) || values.$fixed || !['none', undefined].includes(values.float) || (['flex', 'inline-flex', 'grid', 'inline-grid'].includes(inherited?.display) && !inherited?.$blockFlow);
   if (!box.pseudo && values.display === 'inline' && !blockified && !['img', 'video', 'canvas', 'iframe', 'svg', 'input', 'button', 'select', 'textarea', 'embed', 'object'].includes(box.tag)) {
     const found = [['overflow-x', 'visible'], ['overflow-y', 'visible'], ['text-overflow', 'clip'], ['resize', 'none']].filter(([key, idle]) => sources[key] && values[key] !== undefined && String(values[key]) !== idle);
-    if (found.length) { values.$inlineOverflowInert = found.map(([key]) => [key, values[key]]); for (const [key, idle] of found) values[key] = idle; }
+    if (found.length) { for (const [key] of found) drop(values, 'inline-overflow', key, values[key]); for (const [key, idle] of found) values[key] = idle; }
     // F76: flex / grid container properties lay out the children of a flex or grid container: on an inline element they do
     // nothing (measured in Chromium, Firefox and WebKit, with element children). Recorded for the warning.
     const containerKeys = ['row-gap', 'column-gap', 'grid-template-columns', 'grid-template-rows', 'grid-template-areas', 'grid-auto-flow', 'grid-auto-rows', 'grid-auto-columns', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content', 'justify-items'];
     const idleOf = { 'row-gap': ['normal', '0', '0px'], 'column-gap': ['normal', '0', '0px'], 'grid-template-columns': ['none'], 'grid-template-rows': ['none'], 'grid-template-areas': ['none'], 'grid-auto-flow': ['row'], 'grid-auto-rows': ['auto'], 'grid-auto-columns': ['auto'], 'flex-direction': ['row'], 'flex-wrap': ['nowrap'], 'justify-content': ['normal'], 'align-items': ['normal'], 'align-content': ['normal'], 'justify-items': ['normal', 'legacy'] };
     const container = containerKeys.filter(key => sources[key] && values[key] !== undefined && !idleOf[key].includes(String(sources[key].specified ?? values[key]).trim()));
-    if (container.length) values.$inlineContainerInert = container.map(key => [key, values[key]]);
+    for (const key of container) drop(values, 'inline-container', key, values[key]);
   }
   const nonscroll = value => ['visible', 'clip'].includes(value);
   const x = values['overflow-x'], y = values['overflow-y'];
@@ -1384,51 +1385,51 @@ export function computeStyle(rules, box, active, inherited = {}, {spend, state, 
   for (const [key, idle] of [['word-break', 'normal'], ['line-break', 'auto']]) {
     if (values[key] === undefined) continue;
     if ([idle, 'initial', 'unset', 'revert', 'revert-layer'].includes(String(values[key]))) { delete values[key]; continue; }
-    if (!box.pseudo && ['nowrap', 'pre'].includes(String(values['white-space'])) && String(values['text-wrap-mode'] ?? 'white-space') !== 'wrap' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { (values.$breakInert ??= []).push([key, values[key]]); delete values[key]; }
+    if (!box.pseudo && ['nowrap', 'pre'].includes(String(values['white-space'])) && String(values['text-wrap-mode'] ?? 'white-space') !== 'wrap' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { drop(values, 'one-line', key, values[key]); delete values[key]; }
     else throw new Error(key === 'line-break' ? `Unsupported layout property: line-break (${values[key]} changes line breaking, which is not modeled)` : `Unsupported word-break: ${values[key]} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
   }
   // F84: white-space normal, nowrap and pre-line turn a tab into a space that collapses, so tab-size does nothing there
   // (measured in Chromium, Firefox and WebKit). It is inherited, so only a box with no element inside is judged.
   if (values['tab-size'] !== undefined) {
     if (['8', 'initial', 'unset', 'revert', 'revert-layer'].includes(String(values['tab-size']))) delete values['tab-size'];
-    else if (!box.pseudo && ['normal', 'nowrap', 'pre-line'].includes(String(values['white-space'])) && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { values.$tabSizeInert = values['tab-size']; delete values['tab-size']; }
+    else if (!box.pseudo && ['normal', 'nowrap', 'pre-line'].includes(String(values['white-space'])) && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { drop(values, 'tab-collapsed', 'tab-size', values['tab-size']); delete values['tab-size']; }
     else throw new Error(`Unsupported tab-size: ${values['tab-size']} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
   }
   for (const [key, idle] of [['text-indent', ['0', '0px', 'initial', 'unset', 'revert', 'revert-layer']], ['text-align-last', ['auto', 'initial', 'unset', 'revert', 'revert-layer']]]) {
     if (values[key] === undefined || idle.includes(String(values[key]))) continue;
-    if (!box.pseudo && values.display === 'inline' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { (values.$inlineTextInert ??= []).push([key, values[key]]); delete values[key]; }
+    if (!box.pseudo && values.display === 'inline' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { drop(values, 'inline-text', key, values[key]); delete values[key]; }
     else throw new Error(`Unsupported ${key}: ${values[key]} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
   }
   // F54: clear moves a block below earlier floats; a flex or grid item has none to clear (measured in Chromium, Firefox
   // and WebKit: same layout with clear and without, a float beside it or not). In block flow floats are not modeled.
   if (values.clear !== undefined && !['none', 'initial', 'unset', 'revert', 'revert-layer'].includes(String(values.clear)) && !box.pseudo) {
-    if (['flex', 'inline-flex', 'grid', 'inline-grid'].includes(inherited?.display) && !inherited?.$blockFlow && !['absolute', 'fixed'].includes(values.position)) { values.$clearInert = values.clear; values.clear = 'none'; }
+    if (['flex', 'inline-flex', 'grid', 'inline-grid'].includes(inherited?.display) && !inherited?.$blockFlow && !['absolute', 'fixed'].includes(values.position)) { drop(values, 'clear-item', 'clear', values.clear); values.clear = 'none'; }
     else if (!['none', 'contents'].includes(values.display)) throw new Error(`Unsupported layout property: clear (${values.clear}: floats are not modeled)`);
   }
   // F34: multi-column properties on a flex or grid container do nothing (measured in Chromium, Firefox and WebKit: the
   // items are laid out as without them); on another box multi-column layout is not modeled.
   const multicol = ['column-count', 'column-width'].filter(key => values[key] !== undefined && !['auto', 'initial', 'unset', 'revert', 'revert-layer', 'inherit'].includes(String(values[key])));
   if (multicol.length && !box.pseudo) {
-    if (['flex', 'inline-flex', 'grid', 'inline-grid'].includes(values.display)) { values.$multicolInert = multicol.map(key => [key, values[key]]); for (const key of multicol) values[key] = 'auto'; }
+    if (['flex', 'inline-flex', 'grid', 'inline-grid'].includes(values.display)) { for (const key of multicol) drop(values, 'multicol-item', key, values[key]); for (const key of multicol) values[key] = 'auto'; }
     else if (!['none', 'contents'].includes(values.display)) throw new Error('Unsupported layout property: columns (multi-column layout is not modeled)');
   }
   // F43: min-height / max-height on a table cell do nothing (measured in Chromium, Firefox and WebKit, in auto and fixed
   // tables): the row's height rules. Dropped here (reported by the engine).
   if (!box.pseudo && ['td', 'th'].includes(box.tag) && ['ua', 'table-cell'].includes(String(values.display))) for (const [key, initial] of [['min-block-size', 'auto'], ['max-block-size', 'none']])
-    if (sources[key] && !['auto', 'none', '0', '0px'].includes(String(values[key]))) { (values.$cellInert ??= []).push([key, values[key]]); values[key] = initial; }
+    if (sources[key] && !['auto', 'none', '0', '0px'].includes(String(values[key]))) { drop(values, 'cell-height', key, values[key]); values[key] = initial; }
   // F98: aspect-ratio applies to every box except inline boxes and internal table boxes (CSS Sizing 4 §5.1; measured in
   // Chromium, Firefox and WebKit on cells with text, a box or nothing, in automatic and fixed tables, and on spans): it
   // does nothing there. A replaced element (img, video, …) takes it even when inline.
   if (!box.pseudo && sources['aspect-ratio'] && String(values['aspect-ratio']) !== 'auto') {
     const tablePart = ['td', 'th', 'tr', 'thead', 'tbody', 'tfoot', 'col', 'colgroup'].includes(box.tag) && ['ua', 'table-cell', 'table-row', 'table-row-group', 'table-header-group', 'table-footer-group', 'table-column', 'table-column-group'].includes(String(values.display));
     const inline = String(values.display) === 'inline' && !['img', 'video', 'canvas', 'iframe', 'embed', 'object', 'svg', 'input', 'select', 'textarea', 'button'].includes(box.tag);
-    if (tablePart || inline) { values.$aspectInert = { value: values['aspect-ratio'], where: tablePart ? 'table' : 'inline' }; values['aspect-ratio'] = 'auto'; }
+    if (tablePart || inline) { drop(values, 'aspect-ratio', 'aspect-ratio', values['aspect-ratio'], { where: tablePart ? 'table' : 'inline' }); values['aspect-ratio'] = 'auto'; }
   }
   // F60: in the collapsing border model the table has no padding (measured in Chromium, Firefox and WebKit: same layout
   // with it and without); used as 0 here, reported by the engine.
   if (!box.pseudo && (['table', 'inline-table'].includes(values.display) || (box.tag === 'table' && values.display === 'ua')) && String(values['border-collapse']) === 'collapse') {
     const pads = ['top', 'right', 'bottom', 'left'].map(side => `padding-${side}`).filter(key => sources[key] && !['0', '0px'].includes(String(values[key])));
-    if (pads.length) { values.$tablePaddingInert = pads.map(key => [key, values[key]]); for (const key of pads) values[key] = '0'; }
+    if (pads.length) { for (const key of pads) drop(values, 'table-padding', key, values[key]); for (const key of pads) values[key] = '0'; }
   }
   // overflow: auto or scroll on a table is used as visible (F31, measured in Chromium, Firefox and WebKit): the table
   // grows to its content and never scrolls. Mixed with hidden or clip on the other axis (not measured), it is left as is.

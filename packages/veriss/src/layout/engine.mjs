@@ -8,6 +8,7 @@ import { tracks, tracks as gridTracks, place, parseAreas, expandTracks } from '.
 import { compileSelector, PARENT, dynamicAttributeTests, ignoringSiblings, placeholderField, requiredCapable, optionalDivergent, optionalDivergence, asFormField, readWriteKnown, asEditable, langMatches, directionality } from './selectors.mjs';
 import { selectorUsage } from './selector-usage.mjs';
 import { syntaxWarnings, syntaxNoteOrder } from '../rules/syntax-notes.mjs';
+import { droppedOf, droppedPairs, droppedValue } from './dropped.mjs';
 // User-action and other dynamic pseudo-classes: removed from a selector to ask whether it could match in some state (F83).
 const dynamicStates = /:(?:hover|focus-visible|focus-within|focus|active|target-within|target|checked|indeterminate|visited|link|any-link|open|closed|popover-open|modal|playing|paused|user-invalid|user-valid|invalid|valid|placeholder-shown|autofill|-webkit-autofill|enabled|disabled|read-only|read-write|required|optional|default|in-range|out-of-range|empty|state\([^)]*\))(?![\w-])/gi;
 import { selectorScope } from './selector-scope.mjs';
@@ -490,7 +491,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   function inlineTextAlignment(box, style) {
     if (box.pseudo || style.display !== 'inline' || (box.children ?? []).some(c => !c.anonymous) || (box.inline ?? []).length) return;
-    const found = [...(style.$inlineTextInert ?? [])];
+    const found = [...droppedPairs(style, 'inline-text')];
     if (style.$sources?.['text-align'] && !['start', 'initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(style.$sources['text-align'].specified ?? style['text-align']))) found.unshift(['text-align', style['text-align']]);
     if (!found.length || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(found[0][0]))) return;
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found.map(([key]) => key), css: found.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
@@ -509,11 +510,11 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       message: `${box.label}: text-decoration: none does nothing here — it removes only the element's own line, and it has none; the ${from.style['text-decoration-line']} comes from ${from.box.label} and is drawn across its descendants. Remove the line on ${from.box.label} (and put it on the parts that need it), or make ${box.label} display: inline-block` });
   }
   function inlineOverflow(box, style) {
-    const box2 = style.$inlineContainerInert;
+    const box2 = droppedPairs(style, 'inline-container');
     if (box2?.length && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(box2[0][0])))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: box2.map(([key]) => key), css: box2.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
         message: `${box.label}: ${box2.map(([key]) => key).join(', ')} ${box2.length === 1 ? 'has' : 'have'} no effect on a display: inline element (they lay out the children of a flex or grid container). Set display: flex (or inline-flex, grid) on it` });
-    const found = style.$inlineOverflowInert;
+    const found = droppedPairs(style, 'inline-overflow');
     if (!found?.length || box.pseudo || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(found[0][0]))) return;
     const shown = [...new Map(found.map(([key, value]) => [key.startsWith('overflow') ? 'overflow' : key, value])).entries()];
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found.map(([key]) => key), css: found.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
@@ -552,12 +553,12 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
     inlineAutoMargin(box, style, ancestors?.at(-1)?.style);
-    if (style.$floatInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
+    if (droppedValue(style, 'float-absolute') && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('float')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['float'], ...(style.$sources?.float ? { css: [{ property: 'float', file: style.$sources.float.file, line: style.$sources.float.line, selector: style.$sources.float.selector }] } : {}),
-        message: `${box.label}: float: ${style.$floatInert} has no effect on an absolutely positioned box (its float computes to none). Place it with left / right instead` });
+        message: `${box.label}: float: ${droppedValue(style, 'float-absolute')} has no effect on an absolutely positioned box (its float computes to none). Place it with left / right instead` });
     // F106: word-break / line-break (dropped in css.mjs), hyphens and text-wrap-style where white-space keeps one line.
     {
-      const found = [...(style.$breakInert ?? [])];
+      const found = [...droppedPairs(style, 'one-line')];
       const parentSources = ancestors?.at(-1)?.style?.$sources ?? {}, inheritedFrom = key => { const a = style.$sources?.[key], b = parentSources[key]; return a && b && a.file === b.file && a.line === b.line && a.selector === b.selector; };
       const oneLine = ['nowrap', 'pre'].includes(String(style['white-space'])) && String(style['text-wrap-mode'] ?? 'white-space') !== 'wrap' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length;
       if (oneLine) for (const [key, idle] of [['hyphens', 'manual'], ['text-wrap-style', 'auto']]) if (style.$sources?.[key] && !inheritedFrom(key) && ![idle, 'initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(style[key]))) found.push([key, style[key]]);
@@ -565,9 +566,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found.map(([key]) => key), css: found.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
           message: `${box.label}: ${found.map(([key, value]) => `${key}: ${value}`).join(', ')} ${found.length === 1 ? 'has' : 'have'} no effect with white-space: ${style['white-space']} (the text never wraps, so there are no line breaks to change). Use white-space: normal (or pre-wrap) if the text should wrap` });
     }
-    if (style.$tabSizeInert !== undefined && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('tab-size')))
+    if (droppedValue(style, 'tab-collapsed') !== undefined && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('tab-size')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['tab-size'], ...(style.$sources?.['tab-size'] ? { css: [{ property: 'tab-size', file: style.$sources['tab-size'].file, line: style.$sources['tab-size'].line, selector: style.$sources['tab-size'].selector }] } : {}),
-        message: `${box.label}: tab-size: ${style.$tabSizeInert} has no effect with white-space: ${style['white-space']} (a tab collapses into a space). Use white-space: pre or pre-wrap to keep tabs` });
+        message: `${box.label}: tab-size: ${droppedValue(style, 'tab-collapsed')} has no effect with white-space: ${style['white-space']} (a tab collapses into a space). Use white-space: pre or pre-wrap to keep tabs` });
     // F75: a select of appearance auto is drawn by the browser at its own height: line-height changes neither its size nor
     // its pixels (measured in Chromium, Firefox and WebKit; with appearance: none it does).
     if (!box.pseudo && box.tag === 'select' && style.appearance === 'auto' && style.$sources?.['line-height'] && !['normal', 'initial', 'inherit', 'unset'].includes(String(style.$sources['line-height'].specified ?? style['line-height'])) && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('line-height')))
@@ -630,9 +631,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['border-radius'], css: [{ property: 'border-radius', file: rule.file, line: rule.line, selector: rule.selector }],
           message: `${box.label}: border-radius does not round the table's border with border-collapse: collapse (the cells share the border; only a background is clipped). Use border-collapse: separate with border-spacing: 0, or wrap the table in a rounded div with overflow: hidden` });
     }
-    if (style.$clearInert && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('clear')))
+    if (droppedValue(style, 'clear-item') && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('clear')))
       layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['clear'], ...(style.$sources?.clear ? { css: [{ property: 'clear', file: style.$sources.clear.file, line: style.$sources.clear.line, selector: style.$sources.clear.selector }] } : {}),
-        message: `${box.label}: clear: ${style.$clearInert} has no effect on a ${String(inherited?.display ?? '').includes('grid') ? 'grid' : 'flex'} item (floats do not apply there, so there is nothing to clear). Remove it, or use the container's wrapping (flex-wrap, grid rows) to start a new line` });
+        message: `${box.label}: clear: ${droppedValue(style, 'clear-item')} has no effect on a ${String(inherited?.display ?? '').includes('grid') ? 'grid' : 'flex'} item (floats do not apply there, so there is nothing to clear). Remove it, or use the container's wrapping (flex-wrap, grid rows) to start a new line` });
     // F51: body's overflow goes to the viewport only while html's is visible. With overflow on both (overflow-x: hidden on
     // html and body, the usual guard against a horizontal scrollbar), body is a scroll container of its own that does not
     // scroll (it is as tall as its content): a sticky box in it sticks to body and scrolls away with the page (measured
@@ -672,10 +673,10 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['inline-size'], css: [{ property: 'width', file: style.$sources['inline-size'].file, line: style.$sources['inline-size'].line, selector: style.$sources['inline-size'].selector }],
           message: `${box.label}: width has no effect: with table-layout: fixed only the first row's cells (or col elements) size the columns. Put the width on the first row's cell or on a col` });
     }
-    if (style.$aspectInert && !box.pseudo) aspectInert(box, style);
-    if (style.$cellInert && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(style.$cellInert[0][0])))
-      layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: style.$cellInert.map(([key]) => key), css: style.$cellInert.filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
-        message: `${box.label}: ${style.$cellInert.map(([key, value]) => `${key === 'min-block-size' ? 'min-height' : 'max-height'}: ${value}`).join(', ')} ${style.$cellInert.length === 1 ? 'has' : 'have'} no effect on a table cell (the row's height decides it). Use height on the cell or the row, or put the bound on a div inside the cell` });
+    if (droppedOf(style, 'aspect-ratio').length && !box.pseudo) aspectInert(box, style);
+    if (droppedPairs(style, 'cell-height').length && !box.pseudo && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(droppedPairs(style, 'cell-height')[0][0])))
+      layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: droppedPairs(style, 'cell-height').map(([key]) => key), css: droppedPairs(style, 'cell-height').filter(([key]) => style.$sources?.[key]).map(([key]) => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
+        message: `${box.label}: ${droppedPairs(style, 'cell-height').map(([key, value]) => `${key === 'min-block-size' ? 'min-height' : 'max-height'}: ${value}`).join(', ')} ${droppedPairs(style, 'cell-height').length === 1 ? 'has' : 'have'} no effect on a table cell (the row's height decides it). Use height on the cell or the row, or put the bound on a div inside the cell` });
       // F42: a checkbox or radio of appearance auto is drawn by the platform: background, color, border and padding
       // change no pixel and not its size (measured in Chromium, Firefox and WebKit); accent-color colors it.
     if (!box.pseudo && box.tag === 'input' && ['checkbox', 'radio'].includes(box.inputType) && style.appearance === 'auto') {
@@ -785,10 +786,10 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
             message: `${sel.source} does not match ${box.label}: its parent also holds ${tags}, which is never shown but still counts as a child for :first-child, :last-child and :nth-child. Use :first-of-type / :last-of-type / :nth-of-type, or move the ${tags} out of the list` });
         }
         // F34: columns / column-count / column-width on a flex or grid container (css.mjs resets them to auto).
-        if (style.$multicolInert && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(style.$multicolInert[0][0]))) {
-          const keys = style.$multicolInert.map(([key]) => key), src = style.$sources?.[keys[0]];
+        if (droppedPairs(style, 'multicol-item').length && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(droppedPairs(style, 'multicol-item')[0][0]))) {
+          const keys = droppedPairs(style, 'multicol-item').map(([key]) => key), src = style.$sources?.[keys[0]];
           layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, ...(src ? { css: [{ property: keys[0], file: src.file, line: src.line, selector: src.selector }] } : {}),
-            message: `${box.label}: ${style.$multicolInert.map(([key, value]) => `${key}: ${value}`).join(', ')} has no effect (it is display: ${style.display}; multi-column layout applies only to a block container). Use grid-template-columns (or flex-wrap with a flex-basis) for columns, or display: block for flowing columns` });
+            message: `${box.label}: ${droppedPairs(style, 'multicol-item').map(([key, value]) => `${key}: ${value}`).join(', ')} has no effect (it is display: ${style.display}; multi-column layout applies only to a block container). Use grid-template-columns (or flex-wrap with a flex-basis) for columns, or display: block for flowing columns` });
         }
         // F63: :dir() follows the dir attributes; where the directionality is not known it is Unknown, and a rule that
         // misses only because the direction comes from CSS (direction: rtl, not dir="rtl") is reported.
@@ -927,7 +928,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
               message: `${box.label}: ${name}: ${style.$tableOverflow[keys[0]]} has no effect on a table (it grows to fit its content and never scrolls). Wrap the table in a div with ${name === 'overflow-y' ? 'overflow-y' : 'overflow-x'}: auto to scroll it`, ...ranges(r) });
           // F60: gap does not space table cells (measured in Chromium, Firefox and WebKit: border-spacing does).
           for (const key of ['row-gap', 'column-gap']) if (style.$sources?.[key] && !['normal', '0', '0px'].includes(String(style.$sources[key].specified ?? style[key]).trim())) inert.push([key, `${key === 'row-gap' ? 'row-gap' : 'gap'} does not space the cells of a table; use border-spacing`]);
-          if (style.$tablePaddingInert) for (const [key] of style.$tablePaddingInert) inert.push([key, 'a table with border-collapse: collapse has no padding (its border is shared with the cells); pad the cells, or use border-collapse: separate']);
+          for (const [key] of droppedPairs(style, 'table-padding')) inert.push([key, 'a table with border-collapse: collapse has no padding (its border is shared with the cells); pad the cells, or use border-collapse: separate']);
           if (String(style['border-collapse']) === 'collapse' && style.$sources?.['border-spacing'] && !/^0(?:px)?(?:\s+0(?:px)?)?$/.test(String(style['border-spacing']))) inert.push(['border-spacing', 'border-spacing has no effect with border-collapse: collapse (the cells share their borders). Use border-collapse: separate for spacing, or remove it']);
           // F82: empty-cells: hide only hides empty cells in the separated border model (measured in Chromium, Firefox and
           // WebKit: with collapse the empty cell's background and borders are still painted).
@@ -3323,7 +3324,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     ...['top', 'right', 'bottom', 'left'].flatMap(side => [`padding-${side}`, `margin-${side}`, `border-${side}`]), 'background-color', 'background-image', 'overflow-x', 'overflow-y', 'aspect-ratio'];
   function aspectInert(box, style) {
     if (layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes('aspect-ratio'))) return;
-    const src = style.$sources?.['aspect-ratio'], { value, where } = style.$aspectInert;
+    const src = style.$sources?.['aspect-ratio'], { value, where } = droppedOf(style, 'aspect-ratio')[0];
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['aspect-ratio'], ...(src ? { css: [{ property: 'aspect-ratio', file: src.file, line: src.line, selector: src.selector }] } : {}),
       message: where === 'table' ? `${box.label}: aspect-ratio: ${value} has no effect on a table cell, row or column (the table sizes it). Put the ratio on a block inside the cell` : `${box.label}: aspect-ratio: ${value} has no effect on a display: inline element. Make it display: inline-block (or block)` });
   }
@@ -3663,7 +3664,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     if (child.text || child.contract || child.targets?.length) throw new Error('display: contents with text, contracts or noshift targets needs anonymous or absent boxes');
                     if (emit) contentsInert(child, c.style, c.region);
                     if (emit && child.tablePart) tableRowRadius(child, c.style);
-                    if (emit && child.tablePart && c.style.$aspectInert) aspectInert(child, c.style);
+                    if (emit && child.tablePart && droppedOf(c.style, 'aspect-ratio').length) aspectInert(child, c.style);
                     return [{ region: c.region, children: s.children, contents: c.style }];
                   })));
                   const nested = states.filter(state => state.contents);
