@@ -43,3 +43,11 @@ test('adjacent identical responsive conditions can be emitted as separate rules'
  const interrupted=split.replace('/* compiled stylesheet */','#dock{width:500px}');
  assert.equal(verifyCSSWidthTransition({...input,css:interrupted}).status,'unknown');
 });
+
+test('derived transitions preserve the declared media environment',()=>{
+ const p={...profile,mediaFeatures:{hover:'hover',pointer:'fine','prefers-reduced-motion':'no-preference'}};
+ const r=verifyCSSWidthTransition({...input,profile:p});
+ assert.equal(r.status,'verified',JSON.stringify(r));
+ assert.deepEqual(r.endpoints.environment.profiles[0].mediaFeatures,p.mediaFeatures);
+ assert.equal(verifyCSSWidthTransition({...input,profile:{...p,mediaFeatures:{hover:true}}}).status,'unknown');
+});

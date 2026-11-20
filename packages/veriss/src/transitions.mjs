@@ -160,7 +160,7 @@ export function verifyCSSWidthTransition(input){
   const {profile,predicate,from,to}=input,derived=deriveWidthTransition(input);
   const assumptions=['Closed CSS component and supplied data-attribute event, fixed viewport, overlay scrollbar; no external CSS, runtime override or additional concurrent animation. The fixed border-box and normal block or stretched column flex child inline coordinates (column-reverse is projected onto column; block-axis coordinates are discarded) are affine in the sole changing width. Paired width branches share slopes and their offsets move in one direction.'];
   const evidence=[[from,derived.before],[to,derived.after]].flatMap(([state,html])=>{
-   const layout=createLayoutIR(analyzeHTML(html,{css:derived.css,viewport:profile.viewport,ua:profile.ua,safeArea:profile.safeArea??{},scripting:'enabled',integrity:true,scrollbars:[profile.scrollbar??{name:'overlay',inlineSize:0,blockSize:0}],...(profile.dpr?{devicePixelRatios:[profile.dpr]}:{})}));
+   const layout=createLayoutIR(analyzeHTML(html,{css:derived.css,viewport:profile.viewport,...(profile.mediaFeatures!==undefined?{mediaFeatures:profile.mediaFeatures}:{}),ua:profile.ua,safeArea:profile.safeArea??{},scripting:'enabled',integrity:true,scrollbars:[profile.scrollbar??{name:'overlay',inlineSize:0,blockSize:0}],...(profile.dpr?{devicePixelRatios:[profile.dpr]}:{})}));
    return layoutGeometry({state,profile,layout,targets:derived.targets,local:{assumptions}}).map(e=>{
     if(!e.rows?.length)return e;
     return {...e,axes:['inline'],rows:e.rows.map(r=>({...r,rect:{inlineStart:r.rect.inlineStart,inlineSize:r.rect.inlineSize}}))};
