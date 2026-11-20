@@ -177,7 +177,17 @@ input / fontProfile は環境識別子で、未対応の pointer/hover media 分
   明示的に block 軸だけに作用する宣言と子・兄弟の内容を除外して既存エンジンで計算するが、
   証拠に高さ・縦位置を含めない。一意な html/body に対する単純な class/id 選択肢の存在を問う :has()
   は元 DOM の成否を固定し、存在しない class/id とその否定で元と同じ詳細度を保つ。
-  DOM 状態の変化や複雑な :has() は自動証明しない。独立した縦軸の自動縮約は未対応。
+  DOM 状態の変化や複雑な :has() は自動証明しない。
+  閉じた通常 block の祖先チェーンであることを確認した横軸縮約では、作用しない
+  grid-template / grid-auto / grid-row / grid-column / grid-area 宣言を除去する。
+  Flex/Grid になる可能性が残る場合は拒否する。transition については構文を検証し、
+  色・背景・opacity・影・border 色/角 radius のように明示された非幾何プロパティだけを除去する。
+  all、既定 property、カスタム property、幅/高さ、transform 等は除去しない。
+  縦軸縮約は、非置換・通常 block の viewport 固定配置で、height と top または bottom が
+  明示される対象に限る。祖先の transform/filter/contain 等の containing block 依存、
+  aspect ratio、intrinsic height、auto block margin、混合 inset は拒否する。
+  横方向の宣言を除去した縮約文書は計算のための仮の横寸法を持つが、証拠には縦位置・高さだけを出力する。
+  横方向の保証やフロー依存の縦位置の自動証明は、この経路からは得られない。
   元の全ページ report、他の契約、見た目・hit-test・アクセシビリティの検査結果は変更しない。
 - 証拠は source=local-dom、仮定、被覆付き区分アフィン行または理由付き Unknown。
   この方式は万能な CSS 依存解析でなく、対応外の入力で証明を拒否するための限定プロファイルである。
