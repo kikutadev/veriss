@@ -19,7 +19,7 @@ export function collectLayoutChildren({region,box,style,ancestors,styles,bounded
   // Child boxes per region. display: contents is replaced by its
   // children, which inherit from it (the element tree) but are
   // laid out as items of this container.
-  
+
     let states:ChildState[] = [{region,children:[]}];
     const visit = (child:SolverBox,inheritedStyle:SolverStyle):void => {
       states = bounded(states.flatMap(s => styles(child, s.region, ancestors, inheritedStyle, false).flatMap((c):ChildState[] => {
@@ -90,5 +90,5 @@ export function collectLayoutChildren({region,box,style,ancestors,styles,bounded
       state.children = [...state.children].sort((a, b) => Number(a.style.order) - Number(b.style.order));
     }
     return states;
-  
+
 }

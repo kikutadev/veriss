@@ -45,7 +45,7 @@ export function planGridColumns({box,style,geometryRegion,contentInline,sharedCo
   box:SolverBox;style:SolverStyle;geometryRegion:Region;contentInline:Affine2;sharedColumns?:SharedColumns|undefined;
   resolvedGap:ReturnType<typeof createEdgeSolver>['resolvedGap'];
 }):ColumnPlan[] {
-  
+
   // Flex: the items' flex properties define one row of tracks.
   // repeat(auto-fill, T) with T = Lpx or minmax(Lpx | min(Lpx, 100%), Nfr): as many tracks as fit at their
   // minimum, at least one (css-grid-1 §7.2.3.2). The count is a region split on the container width.
