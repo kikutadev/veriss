@@ -1,3 +1,4 @@
+import {checkUnknownStyles,checkMarkupAccessibility} from './engine-fallback.mjs';
 import {normalizeLayoutState} from './engine-normalize.mjs';
 import {createFinalizer,focusableBox} from './engine-finish.mjs';
 import {checkSettledStyle} from './engine-settled-style.mjs';
@@ -942,31 +943,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // Checklist F where the layout did not run to the end: a style walk over every box (no layout), so the mistakes in
   // the CSS are reported whatever is Unknown. (Each warning is reported once per box.)
   if (diagnostics.some(d => d.severity === 'unknown') && hovered === undefined && !options.$animationFrame && !options.$slideVariant && !untransformed) {
-    const walkStyles = (box, ancestors, inherited) => {
-      let state; try { [state] = styles(box, initial, ancestors, inherited, false); } catch { return; }
-      if (!state) return;
-      try { cssMistakes(box, state.style, ancestors, inherited, true, state.region, undefined); } catch { /* the rest still runs */ }
-      for (const kind of ['before', 'after']) try {
-        const pbox = { ...box, path: `${box.path}/${kind === 'before' ? -1 : (box.children ?? []).length}`, label: `${box.label}::${kind}`, children: [], pseudo: kind };
-        for (const c of styles(pbox, initial, ancestors, state.style, false, false, new Set([`::${kind}`]))) pseudoWithoutContent(pbox, c.style);
-      } catch { /* the rest still runs */ }
-      if (state.style.display === 'none') return;
-      for (const child of box.children ?? []) walkStyles(child, [...ancestors, { box, style: state.style, names: [] }], state.style);
-      // The inline elements of a text leaf (links, spans): the checks that hold for an inline box (F36).
-      const walkInline = (child, chain, parentStyle) => {
-        let c; try { [c] = styles(child, initial, chain, parentStyle, false, false); } catch { return; }
-        if (!c || c.style.display === 'none') return;
-        try { inlineStateTransforms(child, c.style); } catch { /* the rest still runs */ }
-        try { inlineTextAlignment(child, c.style); } catch { /* the rest still runs */ }
-        try { inlineAutoMargin(child, c.style); } catch { /* the rest still runs */ }
-        try { inlineOverflow(child, c.style); } catch { /* the rest still runs */ }
-        try { decorationNone(child, c.style, chain); } catch { /* the rest still runs */ }
-        try { firstPseudoInert(child, c.style); } catch { /* the rest still runs */ }
-        for (const grand of child.inline ?? child.children ?? []) walkInline(grand, [...chain, { box: child, style: c.style, names: [] }], c.style);
-      };
-      for (const child of box.inline ?? []) walkInline(child, [...ancestors, { box, style: state.style, names: [] }], state.style);
-    };
-    try { walkStyles(root, [], undefined); } catch { /* best effort */ }
+    checkUnknownStyles({root,initial,styles,cssMistakes,pseudoWithoutContent,inlineStateTransforms,inlineTextAlignment,inlineAutoMargin,inlineOverflow,decorationNone,firstPseudoInert});
   }
   // F37: a ::first-letter / ::first-line that may apply (a block container it selects, not shown to have none) restyles
   // text in a way that is not modeled.
@@ -1059,41 +1036,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // give it generated text (content), and no ancestor hides it from the accessibility tree.
   else if (options.accessibility && !untransformed && hovered === undefined && !options.$animationFrame && !options.$slideVariant
     && !rules.some(rule => rule.declarations.some(d => d.property === 'content' || (d.property === 'display' && String(d.value) === 'none') || (d.property === 'visibility' && /hidden|collapse/.test(String(d.value))) || (d.property === 'content-visibility' && String(d.value) === 'hidden')))) {
-    const speaks = box => box.text || box.inline?.length || (box.textContent ?? '').trim() || (box.tag === 'img' && (box.alt ?? '').trim()) || box.alt === undefined && box.tag === 'img' || (box.tag === 'svg' && box.named) || (box.children ?? []).some(speaks) || (box.inline ?? []).some(speaks);
-    // label elements by for= (a field is labelled by a wrapping label or label[for=id] whose text is present).
-    const labelsFor = new Map(); (function collect(box) { if (box.tag === 'label' && box.labelFor) labelsFor.set(box.labelFor, [...(labelsFor.get(box.labelFor) ?? []), box]); for (const child of [...(box.children ?? []), ...(box.inline ?? [])]) collect(child); })(root);
-    const labelSpeaks = (label, field) => label.text || (label.textContent ?? '').trim() || [...(label.children ?? []), ...(label.inline ?? [])].some(child => child !== field && speaks(child));
-    const fieldOf = box => ['select', 'textarea'].includes(box.tag) || (box.tag === 'input' && !['hidden', 'submit', 'reset', 'button', 'image'].includes(box.inputType));
-    const widget = new Set(['button', 'link', 'checkbox', 'radio', 'switch', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'slider', 'spinbutton', 'textbox', 'searchbox', 'combobox', 'treeitem', 'gridcell']);
-    const owners = { option: ['listbox'], treeitem: ['tree'], gridcell: ['grid', 'treegrid'], menuitem: ['menu', 'menubar'], menuitemcheckbox: ['menu', 'menubar'], menuitemradio: ['menu', 'menubar'] };
-    const roleOfBox = box => box.role && box.role !== 'dynamic' ? box.role.split(/\s+/)[0] : undefined;
-    const walk = (box, hidden, wrappingLabel = null, ancestorsRoles = []) => {
-      // UA-hidden: a popover (closed until shown), a dialog that is not open, and a closed details' content.
-      const gone = hidden || box.ariaHidden || box.hiddenAttr || box.inert || box.popover || (box.tag === 'dialog' && box.dialogOpen !== true) || box.tag === 'template';
-      const control = !box.pseudo && (box.tag === 'button' || (box.tag === 'a' && box.focusable !== false && box.href !== undefined));
-      // An exposed img without an alt attribute (role none/presentation or aria-hidden take it out of the tree).
-      if (box.tag === 'img' && !box.pseudo && !gone && box.alt === undefined && !['none', 'presentation'].includes(String(box.role ?? '').split(/\s+/)[0]))
-        diagnostics.push({ code: 'E_A11Y_IMAGE_ALT', severity: 'error', box: box.label, path: box.path, source: box.source, rule: 'image-alt', ...ranges(initial),
-          message: `${box.label} has no alt; use alt="" if it is decorative (checked from the markup; the layout was not analysed)` });
-      if (control && !gone && !box.named && !box.labelledBy && !speaks(box))
-        diagnostics.push({ code: 'E_A11Y_NAME', severity: 'error', box: box.label, path: box.path, source: box.source, rule: 'accessible-name', ...ranges(initial),
-          message: `${box.label} has no accessible name: no text, no image text and no aria-label, aria-labelledby or title (checked from the markup; the layout was not analysed)` });
-      // form-label: a field with no aria name and no label with text (label[for] or a wrapping label).
-      if (!box.pseudo && !gone && fieldOf(box) && box.named !== 'dynamic' && box.inputType !== 'dynamic' && !labelsFor.has('dynamic')) {
-        const labelled = box.named === true || (wrappingLabel && labelSpeaks(wrappingLabel, box)) || (box.id && (labelsFor.get(box.id) ?? []).some(l => labelSpeaks(l, box)));
-        if (!labelled && !box.labelledBy) diagnostics.push(box.placeholder
-          ? { code: 'W_A11Y_PLACEHOLDER_LABEL', severity: 'warning', box: box.label, path: box.path, source: box.source, rule: 'form-label', ...ranges(initial), message: `${box.label} is named only by its placeholder, which disappears on input (checked from the markup; the layout was not analysed)` }
-          : { code: 'E_A11Y_LABEL', severity: 'error', box: box.label, path: box.path, source: box.source, rule: 'form-label', ...ranges(initial), message: `${box.label} has no label: add a visible <label>, aria-label, aria-labelledby or title (checked from the markup; the layout was not analysed)` });
-      }
-      // interactive-role-focusable: a widget role on an element that cannot take focus (items of a composite widget get it
-      // from their owner).
-      const role = roleOfBox(box);
-      if (!box.pseudo && !gone && role && widget.has(role) && !(owners[role] ?? []).some(o => ancestorsRoles.includes(o))
-        && !(box.focusable === true || box.tabIndex >= 0 || ['button', 'input', 'select', 'textarea'].includes(box.tag) || (box.tag === 'a' && box.href !== undefined && box.focusable !== false)))
-        diagnostics.push({ code: 'E_A11Y_ROLE_FOCUS', severity: 'error', box: box.label, path: box.path, source: box.source, rule: 'interactive-role-focusable', ...ranges(initial), message: `${box.label} has role ${role} but cannot take focus; add tabindex="0" (checked from the markup; the layout was not analysed)` });
-      for (const child of [...(box.children ?? []), ...(box.inline ?? [])]) walk(child, gone || (box.tag === 'details' && box.detailsOpen !== true && child.tag !== 'summary'), box.tag === 'label' ? box : wrappingLabel, role ? [...ancestorsRoles, role] : ancestorsRoles);
-    };
-    walk(root, false);
+    checkMarkupAccessibility({root,initial,diagnostics,ranges});
   }
   // Layout rectangles: a transform moves the painted box but not the layout box (a layout shift ignores it; measured
   // in docs/cls-evaluation.md). With a transform anywhere, every row's layoutRect comes from the untransformed
