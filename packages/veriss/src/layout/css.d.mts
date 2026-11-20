@@ -13,23 +13,6 @@ export { matches, simpleSelector } from './selectors.mjs';
 export declare function setRootFontSize(size: Rational | null): void;
 export declare function setUAProfile(profile: UAProfile | null): void;
 export declare function setRegisteredProperties(registry: ReadonlyMap<string, PropertyRegistration> | null | undefined): void;
-export declare function transitionsOf(style: Readonly<Record<string, unknown>>): {
-    property: string;
-    duration: string;
-    easing: string;
-    delay: string;
-}[];
-export declare function animationsOf(style: Readonly<Record<string, unknown>>): {
-    name: string;
-    duration: string;
-    count: string;
-    playState: string;
-    direction: string;
-    easing: string;
-    delay: string;
-    fill: string;
-    timeline: string;
-}[];
 export declare const registeredValueProblem: (name: string, text: unknown) => string | null;
 export declare function setSafeArea(area: SafeArea | "unknown" | null): void;
 export declare const viewportLength: (text: unknown) => boolean;
