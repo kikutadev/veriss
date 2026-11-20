@@ -86,7 +86,7 @@ def Operand.Valid : Operand → Prop
   | .add a b => a.Valid ∧ b.Valid
   | .scale k a => 0 < k.den ∧ a.Valid
 
-noncomputable def Operand.value (p : InstanceProfile) (rows : List (String × NamedRow))
+noncomputable def Operand.value (p : InstanceProfile) (rows : List (TargetRef × NamedRow))
     (w h : ℝ) : Operand → Option ℝ
   | .constant k => some k.real
   | .env k => envMeaning p k w h
@@ -94,7 +94,7 @@ noncomputable def Operand.value (p : InstanceProfile) (rows : List (String × Na
   | .add a b => do return (← a.value p rows w h) + (← b.value p rows w h)
   | .scale k a => do return (← a.value p rows w h) * k.real
 
-theorem Operand.compile_sound (o : Operand) (p : InstanceProfile) (rows : List (String × NamedRow))
+theorem Operand.compile_sound (o : Operand) (p : InstanceProfile) (rows : List (TargetRef × NamedRow))
     (w h : ℝ) (z : Scaled) (hv : o.Valid)
     (hr : ∀ t r, rows.lookup t = some r → r.Valid)
     (ok : o.compile p rows = .ok z) :
@@ -141,7 +141,7 @@ def Predicate.Valid : Predicate → Prop
   | .not a => a.Valid
 
 -- The result is present only when all operands were defined.
-noncomputable def Predicate.meaning (p : InstanceProfile) (rows : List (String × NamedRow))
+noncomputable def Predicate.meaning (p : InstanceProfile) (rows : List (TargetRef × NamedRow))
     (w h : ℝ) : Predicate → Option Prop
   | .compare rel a b => do return comparisonMeaning rel (← a.value p rows w h) (← b.value p rows w h)
   | .both a b => do return (← a.meaning p rows w h) ∧ (← b.meaning p rows w h)
@@ -149,7 +149,7 @@ noncomputable def Predicate.meaning (p : InstanceProfile) (rows : List (String �
   | .not a => do return ¬ (← a.meaning p rows w h)
 
 theorem Predicate.compile_sound (pred : Predicate) (p : InstanceProfile)
-    (rows : List (String × NamedRow)) (w h : ℝ) (f : Formula)
+    (rows : List (TargetRef × NamedRow)) (w h : ℝ) (f : Formula)
     (hv : pred.Valid) (hr : ∀ t r, rows.lookup t = some r → r.Valid)
     (ok : pred.compile p rows = .ok f) :
     pred.meaning p rows w h = some (f.holds w h) := by
@@ -198,7 +198,7 @@ theorem Predicate.compile_sound (pred : Predicate) (p : InstanceProfile)
       simp [Predicate.meaning,ia x hv ha,Formula.holds]
 
 theorem Predicate.checked_piece_sound (pred : Predicate) (env : InstanceProfile)
-    (rows : List (String × NamedRow)) (p : Problem) (c : VerifiedCertificate)
+    (rows : List (TargetRef × NamedRow)) (p : Problem) (c : VerifiedCertificate)
     (r : Piece) (w h : ℝ)
     (valid : pred.Valid) (rowValid : ∀ t a, rows.lookup t = some a → a.Valid)
     (compiled : pred.compile env rows = .ok r.goal)

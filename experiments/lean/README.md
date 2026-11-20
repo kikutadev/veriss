@@ -191,15 +191,9 @@ Implemented on the separate Lean research branch; the npm/TypeScript runtime is 
 - `state-cases OBLIGATION.json` checks serialized relational ObligationIR v1
   case keys from its original state/environment/contract, never trusting the
   producer's case list. This is coverage only, not target binding or truth.
-  `state-proofs OBLIGATION.json CERTIFICATES.json` additionally requires one
-  positive relational certificate per regenerated static key and reconstructs
-  each problem from the original evidence entries and contract. Certificates
-  are a JSON array of objects with `key: {contract,profile,from}` and
-  `certificate: VerifiedCertificate`. Event geometry, action, occupancy and
-  negative aggregate certificates remain Unknown; the existing individual
-  counterexample verifier is unchanged. The graph/selector decoder, JSON
-  binding, whole report semantics and evidence's browser/CSS provenance are
-  still trusted boundaries; this is not a state-to-browser correctness claim.
+  The state-wide certificate protocol added here is extended in the fourth
+  milestone below. The graph/selector decoder, JSON binding, whole report
+  semantics and evidence's browser/CSS provenance remain trusted boundaries.
 - `VerissLeanBridge`: independent real-valued interpretation of normalized
   coordinate fields, safe-area/environment values, rational/scaled operands,
   and Boolean predicate AST. Theorems `Operand.compile_sound`,
@@ -240,7 +234,89 @@ propext, Classical.choice and Quot.sound (some theorems use fewer); no sorry
 or native_decide. The earlier saved real-site reports and browser gate were
 not rerun in this milestone. No new production warnings or browser code.
 
-Next: cross-state before/after geometry and reachability path witnesses (S3/S4),
-negative aggregate results, proof composition and actual CSS subset extraction
-(X0–X3), and timing extraction/certificate linkage to the source. Keep source
-provenance, unknown inputs and normalized-model claims separate.
+## Cross-state geometry and reachable counterexamples (fourth milestone)
+
+The same relational certificate checker now handles static and settled
+transition cases from canonical ObligationIR v1. No production package or
+TypeScript worktree was modified.
+
+- `VerissLeanReport` uses a structured (before/after, target ID) reference,
+  independently resolves each endpoint's evidence, and lowers `stable` to
+  equality of the four border-rectangle coordinates/sizes. Expanded event
+  predicates support the existing linear Boolean grammar. No viewport
+  changes occur between the endpoints. The reported target bindings must
+  exactly match the independently generated references, including the state
+  ID and endpoint. `combineRows_sound` and `combineRows_covers` prove complete
+  Cartesian selection and joint guard coverage of the normalized row sets;
+  no feasible combination is discarded. Existing geometry validation
+  checks coverage, nonnegative dimensions and overlap agreement.
+- `VerissLeanState`: `Graph.walk_sound`, `Graph.checkPath_sound` and
+  `Graph.checkPath_edge` prove that a path follows actual declared edges
+  enabled for the given profile, from initial to from, and that the target
+  event/destination is reachable. A path contains the exact Edge objects
+  from the declared graph, including restricted profiles when present.
+- `VerissLeanStateProof`: the normalized input carries a proof that its
+  required keys are exactly the generated obligations. `all_reachable_verified`
+  and `reachable_violation` link graph completeness to the arithmetic
+  checker for positive and negative results. The graph is the declared
+  model, not proven to be an overapproximation of arbitrary JavaScript.
+
+Current protocol (third-milestone static positive certificates still work):
+
+```sh
+lake build VerissLean
+lake env lean StateTest.lean
+lake env lean TimeTest.lean
+lake env lean --run Main.lean state-plan OBLIGATION.json
+lake env lean --run Main.lean state-proofs OBLIGATION.json CERTIFICATES.json
+python3 test_state.py CHECKER OUTPUT_DIR
+python3 kernel_relational.py OUTPUT_DIR/transition-kernel-input.json > Concrete.lean
+lake env lean Concrete.lean
+python3 test_relational.py CHECKER OUTPUT_DIR
+```
+
+`state-plan` returns a list of {key,code,result} objects for the complete
+regenerated case set, with per-case unsupported results (2). A key has
+contract, profile, from and optional event/to. For positive entries supply
+{key,certificate: VerifiedCertificate}; for counterexamples supply
+{key,violation: ViolationCertificate,path: Edge[]}. The path may be empty
+only when from is the initial state. No submitted problem or report status
+is trusted. Duplicate or extraneous certificate keys and inconsistent graph
+keys are rejected. A verified bundle needs every required case to pass;
+a valid in-scope counterexample suffices for exit 1 even if other cases
+lack evidence or are unsupported. Otherwise incomplete/invalid bundles
+exit 2. Action, occupancy and arbitrary temporal behavior remain Unknown.
+The old individual report CLI remains static-only.
+
+Validation:
+- StateTest: 29 concrete kernel tests, including 9 new path tests; TimeTest:
+  8, all successful. Existing KernelExample also passes.
+- test_state.py: 28 integration cases (16 additional since milestone three),
+  including non-deterministic event destinations, stable/self-loop,
+  directional before/after predicate, a rational witness at 601.5 × 400
+  inside a 601–603 width region, and rejection of modified path/profile,
+  swapped target direction, missing axis/geometry/target/certificate and
+  non-violating boundary. Production veriss IR construction and selected
+  contract classifications agree with the independent checker.
+- 18 accepted transition/static model certificates from test_state plus
+  14 accepted existing relational cases checked by concrete kernel
+  reduction. All 29 existing relational regression cases passed.
+- New theorem axiom audits: only propext, Classical.choice, Quot.sound.
+  Concrete reduction checks depend only on propext. No sorryAx or
+  native_decide.
+- Saved portfolio project media-build-smoke reports (converted to
+  ObligationIR with the original state/environment/contract/evidence,
+  then independently replanned and checked): result.json
+  (SHA256 6a3bc06f31fb27a0c8ac9ef4892144153298d9060d9aa9de4c4b3f2847e553f6)
+  3/3 required cases verified; wrong-result.json
+  (SHA256 30ab09eecc18bdd559a463183824c1c33551075a5859f80f01e027cb8d2d42bd)
+  2/2 Unknown with zero evidence. These are saved static models, not new
+  browser measurements. The complete prior 46-instance dataset and
+  three-browser gate were not rerun.
+
+Remaining: actual JS-to-StateIR refinement (S5), component composition
+(C1–C4), CSS subset extraction (X0–X3) and source-bound timing. The
+semantic theorem is for normalized predicates/geometry; decoding,
+raw CSS/browser correspondence, profile-key provenance and full
+source-model linkage are not formalized end-to-end. This is not a proof
+of concrete UI reachability or of actual browser animations.

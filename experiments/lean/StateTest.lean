@@ -1,4 +1,4 @@
-import VerissLeanState
+import VerissLeanStateProof
 open VerissLean.State
 def g : Graph := ⟨"a", ["a","b","c","dead"], ["desktop","mobile"],
   [⟨"a","open","b",none⟩, ⟨"b","close","a",none⟩,
@@ -44,3 +44,26 @@ set_option maxRecDepth 100000 in
 set_option maxHeartbeats 5000000 in
 example : ((chain 64).checkedReach "p").map List.length = some 64 := by decide
 example : (chain 65).valid = false := by decide
+
+def closeKey : CaseKey := ⟨"close","desktop","b",some "close",some "a"⟩
+def pathAB : List Edge := [⟨"a","open","b",none⟩]
+example : g.checkPath closeKey pathAB = true := by decide
+example : g.checkPath closeKey [] = false := by decide
+example : g.checkPath closeKey [⟨"a","open","c",some ["mobile"]⟩] = false := by decide
+example : g.checkPath ({closeKey with «to» := some "c"}) pathAB = false := by decide
+example : g.checkPath ⟨"self","desktop","b",some "stay",some "b"⟩ pathAB = true := by decide
+example : g.checkPath ⟨"open","mobile","a",some "open",some "c"⟩ [] = true := by decide
+example : g.checkPath ⟨"open","desktop","a",some "open",some "c"⟩ [] = false := by decide
+example : g.checkPath ⟨"static","mobile","c",none,none⟩ [⟨"a","open","c",some ["mobile"]⟩] = true := by decide
+example : g.checkPath ⟨"static","desktop","c",none,none⟩ [⟨"a","open","c",some ["mobile"]⟩] = false := by decide
+#print axioms Graph.walk_sound
+#print axioms Graph.checkPath_sound
+#print axioms Graph.checkPath_edge
+
+#print axioms StateInput.aggregate_verified
+#print axioms StateInput.aggregate_violated
+#print axioms StateInput.all_reachable_verified
+#print axioms StateInput.reachable_violation
+
+#print axioms VerissLean.Relation.combineRows_sound
+#print axioms VerissLean.Relation.combineRows_covers

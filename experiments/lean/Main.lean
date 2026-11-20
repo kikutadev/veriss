@@ -1,4 +1,4 @@
-import VerissLeanState
+import VerissLeanStateProof
 import VerissLeanTime
 open Lean VerissLean
 
@@ -78,30 +78,6 @@ def batch (file : String) : IO UInt32 := do
       Json.mkObj [("code",toJson code),("result",data)])).compress
     return (if results.any (·.1 == 2) then 2 else if results.any (·.1 == 1) then 1 else 0)
 
-structure StateProofEntry where
-  key : State.CaseKey
-  certificate : Relation.VerifiedCertificate
-  deriving FromJson
-
--- Coverage is regenerated from the original obligation. No supplied problem
--- or status is accepted. Event contracts remain unsupported in this entrypoint.
-def checkStateProofs (raw : Json) (certs : List StateProofEntry) : Except String Unit := do
-  let (g,cs,reported) ← State.decodeObligation raw
-  Relation.require (g.checkCases cs reported) "Missing or invalid reachable cases"
-  let some required := g.required cs | throw "Invalid graph or scope"
-  Relation.require (certs.length ≤ 32768 && State.checkKeys required (certs.map (·.key))) "Missing, duplicate or extraneous case certificates"
-  let i ← raw.getObjVal? "implementation"
-  let evidence ← i.getObjVal? "evidence"
-  State.checkTag evidence "evidence"
-  let source := Json.mkObj [
-    ("report", Json.mkObj [("environment", ← i.getObjVal? "environment"),
-      ("contract", ← raw.getObjVal? "contract")]),
-    ("evidence", ← evidence.getObjVal? "entries")]
-  for entry in certs do
-    Relation.require entry.key.event.isNone "Event geometry unsupported"
-    let p ← Relation.getProblem source entry.key.«from» entry.key.profile entry.key.contract
-    Relation.require (p.checkVerified entry.certificate) "Invalid or insufficient case proof"
-
 def main (args : List String) : IO UInt32 := do
   match args with
   | ["time-domain",file] =>
@@ -112,13 +88,24 @@ def main (args : List String) : IO UInt32 := do
         IO.println "Checked: normalized shared linear progress covers the declared real-time domain"
         return 0
       else fail "Invalid or incomplete time domain"
+  | ["state-plan",file] =>
+    match (← readJson file) >>= stateInput with
+    | .error msg => fail msg
+    | .ok input =>
+      let plans := statePlan input
+      IO.println (toJson plans).compress
+      return if plans.any (fun j => j.getObjValD "code" == toJson (2 : Nat)) then 2 else 0
   | ["state-proofs",file,certs] =>
     match (← readJson file), ((← readJson certs) >>= fromJson? (α := List StateProofEntry)) with
     | .ok raw, .ok entries =>
       match checkStateProofs raw entries with
-      | .ok () =>
-        IO.println "Verified: all required declared static-state relational model cases"
+      | .ok 0 =>
+        IO.println "Verified: all required declared static and transition relational model cases"
         return 0
+      | .ok 1 =>
+        IO.println "Violated: exact relational counterexample on a reachable declared case"
+        return 1
+      | .ok _ => fail "Missing, unsupported or invalid case proof"
       | .error msg => fail msg
     | .error msg, _ | _, .error msg => fail msg
   | ["state-cases",file] =>
@@ -135,4 +122,4 @@ def main (args : List String) : IO UInt32 := do
   | ["violate",report,state,profile,contract,file] => relational "violate" report state profile contract (some file)
   | [file] => checkFile file none
   | ["report",report,state,profile,target,file] => checkFile file (some (report,state,profile,target))
-  | _ => fail "usage: time-domain TRACE.json, state-cases OBLIGATION.json, state-proofs OBLIGATION.json CERTIFICATES.json, plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"
+  | _ => fail "usage: time-domain TRACE.json, state-cases OBLIGATION.json, state-plan OBLIGATION.json, state-proofs OBLIGATION.json CERTIFICATES.json, plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"

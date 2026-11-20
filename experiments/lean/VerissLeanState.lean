@@ -43,6 +43,28 @@ inductive Reach (g : Graph) (p : String) : String → Prop
   | step (e : Edge) : e ∈ g.edges → e.enabled p = true →
       Reach g p e.from → Reach g p e.to
 
+-- A witness is an exact sequence of declared edges, not observed events.
+def Graph.walk (g : Graph) (p : String) (start : String) : List Edge → Option String
+  | [] => some start
+  | e :: es =>
+    if decide (e ∈ g.edges) && e.enabled p && e.«from» == start then
+      g.walk p e.«to» es
+    else none
+
+theorem Graph.walk_sound (g : Graph) (p : String) (start dest : String) (es : List Edge)
+    (hs : Reach g p start) (ok : g.walk p start es = some dest) : Reach g p dest := by
+  induction es generalizing start with
+  | nil =>
+    simp [Graph.walk] at ok
+    exact ok ▸ hs
+  | cons e es ih =>
+    simp only [Graph.walk] at ok
+    split at ok
+    next he =>
+      simp only [Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at he
+      exact ih e.«to» (Reach.step e he.1.1 he.1.2 (he.2.symm ▸ hs)) ok
+    next => contradiction
+
 def Graph.expand (g : Graph) (p : String) (seen : List String) : List String :=
   g.states.filter fun s => decide (s ∈ seen) ||
     g.edges.any (fun e => e.enabled p && decide (e.from ∈ seen) && decide (e.to = s))
@@ -193,6 +215,29 @@ theorem Graph.required_spec (g : Graph) (contracts : List Scope) (ks : List Case
       exact ⟨c,hc',p,hp,(c.cases_spec g p _ (hs p hp) k).mpr hk⟩
   next => contradiction
 
+def Graph.checkPath (g : Graph) (k : CaseKey) (es : List Edge) : Bool :=
+  es.length ≤ 256 && g.walk k.profile g.initial es == some k.«from» &&
+  match k.event,k.«to» with
+  | none,none => true
+  | some ev,some dest => g.edges.any fun e =>
+    e.enabled k.profile && e.«from» == k.«from» && e.event == ev && e.«to» == dest
+  | _,_ => false
+
+theorem Graph.checkPath_sound (g : Graph) (k : CaseKey) (es : List Edge)
+    (ok : g.checkPath k es = true) : Reach g k.profile k.«from» := by
+  simp only [Graph.checkPath, Bool.and_eq_true, beq_iff_eq] at ok
+  exact g.walk_sound k.profile g.initial k.«from» es Reach.initial ok.1.2
+
+theorem Graph.checkPath_edge (g : Graph) (k : CaseKey) (es : List Edge)
+    (ok : g.checkPath k es = true) (ev dest : String)
+    (he : k.event = some ev) (hd : k.«to» = some dest) :
+    ∃ e ∈ g.edges, e.enabled k.profile = true ∧ e.«from» = k.«from» ∧
+      e.event = ev ∧ e.«to» = dest ∧ Reach g k.profile dest := by
+  have reached := g.checkPath_sound k es ok
+  simp only [Graph.checkPath, Bool.and_eq_true, he, hd, List.any_eq_true, beq_iff_eq] at ok
+  obtain ⟨e,hm,⟨⟨⟨hp,hf⟩,hev⟩,hto⟩⟩ := ok.2
+  exact ⟨e,hm,hp,hf,hev,hto,hto ▸ Reach.step e hm hp (hf.symm ▸ reached)⟩
+
 -- Untrusted case lists are compared against regenerated obligations, not counted.
 def checkKeys (expected supplied : List CaseKey) : Bool :=
   unique supplied && expected.all (fun k => decide (k ∈ supplied)) &&
@@ -228,6 +273,13 @@ def checkTag (j : Json) (kind : String) : Except String Unit := do
 
 -- Only decode selectors and graph. Geometry/profile details and target lists
 -- deliberately do not participate in this coverage-only claim.
+def decodeCase (k : Json) : Except String CaseKey := do
+  let tr ← k.getObjVal? "transition"
+  shape tr ["from","event","to","profiles"]
+  let event : Option String ← fromJson? (tr.getObjValD "event")
+  let dest : Option String ← fromJson? (tr.getObjValD "to")
+  return ⟨← str k "contract", ← str k "profile", ← str tr "from", event, dest⟩
+
 def decodeObligation (j : Json) : Except String (Graph × List Scope × List CaseKey) := do
   checkTag j "obligation"
   require ((← str j "operation") == "relational") "Unsupported operation"
@@ -246,12 +298,7 @@ def decodeObligation (j : Json) : Except String (Graph × List Scope × List Cas
   checkTag contract "contract"
   require ((← str (← contract.getObjVal? "profile") "id") == "relational/1") "Unsupported contract profile"
   let cs ← (← items contract "contracts").mapM fun c => fromJson? (α := Scope) c
-  let ks ← (← items j "cases").mapM fun k => do
-    let tr ← k.getObjVal? "transition"
-    shape tr ["from","event","to","profiles"]
-    let event : Option String ← fromJson? (tr.getObjValD "event")
-    let dest : Option String ← fromJson? (tr.getObjValD "to")
-    return (⟨← str k "contract", ← str k "profile", ← str tr "from", event, dest⟩ : CaseKey)
+  let ks ← (← items j "cases").mapM decodeCase
   return (g,cs,ks)
 
 end VerissLean.State
