@@ -196,6 +196,9 @@ importers:
       vue:
         specifier: 3.5.44
         version: 3.5.44(typescript@6.0.3)
+      z3-solver:
+        specifier: 5.3.3
+        version: 5.3.3
 
   packages/adapter-core:
     dependencies:
