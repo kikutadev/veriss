@@ -353,3 +353,75 @@ test('conditional convex transition proof agrees with a shared bounded width int
  }
  expect(verifyInterpolatedPredicate({...input,interpolation:{...input.interpolation,easing:'cubic-bezier(.3,2,.2,1)'}}).status).toBe('unknown');
 });
+
+test('font-independent form width ignores focus paint and inactive animation metadata',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const html='<!doctype html><html lang="en"><head><title>Account settings</title></head><body><header><kbd>native</kbd></header><main id="account"><section tabindex="0" id="settings"><kbd>unknown height</kbd></section></main></body></html>';
+ const base='*{box-sizing:border-box;margin:0;padding:0}#account{max-width:640px;margin:auto;padding-inline:24px}#settings{width:100%}';
+ // Explicit tabindex is not yet admitted by the conservative projection;
+ // test the same focus-paint cascade with an independently sized container.
+ const source=html.replace(' tabindex="0"','');
+ const paint='body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}:focus-visible{outline:3px solid orange;outline-offset:4px}@media(prefers-reduced-motion:reduce){*{animation-iteration-count:1!important;animation-duration:.01ms!important;animation-fill-mode:none;transition-duration:.01ms!important}}';
+ const css=base+paint;
+ const [e]=domGeometry({state:'screen',profile,html:source,css,targets:['settings']});
+ expect(e.axes,JSON.stringify(e)).toEqual(['inline']);
+ for(const reducedMotion of ['reduce','no-preference']){
+  await page.emulateMedia({reducedMotion});
+  for(const width of [320,639,640,641,1000]){
+   const height=600;await page.setViewportSize({width,height});
+   await page.setContent(source.replace('</head>','<style>'+css+'</style></head>'));
+   const actual=await page.locator('#settings').evaluate(n=>{const r=n.getBoundingClientRect();return [r.x,r.width]});
+   const rows=e.rows.filter(r=>r.constraints.every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+   expect(rows.length).toBeGreaterThan(0);
+   for(const r of rows){
+    expect(actual[0]).toBeCloseTo(value(r.rect.inlineStart,width,height),1);
+    expect(actual[1]).toBeCloseTo(value(r.rect.inlineSize,width,height),1);
+   }
+  }
+ }
+ for(const extra of [':focus-visible{width:200vw}','#account{animation-name:grow}@keyframes grow{to{width:200vw}}']){
+  expect(domGeometry({state:'screen',profile,html:source,css:css+extra,targets:['settings']})[0].rows).toBeUndefined();
+ }
+});
+
+test('shared progress can prove clearance of two moving workspace panes, not just a navigation width',async({page,browserName})=>{
+ const {verifyInterpolatedPredicate}=await import('../packages/veriss/src/transitions.mjs');
+ const {layoutGeometry,createLayoutIR}=await import('../packages/veriss/src/layout-contract.mjs');
+ const {analyzeHTML}=await import('../packages/veriss/src/html.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const source='<!doctype html><html lang="en"><head><title>Workspace</title></head><body><aside id="palette"></aside><main id="workspace"></main></body></html>';
+ const base='*{margin:0;padding:0;box-sizing:border-box}#palette{position:fixed;top:0;left:0;width:48px;height:80px}#workspace{position:fixed;left:56px;right:0;top:16px;height:80px}';
+ const expanded='#palette{width:136px}#workspace{left:144px;height:120px}';
+ const assumptions=['Both panes share the same interpolation progress at a fixed viewport.'];
+ const extract=(state,css)=>layoutGeometry({state,profile,layout:createLayoutIR(analyzeHTML(source,{css,viewport:profile.viewport,ua:browserName,integrity:true,scrollbars:[{name:'overlay',inlineSize:0,blockSize:0}]})),targets:['palette','workspace'],local:{assumptions}});
+ const before=extract('compact',base),after=extract('editing',base+expanded);
+ const predicate={op:'all',items:[
+  {op:'compare',relation:'le',left:{op:'add',items:[{target:'palette',field:'inlineEnd'},'8']},right:{target:'workspace',field:'inlineStart'}},
+  {op:'compare',relation:'le',left:{target:'workspace',field:'inlineEnd'},right:{environment:'width'}},
+  {op:'compare',relation:'le',left:{target:'workspace',field:'blockEnd'},right:{environment:'height'}}
+ ]};
+ const input={profile,from:'compact',to:'editing',evidence:[...before,...after],predicate,interpolation:{kind:'shared-affine',easing:'linear',assumptions}};
+ expect(verifyInterpolatedPredicate(input).status).toBe('verified');
+ expect(verifyInterpolatedPredicate({...input,evidence:[...before,...extract('editing',base+expanded+'#workspace{left:120px}')] }).status).toBe('violated');
+ for(const width of [320,480,1000]) {
+  await page.setViewportSize({width,height:480});
+  await page.setContent(source.replace('</head>','<style>'+base+'</style></head>'));
+  const samples=await page.evaluate(()=>{
+   const p=document.querySelector('#palette'),w=document.querySelector('#workspace');
+   const a=p.animate([{width:'48px'},{width:'136px'}],{duration:400,fill:'both',easing:'linear'});
+   const b=w.animate([{left:'56px',height:'80px'},{left:'144px',height:'120px'}],{duration:400,fill:'both',easing:'linear'});
+   a.pause();b.pause();
+   const result=[];
+   for(const t of [0,1,80,160,240,320,399,400]) {
+    a.currentTime=b.currentTime=t;
+    const x=p.getBoundingClientRect(),y=w.getBoundingClientRect();result.push({clearance:y.x-x.right,right:y.right,bottom:y.bottom});
+   }
+   // Moving only the palette proves why common progress must be an assumption.
+   a.currentTime=400;b.currentTime=0;
+   const asynchronous=w.getBoundingClientRect().x-p.getBoundingClientRect().right;
+   a.cancel();b.cancel();return {result,asynchronous};
+  });
+  for(const r of samples.result){expect(r.clearance).toBeCloseTo(8,1);expect(r.right).toBeCloseTo(width,1);expect(r.bottom).toBeLessThanOrEqual(480.05)}
+  expect(samples.asynchronous).toBeLessThan(0);
+ }
+});
