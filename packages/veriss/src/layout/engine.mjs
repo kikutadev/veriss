@@ -3872,7 +3872,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     // again with them (paint only, so the geometry is the same). System colors stay the light ones:
     // the color-scheme property is outside the subset.
     if (pristine && rules.some(rule => rule.preferences?.some(p => p.feature === 'prefers-color-scheme' && p.value === 'dark') || rule.declarations.some(d => d.property === 'color-scheme' && /\bdark\b/.test(d.value) && /\blight\b/.test(d.value)))) {
-      const dark = analyzeBoxTree(pristine, { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['prefers-color-scheme:dark']);
+      const dark = analyzeBoxTree(structuredClone(pristine), { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['prefers-color-scheme:dark']);
       const contrastCodes = new Set(['E_A11Y_CONTRAST', 'U_A11Y_CONTRAST', 'E_A11Y_STATE_CONTRAST', 'E_A11Y_LINK_IN_TEXT', 'U_A11Y_LINK_IN_TEXT', 'E_A11Y_FOCUS_VISIBLE']);
       // A finding that holds in both schemes is reported once, with `alsoUnder`.
       const same = (a, b) => a.code === b.code && a.path === b.path && a.message === b.message && JSON.stringify([a.range, a.heightRange, a.regionConstraints, a.state]) === JSON.stringify([b.range, b.heightRange, b.regionConstraints, b.state]);
@@ -3888,7 +3888,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const scrolledCovers = diagnostics.filter(d => d.code === 'U_A11Y_SCROLLED_COVER');
     const alignedScroller = geometry.some(row => row.overflow === 'scroll' && row.alignsContent && !row.box.documentRoot);
     if (pristine && (scrolledCovers.length || alignedScroller)) {
-      const zero = analyzeBoxTree(pristine, { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['scroll-zero']);
+      const zero = analyzeBoxTree(structuredClone(pristine), { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['scroll-zero']);
       // Content before a scroll container's start edge (any scroll offset: it never scrolls there).
       for (const d of zero.diagnostics.filter(d => d.code === 'E_A11Y_SCROLL_START_UNREACHABLE'))
         if (!diagnostics.some(x => x.code === d.code && x.path === d.path && x.edge === d.edge && JSON.stringify([x.range, x.heightRange]) === JSON.stringify([d.range, d.heightRange]))) diagnostics.push(d);
@@ -3907,7 +3907,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       const all = []; (function walk(box, chain) { all.push({ box, chain }); for (const child of box.children ?? []) walk(child, [...chain, box]); })(root, []);
       const reached = ({ box, chain }) => layoutRules.some(rule => rule.selectors.some(selector => (selector.state !== 'focus-within' && matches(selector, box, new Set(['focus', 'focus-visible', 'focus-within']))) || (selector.state === 'focus-within' && [...chain, box].some(a => matches(selector, a, new Set(['focus-within']))))));
       for (const entry of all.filter(entry => focusableBox(entry.box) && reached(entry))) {
-        const focused = analyzeBoxTree(pristine, { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], [`focus-at:${entry.box.path}`]);
+        const focused = analyzeBoxTree(structuredClone(pristine), { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], [`focus-at:${entry.box.path}`]);
         for (let i = diagnostics.length - 1; i >= 0; i--) if (diagnostics[i].path === entry.box.path && geometricFocus.has(diagnostics[i].code)) diagnostics.splice(i, 1);
         if (focused.status === 'unknown') { diagnostics.push({ code: 'U_A11Y_FOCUS_LAYOUT', severity: 'unknown', message: `${entry.box.label}: its focused layout is not decided (${focused.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: entry.box.label, path: entry.box.path, rule: 'focus-obscured' }); continue; }
         for (const d of focused.diagnostics.filter(d => d.path === entry.box.path && geometricFocus.has(d.code))) diagnostics.push({ ...d, message: `${d.message} (in its focused layout)`, focusedLayout: true });
@@ -3985,7 +3985,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // in docs/cls-evaluation.md). With a transform anywhere, every row's layoutRect comes from the untransformed
   // re-layout, matched by path and condition region; a row without a match gets layoutRect null (not decided).
   if (pristine && sawTransform && !diagnostics.some(d => d.severity === 'unknown')) {
-    const plain = analyzeBoxTree(pristine, options, scrollbarProfile, budget, inlineSheets, [], [...preferences, 'untransformed']);
+    const plain = analyzeBoxTree(structuredClone(pristine), options, scrollbarProfile, budget, inlineSheets, [], [...preferences, 'untransformed']);
     // Rows correspond by path and condition polygon (its vertices; constraints may repeat redundant bounds).
     const key = row => JSON.stringify([row.path, row.range, row.heightRange, row.region?.vertices]);
     const byKey = new Map();
@@ -4013,7 +4013,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const at = (a, w, h) => add(add(r(a.constant), mul(r(a.coefficient), w)), mul(r(a.heightCoefficient), h));
     if (targets.length>64) unknown('U_LAYOUT_HOVER_SHIFT','Hover state coverage exceeds 64 targets');
     for (const target of targets.length<=64?targets:[]) {
-      const hover = analyzeBoxTree(pristine, options, scrollbarProfile, budget, inlineSheets, [], [`hover-at:${target.path}`]);
+      const hover = analyzeBoxTree(structuredClone(pristine), options, scrollbarProfile, budget, inlineSheets, [], [`hover-at:${target.path}`]);
       if (hover.status === 'unknown') { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: its hovered layout is not decided (${hover.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: target.label, path: target.path }); continue; }
       // Geometry checks of both normal and hovered layouts must reach the
       // solver. Otherwise a growing last item could overflow without moving
@@ -4101,7 +4101,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         }
         // Offsets that move nothing (bottom under a set top, an unchanged value): the layout is the box's own.
         if (offsetsOnly) { states.push({ offset: frame.offset, sizes }); continue; }
-        const moved = analyzeBoxTree(pristine, { ...options, $animationFrame: { path: entry.box.path, css: frame.layout } }, scrollbarProfile, budget, inlineSheets, [], preferences);
+        const moved = analyzeBoxTree(structuredClone(pristine), { ...options, $animationFrame: { path: entry.box.path, css: frame.layout } }, scrollbarProfile, budget, inlineSheets, [], preferences);
         if (moved.status === 'unknown') { diagnostics.push({ code: 'U_LAYOUT_ANIMATION_SHIFT', severity: 'unknown', message: `${entry.box.label}: the layout at keyframe ${label} is not decided (${moved.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: entry.box.label, path: entry.box.path }); continue; }
         if (moved.status !== 'unknown') states.push({ offset: frame.offset, sizes: moved.sizes }); else complete = false;
         const undecided = [...sizes, ...moved.sizes].find(row => !rect(row) || !row.$shown?.region);

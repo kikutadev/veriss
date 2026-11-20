@@ -110,3 +110,11 @@ test('fixed media profile still resolves variable-dependent geometry',()=>{
   assert.equal(r.sizes.find(s=>s.box==='.card').rect.blockSize.constant,value==='reduce'?'120':'100');
  }
 });
+
+test('each hovered target starts from an independent tree with the same trusted contracts',()=>{
+ const source='<main><div class="entry"></div><div class="entry"></div><div class="entry"></div></main>';
+ const css='*{box-sizing:border-box;margin:0}main{display:grid;grid-template-columns:minmax(0,1fr)}.entry{--h:100px;height:var(--h)}.entry:hover{--h:140px}';
+ const report=analyzeHTML(source,{viewport,css,boxes:{'.entry':{minInlineSize:40,minBlockSize:20}}});
+ assert.equal(report.status,'violated',JSON.stringify(report.diagnostics));
+ assert.equal(new Set(report.checks.flatMap(c=>c.hoveredPath?[c.hoveredPath]:[])).size,3);
+});
