@@ -114,3 +114,11 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 - 継続方針: 残る engine を責務単位で型付けする。実際の幾何・証明ロジックと診断・レポート組み立てを分離し、状態ごとの座標比較を共通化する。未対応領域の Unknown、出力順序、正確な有理数、既存の公開 API を維持する。
 - 検証条件: 既存の全単体テスト、型検査・生成差分に加え、抽出した義務・状態比較について境界値の単体テストと旧実装との出力比較を行う。最終版の gate と Git 依存確認が済むまでは既存 main に統合しない。
+
+第三段階の結果 (実装 4971965):
+- 前回の未統合コミット a27078d を取り込み、クエリ・画像候補解決、包含ブロック・subgrid 幾何を型付きモジュールへ移した。
+- 証明義務の生成・失敗領域・反例 (engine-obligations)、CSS/DOM 事前検査 (engine-preflight)、カルーセル状態列挙 (engine-carousel) を分離。状態変化の厳密な始点比較を engine-geometry に共通化し、説明情報の型を公開型と統一した。未決定の layoutRect:null は描画矩形で代替しない。元ツリーにカルーセルのスライドを対応付けられないときは Unknown とする。
+- engine.mjs: 2996 → 2713 行。元の実装ファイルの移行数は依然 69/70 (分離先の追加は100%完了と数えない)。engine の残部は未移行。型付け済みテストは元の 88/127 に加え新規テスト7件。
+- pnpm build:ts / check:ts / test / git diff --check 成功。全867件 (root 29, verifier 742, adapter-core 66, Vue 6, React 12, Svelte 12)、失敗・skip 0。
+- e98f09a の既存 worktree と、現版の analyzeHTML を同一入力67件で比較。JSON 化したレポート全体が67/67一致 (verified 17, violated 14, unknown 36)。grid/flex・media/container query・カルーセル・hover/focus・アニメーション・a11y・未対応CSSを含む。今回の抽出を含む差分の回帰確認であり、ブラウザー照合や全入力に対する同値性証明ではない。
+- 最終 gate (3ブラウザーE2E/既存eval)、Git依存導入、性能比較は今回未実施。main と remote は変更せず、全体移行は未完了。残る engine の solve/styles とレポート構築、未移行テスト/補助スクリプトを継続対象とする。
