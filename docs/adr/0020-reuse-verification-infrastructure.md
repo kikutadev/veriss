@@ -195,3 +195,11 @@ Chromium/Firefox/WebKit E2E 363件成功、QA supervisor 638 PID追跡・残留0
 等価性を必須にした。閉じた3 framework の boolean click fragment は既存 compiler と
 template adapter を使う。Svelte/Vue scoped CSS の実際の属性・scope の復元は未実装なので
 契約証明を拒否する。一般 JS・描画・hit test の完全性は目的外。
+
+移植の補足単回測定: 12対象・各8区分、局所幅/高さは親の1/2、原点(20,30)。
+通常は comparison budget 超過で Unknown (771.66ms)、移植合成 Verified (361.62ms)、
+再利用 Verified (73.96ms)。計算後の合成入力での比較であり実サイトの速度保証ではない。
+全 gate (b61f511): 6単体群失敗0、component-lint 4評価差分なし、
+Chromium/Firefox/WebKit E2E 375成功 (新規12件含む)、監督ランナー exit 0、674 PID追跡、残留0。
+並行の片軸幾何開発と作業場所が衝突したため専用 worktree に分離し、
+元の checkout から本作業の重複変更だけを除去した。片軸担当の変更はそのまま保持。
