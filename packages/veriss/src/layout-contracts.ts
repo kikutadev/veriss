@@ -21,7 +21,7 @@ type Override<T> = T extends readonly unknown[] ? T : T extends object ? {[K in 
 export type UAOption = BrowserEngine | ({base?:BrowserEngine} & Override<UAProfile>);
 export interface LayoutAccessibilityOptions {contrast?:'AA'|'AAA';targetLevel?:'AA'|'AAA';targetSize?:number;profile?:'all'|'core'}
 export interface LayoutOptions {
-  ua?:UAOption;
+  ua?:UAOption|null|undefined;
   knownFonts?:readonly string[];
   scope?:{mode:'scoped'|'global';owned?:readonly string[];firstLine?:number;ancestors?:'scoped'};
   reportTextFonts?:boolean;

@@ -3,7 +3,7 @@ import type { LayoutIR, ContractIR } from '../layout-contract.mjs';
 import type { LayoutScenarioIdentity, LayoutDeclaration } from '../layout-contracts.d.ts';
 interface Scenario { readonly variant?: number; readonly scrollbarProfile?: string }
 interface ScenarioRow extends Scenario { readonly path?: string }
-export interface LayoutInstance { path: string; declaration: Readonly<LayoutDeclaration>; contract: ContractIR; cases: Scenario[] }
+export interface LayoutInstance { path: string; declaration?: Readonly<LayoutDeclaration>; contract: ContractIR; cases: readonly Scenario[] }
 import {matchesBindingSelector} from './positioned-contract.mjs';
 
 export const caseKey=(row: Scenario)=>JSON.stringify([row.variant ?? null,row.scrollbarProfile ?? null]);

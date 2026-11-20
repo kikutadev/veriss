@@ -17,7 +17,7 @@ export function analyzeInput(tree:BoxTree,options:LayoutOptions,adapterDiagnosti
   const ratios=configuration.devicePixelRatios ?? [undefined];
   for(const profile of configuration.scrollbars ?? [undefined]) for(const ratio of ratios) {
     // Contracts are attached by the engine; each case owns its tree.
-    reports.push(analyzeBoxTree(structuredClone(root),{...configuration,name,...(ratio!==undefined ? {$devicePixelRatio:ratio} : {})},profile,budget,[],inputDiagnostics,preferences));
+    reports.push(analyzeBoxTree(structuredClone(root),{...configuration,name,...(ratio!==undefined ? {$devicePixelRatio:ratio} : {})},profile,budget,[],inputDiagnostics,[...preferences]));
     if(budget.remaining<0) break;
   }
   const report=reports[0];

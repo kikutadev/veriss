@@ -13,12 +13,68 @@
     "types": [
       "node"
     ],
-    "rootDir": "."
+    "rootDir": ".",
+    "paths": {
+      "@mizchi/veriss-vue": [
+        "./packages/vue-adapter/src/index.mts"
+      ],
+      "@mizchi/veriss-svelte": [
+        "./packages/svelte-adapter/src/index.mts"
+      ],
+      "@mizchi/veriss-react": [
+        "./packages/react-adapter/src/index.mts"
+      ],
+      "@mizchi/veriss": [
+        "./packages/veriss/src/index.mts"
+      ],
+      "@mizchi/veriss/html": [
+        "./packages/veriss/src/html.mts"
+      ],
+      "@mizchi/veriss/z3": [
+        "./packages/veriss/src/layout-z3.mts"
+      ],
+      "@mizchi/veriss/z3/node": [
+        "./packages/veriss/src/layout-z3-node.mts"
+      ],
+      "@mizchi/veriss/contracts": [
+        "./packages/veriss/src/layout-contract.mts"
+      ],
+      "@mizchi/veriss/contracts/node": [
+        "./packages/veriss/src/layout-contract-node.mts"
+      ],
+      "@mizchi/veriss/transitions": [
+        "./packages/veriss/src/transitions.mts"
+      ],
+      "@mizchi/veriss/transitions/node": [
+        "./packages/veriss/src/transitions-node.mts"
+      ],
+      "@mizchi/veriss/text": [
+        "./packages/veriss/src/text.mts"
+      ],
+      "@mizchi/veriss/text/node": [
+        "./packages/veriss/src/text-node.mts"
+      ],
+      "@mizchi/veriss/src/*": [
+        "./packages/veriss/src/*"
+      ],
+      "@mizchi/veriss/text-metrics/fixtures/*": [
+        "./packages/veriss/text-metrics/fixtures/*"
+      ],
+      "@mizchi/veriss-adapter-core": [
+        "./packages/adapter-core/src/index.mts"
+      ]
+    }
   },
   "include": [
     "packages/**/*.mts",
     "types/**/*.d.ts",
-    "packages/veriss/src/layout-contracts.ts"
+    "packages/veriss/src/layout-contracts.ts",
+    "tools/**/*.mts",
+    "tools/**/*.cts",
+    "experiments/**/*.mts",
+    "e2e/**/*.mts",
+    "tests/**/*.mts",
+    "playwright.layout.config.mts"
   ],
   "exclude": [
     "**/node_modules",

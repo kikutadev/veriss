@@ -9,10 +9,10 @@ export interface EngineBoxContract extends Omit<LayoutBoxContract, 'wrap' | 'int
   maxInlineSize?: number;
   textRuns?: readonly EngineBoxContract[];
 }
-export interface EngineOptions extends Omit<LayoutOptions, 'boxes' | 'mediaFeatures'> {
+export interface EngineOptions extends Omit<LayoutOptions, 'boxes' | 'mediaFeatures' | 'ua'> {
   boxes?: Readonly<Record<string, EngineBoxContract>>;
-  mediaFeatures?: Readonly<Record<string, string>>;
-  ua?: 'chromium' | 'firefox' | 'webkit' | ({ base?: 'chromium' | 'firefox' | 'webkit' } & Readonly<Record<string, unknown>>) | null;
+  mediaFeatures?: LayoutOptions['mediaFeatures'];
+  ua?: LayoutOptions['ua'];
   scope?: { mode: 'scoped' | 'global'; owned?: readonly string[]; firstLine?: number; ancestors?: 'scoped' };
   knownFonts?: readonly string[];
   reportTextFonts?: boolean;
