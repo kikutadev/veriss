@@ -37,7 +37,7 @@ export declare const clamp: (region: Region, value: Affine2) => {
     value: Affine2;
 }[];
 export declare const ratioOf: (style: {
-    "aspect-ratio"?: string;
+    "aspect-ratio"?: string | undefined;
 }) => Rational | null;
 export declare const minimumOf: (region: Region, a: Affine2, b: Affine2) => {
     region: Region;

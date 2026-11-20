@@ -74,8 +74,8 @@ export interface LayoutBoxContract {
   /** Font the size bounds were measured with (`/text`); the computed CSS font must match or the box is Unknown. */
   font?: { family: string; size: number; lineHeight: number; weight?: number; style?: 'normal'; letterSpacing?:number };
   /** Provenance of font-derived bounds. A domain bound table indexed by character count. */
-  textMetrics?: { kind: 'content'; text: string; width: number; font?: object; allowance?: string }
-    | { kind: 'domain'; characters: string; maxLength: number; perCharacter: number; pairAdjustment: number; widest: string; bounds: number[]; font?: object; allowance?: string }
+  textMetrics?: { kind: 'content'; text: string; width: number; lang?:string; font?: object; allowance?: string }
+    | { kind: 'domain'; lang?:string; characters: string; maxLength: number; perCharacter: number; pairAdjustment: number; widest: string; bounds: number[]; font?: object; allowance?: string }
     | { kind: 'lines'; text: string; width: number; minContent: number; overflowWrap: 'normal' | 'anywhere' | 'break-word'; profile: { atLeastInlineSize: number; lines: number | null }[]; lang?: string; font?: object; allowance?: string };
 }
 export interface CheckedLayoutBoxContract extends Omit<LayoutBoxContract, 'overflow' | 'overflowBlock'> {
@@ -173,13 +173,14 @@ export interface LayoutWarning {
   code:string;severity:'warning'|'error'|'unknown';message:string;
   box?:string;path?:string;
   /** Syntax warnings can cite several author declarations. */
-  css?:{file:string;line:number;column?:number}|{file:string;line:number;property:string;selector?:string}[];
+  css?:{file:string;line:number;column?:number}|{file:string;line:number;property:string;selector?:string}[]|undefined;
   property?:string|undefined;min?:number;max?:number;media?:string;attributes?:string[];tag?:string;
+  blockSize?:string|undefined;fontSize?:string|undefined;lineHeight?:string|undefined;intervals?:[number,number][];
   boxes?:string[];query?:string;name?:string;reason?:string;
   parent?:string;srcset?:string|undefined;sizes?:string;marker?:string;clippedBy?:string;
   naturalWidth?:number;natural?:string;basis?:'file'|'attributes';stretched?:'wider'|'taller';
   columns?:string|undefined;width?:number|string|undefined;properties?:string[]|undefined;scrollbar?:number;
-  range?:LayoutRange|undefined;heightRange?:LayoutRange;region?:LayoutRegion;
+  range?:(Pick<LayoutRange,'min'|'max'|'minInclusive'|'maxInclusive'>&Partial<Pick<LayoutRange,'minExact'|'maxExact'>>)|undefined;heightRange?:LayoutRange;region?:LayoutRegion;
   rule?:string;selector?:string|undefined;file?:string;line?:number;hint?:string;
   source?:SourceSpan|number|undefined;
 }

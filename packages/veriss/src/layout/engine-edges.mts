@@ -26,7 +26,7 @@ export const maximum = (region: Region, a: Affine2, b: Affine2) => {
   };
 export const clamp = (region: Region, value: Affine2) => maximum(region, value, scalar(0));
   // The block-per-inline factor of an aspect-ratio (h / w), or null for auto.
-export const ratioOf = (style: { "aspect-ratio"?: string }) => { const m = /(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/.exec(String(style['aspect-ratio'] ?? 'auto')); return m ? div(q(m[2]!), q(m[1]!)) : null; };
+export const ratioOf = (style: { "aspect-ratio"?: string|undefined }) => { const m = /(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/.exec(String(style['aspect-ratio'] ?? 'auto')); return m ? div(q(m[2]!), q(m[1]!)) : null; };
 export const minimumOf = (region: Region, a: Affine2, b: Affine2) => {
     const p = partition(region, diff(b, a), '>=');
     return [...p.yes.map(region => ({ region, value: a })), ...p.no.map(region => ({ region, value: b }))];

@@ -148,10 +148,12 @@ export interface LayoutBoxContract {
         kind: 'content';
         text: string;
         width: number;
+        lang?: string;
         font?: object;
         allowance?: string;
     } | {
         kind: 'domain';
+        lang?: string;
         characters: string;
         maxLength: number;
         perCharacter: number;
@@ -478,13 +480,17 @@ export interface LayoutWarning {
         line: number;
         property: string;
         selector?: string;
-    }[];
+    }[] | undefined;
     property?: string | undefined;
     min?: number;
     max?: number;
     media?: string;
     attributes?: string[];
     tag?: string;
+    blockSize?: string | undefined;
+    fontSize?: string | undefined;
+    lineHeight?: string | undefined;
+    intervals?: [number, number][];
     boxes?: string[];
     query?: string;
     name?: string;
@@ -502,7 +508,7 @@ export interface LayoutWarning {
     width?: number | string | undefined;
     properties?: string[] | undefined;
     scrollbar?: number;
-    range?: LayoutRange | undefined;
+    range?: (Pick<LayoutRange, 'min' | 'max' | 'minInclusive' | 'maxInclusive'> & Partial<Pick<LayoutRange, 'minExact' | 'maxExact'>>) | undefined;
     heightRange?: LayoutRange;
     region?: LayoutRegion;
     rule?: string;
