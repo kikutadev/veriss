@@ -219,3 +219,16 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - 863adb0: incorporated the exact tested optimization into .mts source; generated JS differs from measured candidate only in comments. Full 875 ordinary unit tests, strict build/check:ts, independent MoonBit CSS oracle 5000 seeds (18/18), targeted E2E 12/12 in three browsers passed. Full gate must be rerun on optimized HEAD before pushing; published branch is still 1fdf48a. No validation or tolerances removed. Remaining six CLS differences (font-swap, classic scrollbar x3, Firefox discrete display, WebKit text-overflow), three WebKit UA-profile disagreements, and complete accessibility E2E remain open. Do not treat those as resolved or widen proof coverage on their basis.
 
 第十三段階（2026-11-21）受入続行: 最適化版 863adb0 以降を固定してアクセシビリティE2E全件と残余CLS/UAの実測分類を行う。検査条件を緩めて通した扱いにはしない。最終的に frozen install、型・生成一致、unit・オラクル、全gateを通過させた同一コミットをforkのTypeScriptブランチにpush。mainは他の作業が進行しているので、相手の変更と整合を検証してから統合する。
+
+
+## 操作状態と時間領域の次期設計 (2026-11-20)
+
+[詳細設計](interactive-state-and-motion-design.md) — 関係 selector、複合操作状態の被覆、
+遷移中の幾何を既存 IR・solver・Lean へ接続する提案。TypeScript 移行/幅遷移/Lean の
+並行成果を統合してから着手する。未実装。実装順序・各段階の受入条件はリンク先を正とする。
+
+## mainの状態依存変数検証をTypeScriptに統合 (2026-11-21)
+
+main で追加された hover・CSS変数の推移的依存関係、hover時の独立ツリー再検証、
+操作時の容量制約のZ3への引き渡し、上限超過時のUnknownを .mts 正本へ移植。
+main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して引き続き使う。

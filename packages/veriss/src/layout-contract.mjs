@@ -49,7 +49,7 @@ export const PositionedGrid = freeze({ ...SafeGrid, id: 'positioned-grid/1', pos
 const isArray = (v) => Array.isArray(v);
 const object = (value, keys) => value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(key => keys.includes(key));
 const identity = (row) => JSON.stringify([row.variant ?? null, row.scrollbarProfile ?? null]);
-const metadata = (row) => ({ box: row.box, path: row.path, ...(row.variant !== undefined ? { variant: row.variant } : {}), ...(row.scrollbarProfile !== undefined ? { scrollbarProfile: row.scrollbarProfile } : {}) });
+const metadata = (row) => ({ box: row.box, path: row.path, ...(row.hoveredPath ? { hoveredPath: row.hoveredPath } : {}), ...(row.variant !== undefined ? { variant: row.variant } : {}), ...(row.scrollbarProfile !== undefined ? { scrollbarProfile: row.scrollbarProfile } : {}) });
 const unknown = (code, message) => ({ code, severity: 'unknown', message });
 const nonnegative = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1_000_000;
 function range(input) {

@@ -14,7 +14,7 @@ import {unitContext,layoutRectangle,firstStartMove,layoutStartMoves,shiftScoreBo
 
 type ShiftBox=NormalizedBox & {pseudo?:string|boolean};
 type ShiftSize=LayoutSummary['sizes'][number] & {$shown?:{region:Region}};
-type ShiftReport=Pick<LayoutSummary,'status'|'diagnostics'> & {sizes:readonly ShiftSize[]};
+type ShiftReport=Pick<LayoutSummary,'status'|'diagnostics'|'checks'> & {sizes:readonly ShiftSize[]};
 interface ShiftInput {
   block:boolean;sizes:readonly ShiftSize[];diagnostics:LayoutDiagnostic[];
   ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion};
@@ -23,15 +23,36 @@ export interface AnimatedBox {
   box:ShiftBox;region:Region;name:string;position:string;duration:string;count:string;direction:string;
   easing?:string;delay?:string;fill?:string;scrollDriven?:boolean;style:Readonly<Record<string,unknown>>;
 }
-export function checkHoverShifts({root,rules,block,sizes,diagnostics,ranges,analyze}:ShiftInput & {
+export function checkHoverShifts({root,rules,block,sizes,diagnostics,checks,ranges,analyze}:ShiftInput & {
+  checks:LayoutSummary['checks'];
   root:ShiftBox;rules:readonly CSSRule[];analyze:(path:string)=>ShiftReport;
 }):void {
-  const hoverRules = rules.filter(rule => rule.hoverLayout);
-  const targets:ShiftBox[] = []; (function walk(box:ShiftBox) { if (hoverRules.some(rule => rule.selectors.some(selector => matches(selector, box, new Set(['hover']))))) targets.push(box); for (const child of box.children ?? []) walk(child); })(root);
-
-  for (const target of targets.slice(0, 64)) {
-    const hover = analyze(target.path);
-    if (hover.status === 'unknown') { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: its hovered layout is not decided (${hover.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: target.label, path: target.path }); continue; }
+  const hoverRules=rules.filter(rule=>rule.hoverLayout);
+  const targets:ShiftBox[]=[];
+  (function walk(box:ShiftBox,inline=false):void {
+    if(hoverRules.some(rule=>rule.selectors.some(sel=>matches(sel,box,new Set(['hover']))))){
+      if(inline)diagnostics.push({code:'U_LAYOUT_HOVER_SHIFT',severity:'unknown',message:`${box.label}: hovered inline text geometry is not modeled`,box:box.label,path:box.path});
+      else targets.push(box);
+    }
+    for(const child of box.children??[])walk(child,inline);
+    for(const child of box.inline??[])walk(child,true);
+  })(root);
+  if(targets.length>64)diagnostics.push({code:'U_LAYOUT_HOVER_SHIFT',severity:'unknown',message:'Hover state coverage exceeds 64 targets'});
+  for(const target of targets.length<=64?targets:[]){
+    const hover=analyze(target.path);
+    if(hover.status==='unknown'){
+      diagnostics.push({code:'U_LAYOUT_HOVER_SHIFT',severity:'unknown',message:`${target.label}: its hovered layout is not decided (${hover.diagnostics.find(d=>d.severity==='unknown')?.message??'unknown'})`,box:target.label,path:target.path});
+      continue;
+    }
+    if(checks.length+hover.checks.length>32768){
+      diagnostics.push({code:'U_LAYOUT_HOVER_SHIFT',severity:'unknown',message:'Hover fit obligation limit exceeded',box:target.label,path:target.path});
+      break;
+    }
+    for(const check of hover.checks)checks.push({...check,hoveredPath:target.path});
+    for(const finding of hover.diagnostics)if(finding.severity==='error')diagnostics.push({...finding,hovered:target.label,hoveredPath:target.path,message:`${finding.message} (hovering ${target.label})`});
+    const restPaths=new Set(sizes.map(row=>row.path)),hoverPaths=new Set(hover.sizes.map(row=>row.path));
+    if(restPaths.size!==hoverPaths.size||[...restPaths].some(path=>!hoverPaths.has(path)))
+      diagnostics.push({code:'U_LAYOUT_HOVER_SHIFT',severity:'unknown',message:`${target.label}: hovered box coverage differs from base layout`,box:target.label,path:target.path});
     const result=layoutStartMoves(sizes,hover.sizes);
     if (result.undecided) { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: the hovered layout of ${result.undecided.box} cannot be compared (it has no layout rectangle)`, box: target.label, path: target.path }); continue; }
     for(const {row,shared,field,v,delta} of result.moves) {

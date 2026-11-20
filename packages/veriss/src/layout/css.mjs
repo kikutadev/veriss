@@ -1028,6 +1028,7 @@ export function parseLayoutCSS(sheets, diagnostic, { scripting, mediaFeatures } 
     // Findings of the syntax stage, one shape: { code, ...data } (ADR-0016 M3). The rules/syntax-notes.mjs catalog words them.
     const notes = [], note = (data) => { notes.push(data); }, notesOf = (code) => notes.filter((n) => n.code === code);
     const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+    const animatedCustom = [], animatedReads = [];
     const layerIndex = (name) => { if (!layers.includes(name))
         layers.push(name); return layers.indexOf(name); };
     let count = 0, scope = null;
@@ -1102,6 +1103,20 @@ export function parseLayoutCSS(sheets, diagnostic, { scripting, mediaFeatures } 
             if (node.type === 'atrule' && /^(?:-webkit-)?keyframes$/i.test(node.name)) {
                 const name = node.params.trim().replace(/^["']|["']$/g, '');
                 keyframes.add(name);
+                node.walkDecls(d => {
+                    if (d.important)
+                        return;
+                    if (d.prop.startsWith('--'))
+                        animatedCustom.push({ property: d.prop, line: sourceStart(d).line, file: filename, name });
+                    else if (/var\(/i.test(d.value)) {
+                        try {
+                            animatedReads.push({ pending: { property: `@keyframes ${name} ${d.prop}`, expression: variableValue(d.value) } });
+                        }
+                        catch (error) {
+                            problem(error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : 'U_LAYOUT_VARIABLE', error instanceof Error ? error.message : String(error), sourceStart(d).line);
+                        }
+                    }
+                });
                 // The paint of each frame (for the flash rule): offsets with their background-color and opacity.
                 const frames = [];
                 for (const frame of node.nodes ?? [])
@@ -1676,7 +1691,7 @@ export function parseLayoutCSS(sheets, diagnostic, { scripting, mediaFeatures } 
                         note({ code: 'W_CSS_KEYFRAMES_MISSING', name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
                     return 'none';
                 }).join(', ');
-    return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules };
+    return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules, animatedCustom, animatedReads };
 }
 // The UA default family and the user's default font size are not author
 // facts: `medium` and `ua-default` stay unresolved for text metrics.

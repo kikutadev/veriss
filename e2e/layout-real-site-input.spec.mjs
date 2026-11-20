@@ -346,3 +346,53 @@ test('screen media capabilities and motion preferences compose with responsive l
             }
         }
 });
+test('hover variable dependencies and direct size changes agree with browser layout', async ({ page }) => {
+    const html = '<!doctype html><html lang="en"><head><title>Inventory</title></head><body><main class="list"><div class="item"><div class="badge"></div></div><div class="next"></div></main></body></html>';
+    const base = '*{box-sizing:border-box;margin:0;padding:0}.list{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:8px}.item{height:100px;display:grid;grid-template-columns:minmax(0,1fr)}.badge{height:20px}.next{height:40px;min-width:0}';
+    const viewport = { min: 320, max: 960, height: { min: 320, max: 900 } };
+    const fixtures = [
+        { selector: '.item', target: '.next', css: '.item{--n:100px;--missing:initial;--alias:var(--missing,var(--n));height:var(--alias)}@media (min-width:600px){.item:hover{--n:140px}}', kind: 'shift', delta: 40 },
+        { selector: '.item', target: '.badge', css: '.item{--g:0px}.badge{margin-left:var(--g)}.item:hover{--g:30px}', kind: 'shift-inline', delta: 30 },
+        { selector: '.next', target: '.next', css: '.next{--w:100px;width:var(--w)}.next:hover{--w:1200px}', kind: 'overflow' },
+        { selector: '.next', target: '.next', css: '.next:hover{width:1200px}', kind: 'overflow' },
+        { selector: '.next', target: '.next', css: '.next{--w:100px;width:var(--w)}.next:hover{--w:120px}', kind: 'safe' },
+        { selector: '.item', target: '.next', css: '.item{--ink:#111;color:var(--ink)}.item:hover{--ink:#eee}', kind: 'paint' },
+        { selector: '.item', target: '.next', css: '.item{--n:100px;height:var(--n)}:is(.item:hover){--n:140px}', kind: 'unknown' },
+    ];
+    const rat = (v) => { const [n, d = '1'] = String(v ?? 0).split('/'); return Number(n) / Number(d); };
+    for (const fixture of fixtures) {
+        const css = base + fixture.css;
+        const r = analyzeHTML(html, { css, viewport });
+        const expected = fixture.kind === 'unknown' ? 'unknown' : ['shift', 'shift-inline', 'overflow'].includes(fixture.kind) ? 'violated' : 'verified';
+        expect(r.status, JSON.stringify({ fixture, diagnostics: r.diagnostics })).toBe(expected);
+        for (const width of [320, 599, 600, 960]) {
+            await page.setViewportSize({ width, height: 600 });
+            await page.mouse.move(0, 590);
+            await page.setContent(html.replace('</head>', '<style>' + css + '</style></head>'));
+            const target = page.locator(fixture.target);
+            const before = await target.evaluate(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
+            await page.locator(fixture.selector).hover();
+            const after = await target.evaluate(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
+            const shift = r.diagnostics.find(d => d.code === 'E_LAYOUT_HOVER_SHIFT' && d.box === fixture.target && d.range !== undefined && d.range.min <= width && d.range.max >= width && !(d.range.min === width && !d.range.minInclusive) && !(d.range.max === width && !d.range.maxInclusive));
+            if (fixture.kind === 'shift' || fixture.kind === 'shift-inline') {
+                const field = fixture.kind === 'shift' ? 1 : 0;
+                const delta = fixture.kind === 'shift' && width < 600 ? 0 : fixture.delta;
+                expect(after[field] - before[field]).toBe(delta);
+                expect(shift ? rat(shift.delta) : 0).toBe(delta);
+            }
+            else if (fixture.kind === 'overflow') {
+                expect(after[0] + after[2]).toBeGreaterThan(width);
+                expect(after[0]).toBe(before[0]);
+                expect(r.diagnostics.some(d => d.code === 'E_LAYOUT_ITEM_SIZE' && d.box === fixture.target && d.hoveredPath)).toBe(true);
+            }
+            else if (fixture.kind === 'unknown')
+                expect(after[1] - before[1]).toBe(40);
+            else {
+                expect(after.slice(0, 2)).toEqual(before.slice(0, 2));
+                expect(after[0] + after[2]).toBeLessThanOrEqual(width);
+                if (fixture.kind === 'paint')
+                    expect(after).toEqual(before);
+            }
+        }
+    }
+});

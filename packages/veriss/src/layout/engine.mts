@@ -45,6 +45,9 @@ import { resolveUAProfile } from './ua-profile.mjs';
 import {place,parseAreas,expandTracks} from './grid.mjs';
 import {PARENT,ignoringSiblings,placeholderField,requiredCapable,optionalDivergent,optionalDivergence,asFormField,readWriteKnown,asEditable,langMatches,directionality} from './selectors.mjs';
 import { droppedOf, droppedPairs, droppedValue } from './dropped.mjs';
+import {stateVariableDependencies,variableValue} from './variables.mjs';
+import type {Selector} from './selectors.mjs';
+import type {CSSRule} from './css.mjs';
 import { createCssMistakes } from '../rules/css-mistakes.mjs';
 import {trackArea,trackSlice} from './subgrid.mjs';
 import { scrollbarFrames } from './scrollbars.mjs';
@@ -70,7 +73,7 @@ let uaEngine:string|undefined; // the engine of the ua option's profile (set per
 export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarProfile:LayoutScrollbarProfile|undefined,budget:{remaining:number},inlineSheets:readonly {css:string;file:string}[]=[],inputDiagnostics:readonly TreeDiagnostic[]=[],preferences:readonly string[]=[]):EngineReport {
   // A hovered re-layout (hover-at:<path>) still needs its own untransformed re-layout, so it keeps a pristine copy.
   const hovered = preferences.find(p => p.startsWith('hover-at:'))?.slice(9);
-  const pristine = (options.accessibility || options.integrity || /:hover|@(?:-webkit-)?keyframes|@starting-style/i.test(String(options.css ?? '')) || inlineSheets.length || hasCarousel(root)) && preferences.every(p => p.startsWith('hover-at:')) ? structuredClone(root) : null;
+  const pristine = (options.accessibility || options.integrity || /:hover|@(?:-webkit-)?keyframes|@starting-style/i.test(String(options.css ?? '')) || options.reset?.some(s => /:hover/i.test(s.css)) || inlineSheets.length || hasCarousel(root)) && preferences.every(p => p.startsWith('hover-at:')) ? structuredClone(root) : null;
   // The untransformed re-layout (CSS transforms removed): the layout boxes, which is what a layout shift compares.
   const untransformed = preferences.includes('untransformed');
   let sawTransform = false;
@@ -120,7 +123,7 @@ export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarPro
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
   },{scripting:options.scripting,mediaFeatures:options.mediaFeatures});
-  const { rules, layers, keyframes: keyframeNames = new Set(), dependentDeclarations = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, startingRules = [] } = parsed;
+  const { rules, layers, keyframes: keyframeNames = new Set(), dependentDeclarations = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, startingRules = [], animatedCustom = [], animatedReads = [] } = parsed;
   preflight({options,boxes,parsed,diagnostics,layoutWarnings,unknown});
   // style attributes: each element's declarations as a rule that matches only it, element-attached in the cascade.
   for (const box of boxes.filter(box => box.inlineStyle !== undefined)) {
@@ -128,6 +131,47 @@ export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarPro
     const attached = parseLayoutCSS([{ css: `*{${box.inlineStyle}}`, file: `${box.label} style attribute` }], (code, message, line, file, detail) => { if (detail) diagnostics.push({ code, message, ...detail }); else unknown(code, message, line, box, file); }).rules;
     for (const rule of attached) { rule.selectors = [{ source: `${box.label} [style]`, parts: [{ kind: 'path', value: box.path }], specificity: [0, 0, 0] }]; rule.attached = true; rules.push(rule); }
   }
+  // State-dependent custom properties may change layout on another descendant through
+  // inheritance, aliases and fallback edges. Only finite hover with known length
+  // consumers is eligible for endpoint comparison; all other dependencies are Unknown.
+  try {
+    const startingReads=startingRules.flatMap(r=>r.declarations.filter(d=>!d.property.startsWith('--')&&/var\(/i.test(d.value)).map(d=>({pending:{property:`@starting-style ${d.property}`,expression:variableValue(d.value)}})));
+    const inlineBoxes:SolverBox[]=[];
+    const collectInline=(box:SolverBox,inside=false):void=>{
+      if(inside)inlineBoxes.push(box);
+      for(const child of box.inline??[]){child[PARENT]=box;collectInline(child,true);}
+      for(const child of box.children??[]){child[PARENT]=box;collectInline(child,inside);}
+    };
+    collectInline(root);
+    const unmodeledSelector=(sel:Selector):boolean=>sel.parts.some(p=>p.kind==='placeholder-shown'||p.kind==='link'&&p.name==='link'||('choices' in p && p.choices.some(unmodeledSelector)))||Boolean(sel.chain?.some(c=>unmodeledSelector(c.compound)));
+    const dynamicRule=(rule:CSSRule)=>Boolean(rule.preferences?.length)||rule.selectors.some(sel=>sel.state||unmodeledSelector(sel));
+    const inlineMatch=(rule:CSSRule)=>inlineBoxes.some(box=>rule.selectors.some(sel=>matches(sel,box,new Set([...(sel.state?[sel.state]:[]),...(sel.pseudoElement?[`::${sel.pseudoElement}`]:[])]))));
+    const inlineRules:CSSRule[]=[];
+    if(rules.some(r=>dynamicRule(r)&&r.declarations.some(d=>d.expression))||animatedCustom.length||startingRules.length){
+      for(const box of inlineBoxes)if(box.inlineStyle!==undefined){
+        if(box.inlineStyle==='dynamic'){unknown('U_LAYOUT_STATE_VARIABLE','Dynamic inline text style can read state-dependent custom properties',undefined,box);continue;}
+        const parsed=parseLayoutCSS([{css:`*{${box.inlineStyle}}`,file:`${box.label} style attribute`}],(code,message,line,file)=>unknown(code,message,line,box,file));
+        inlineRules.push(...parsed.rules.map(r=>({...r,unmodeledVariableConsumer:true})));
+      }
+      for(const rule of rules)if(rule.declarations.some(d=>d.pending)&&inlineMatch(rule))
+        inlineRules.push({...rule,unmodeledVariableConsumer:true});
+    }
+    const {reads,onlyLengths}=stateVariableDependencies([...rules,...inlineRules,{declarations:[...animatedReads,...startingReads]}]);
+    for(const rule of rules){
+      if(!dynamicRule(rule))continue;
+      for(const d of rule.declarations.filter(d=>d.expression&&reads.has(d.property))){
+        if(!rule.preferences?.length&&rule.selectors.every(sel=>sel.state==='hover'&&!sel.pseudoElement&&!unmodeledSelector(sel))&&onlyLengths(d.property)&&!rule.stateGeometry&&!inlineMatch(rule)){
+          rule.stateLayout=true;rule.hoverLayout=true;rule.variableHover=true;
+        }else unknown('U_LAYOUT_STATE_VARIABLE',`${d.property} in a state-dependent rule can affect ${[...reads.get(d.property)!].join(', ')}; this state dependency is not modeled`,d.line,undefined,d.file);
+      }
+    }
+    for(const d of animatedCustom)if(reads.has(d.property))unknown('U_LAYOUT_STATE_VARIABLE',`${d.property} in @keyframes ${d.name} can affect ${[...reads.get(d.property)!].join(', ')}; animated variable geometry is not modeled`,d.line,undefined,d.file);
+    for(const rule of startingRules)for(const d of rule.declarations)if(reads.has(d.property))unknown('U_LAYOUT_STATE_VARIABLE',`${d.property} in @starting-style can affect geometry`,rule.line,undefined,rule.file);
+  }catch(error){
+    const code=error instanceof Error&&'code' in error&&typeof error.code==='string'?error.code:'U_LAYOUT_STATE_VARIABLE';
+    unknown(code,error instanceof Error?error.message:String(error));
+  }
+  if(!preferences.length&&!options.$animationFrame&&!options.$slideVariant&&rules.some(r=>r.variableHover)&&(!pristine||options.ancestors?.length))unknown('U_LAYOUT_STATE_VARIABLE','Hovered custom property layout requires the complete possible hovered tree, not omitted ancestors');
   // An animation frame re-layout: the keyframe's layout declarations apply to that one box (animations override the
   // author's normal declarations, like an element-attached rule).
   if (options.$animationFrame) {
@@ -477,7 +521,7 @@ export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarPro
     // again with them (paint only, so the geometry is the same). System colors stay the light ones:
     // the color-scheme property is outside the subset.
     if (pristine && rules.some(rule => rule.preferences?.some(p => p.feature === 'prefers-color-scheme' && p.value === 'dark') || rule.declarations.some(d => d.property === 'color-scheme' && /\bdark\b/.test(String(d.value)) && /\blight\b/.test(String(d.value))))) {
-      const dark = analyzeBoxTree(pristine, { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['prefers-color-scheme:dark']);
+      const dark = analyzeBoxTree(structuredClone(pristine), { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['prefers-color-scheme:dark']);
       const contrastCodes = new Set(['E_A11Y_CONTRAST', 'U_A11Y_CONTRAST', 'E_A11Y_STATE_CONTRAST', 'E_A11Y_LINK_IN_TEXT', 'U_A11Y_LINK_IN_TEXT', 'E_A11Y_FOCUS_VISIBLE']);
       // A finding that holds in both schemes is reported once, with `alsoUnder`.
       const same = (a:LayoutDiagnostic,b:LayoutDiagnostic) => a.code === b.code && a.path === b.path && a.message === b.message && JSON.stringify([a.range, a.heightRange, a.regionConstraints, a.state]) === JSON.stringify([b.range, b.heightRange, b.regionConstraints, b.state]);
@@ -493,7 +537,7 @@ export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarPro
     const scrolledCovers = diagnostics.filter(d => d.code === 'U_A11Y_SCROLLED_COVER');
     const alignedScroller = geometry.some(row => row.overflow === 'scroll' && row.alignsContent && !row.box.documentRoot);
     if (pristine && (scrolledCovers.length || alignedScroller)) {
-      const zero = analyzeBoxTree(pristine, { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['scroll-zero']);
+      const zero = analyzeBoxTree(structuredClone(pristine), { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], ['scroll-zero']);
       // Content before a scroll container's start edge (any scroll offset: it never scrolls there).
       for (const d of zero.diagnostics.filter(d => d.code === 'E_A11Y_SCROLL_START_UNREACHABLE'))
         if (!diagnostics.some(x => x.code === d.code && x.path === d.path && x.edge === d.edge && JSON.stringify([x.range, x.heightRange]) === JSON.stringify([d.range, d.heightRange]))) diagnostics.push(d);
@@ -508,11 +552,11 @@ export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarPro
     // focus findings for that box come from that layout instead of the unfocused one.
     if (pristine && rules.some(rule => rule.stateLayout)) {
       const geometricFocus = new Set(['E_A11Y_FOCUS_OBSCURED', 'E_A11Y_FOCUS_OFFSCREEN', 'E_A11Y_FOCUS_CLIPPED', 'E_A11Y_FOCUS_SCROLLED_UNDER', 'E_A11Y_FOCUS_AREA', 'E_A11Y_FOCUS_CLIPPED_AWAY']);
-      const layoutRules = rules.filter(rule => rule.stateLayout);
+      const layoutRules = rules.filter(rule => rule.stateLayout && !rule.hoverLayout);
       const all:{box:SolverBox;chain:SolverBox[]}[] = []; (function walk(box:SolverBox,chain:SolverBox[]) { all.push({ box, chain }); for (const child of box.children ?? []) walk(child, [...chain, box]); })(root, []);
       const reached = ({box,chain}:{box:SolverBox;chain:SolverBox[]}) => layoutRules.some(rule => rule.selectors.some(selector => (selector.state !== 'focus-within' && matches(selector, box, new Set(['focus', 'focus-visible', 'focus-within']))) || (selector.state === 'focus-within' && [...chain, box].some(a => matches(selector, a, new Set(['focus-within']))))));
       for (const entry of all.filter(entry => focusableBox(entry.box) && reached(entry))) {
-        const focused = analyzeBoxTree(pristine, { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], [`focus-at:${entry.box.path}`]);
+        const focused = analyzeBoxTree(structuredClone(pristine), { ...options, integrity: undefined }, scrollbarProfile, budget, inlineSheets, [], [`focus-at:${entry.box.path}`]);
         for (let i = diagnostics.length - 1; i >= 0; i--) if (diagnostics[i]!.path === entry.box.path && geometricFocus.has(diagnostics[i]!.code)) diagnostics.splice(i, 1);
         if (focused.status === 'unknown') { diagnostics.push({ code: 'U_A11Y_FOCUS_LAYOUT', severity: 'unknown', message: `${entry.box.label}: its focused layout is not decided (${focused.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: entry.box.label, path: entry.box.path, rule: 'focus-obscured' }); continue; }
         for (const d of focused.diagnostics.filter(d => d.path === entry.box.path && geometricFocus.has(d.code))) diagnostics.push({ ...d, message: `${d.message} (in its focused layout)`, focusedLayout: true });
@@ -556,16 +600,16 @@ export function analyzeBoxTree(root:SolverBox,options:EngineOptions,scrollbarPro
   // in docs/cls-evaluation.md). With a transform anywhere, every row's layoutRect comes from the untransformed
   // re-layout, matched by path and condition region; a row without a match gets layoutRect null (not decided).
   if (pristine && sawTransform && !diagnostics.some(d => d.severity === 'unknown')) {
-    const plain = analyzeBoxTree(pristine, options, scrollbarProfile, budget, inlineSheets, [], [...preferences, 'untransformed']);
+    const plain = analyzeBoxTree(structuredClone(pristine), options, scrollbarProfile, budget, inlineSheets, [], [...preferences, 'untransformed']);
     const matches = matchLayoutRectangles(sizes, plain.sizes, plain.status !== 'unknown');
     sizes.forEach((row, i) => { row.layoutRect = matches[i] ?? null; });
   }
   if (pristine && hovered === undefined && !options.$animationFrame && !options.$slideVariant && rules.some(rule => rule.hoverLayout) && !diagnostics.some(d => d.severity === 'unknown')) {
-    checkHoverShifts({root,rules,block,sizes,diagnostics,ranges,analyze:path=>analyzeBoxTree(pristine,options,scrollbarProfile,budget,inlineSheets,[],[`hover-at:${path}`])});
+    checkHoverShifts({root,rules,block,sizes,diagnostics,checks,ranges,analyze:path=>analyzeBoxTree(structuredClone(pristine),options,scrollbarProfile,budget,inlineSheets,[],[`hover-at:${path}`])});
   }
   if (pristine && hovered === undefined && !options.$animationFrame && !options.$slideVariant && animated.length && !diagnostics.some(d => d.severity === 'unknown')) {
     checkAnimationShifts({block,sizes,diagnostics,ranges,animated,keyframeFrames,heightKnown:Boolean(options.viewport.height),
-      analyze:(path,css)=>analyzeBoxTree(pristine,{...options,$animationFrame:{path,css}},scrollbarProfile,budget,inlineSheets,[],preferences)});
+      analyze:(path,css)=>analyzeBoxTree(structuredClone(pristine),{...options,$animationFrame:{path,css}},scrollbarProfile,budget,inlineSheets,[],preferences)});
   }
   if (hovered === undefined && !options.$animationFrame && !options.$slideVariant)
     checkLayoutWarnings({block,options,scrollbarProfile,geometry,sizes,boxes,diagnostics,layoutWarnings,ranges,context,isZeroAffine});

@@ -190,6 +190,7 @@ function compileCompound(source: string, depth = 0): Selector {
       if (level) throw new Error(`Unclosed selector function: ${source}`);
       // Pseudo-elements are invalid in these forgiving lists, so those branches cannot match.
       const choices = postcss.list.comma(rest.slice(fn[0].length, end - 1)).map(s => compileSelector(s, depth + 1, true)).filter(s => !s.pseudoElement);
+      if (choices.some(c => c.state)) throw new Error(`Unsupported selector (a state inside :is() or :where()): ${source}`);
       parts.push({ kind: 'any', choices });
       if (capture(fn, 1).toLowerCase() === 'is') specificity = combine(specificity, choices.reduce<Specificity>((best, s) => greaterRank(s.specificity, best) ? s.specificity : best, [0, 0, 0]));
       rest = rest.slice(end); continue;

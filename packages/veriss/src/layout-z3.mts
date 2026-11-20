@@ -1,7 +1,7 @@
 // TypeScript source. Run pnpm build:ts to regenerate the adjacent ESM and declarations.
 import type {LayoutSummary,LayoutDiagnostic,LayoutAffine} from './layout-contracts.d.ts';
 export interface LayoutObligation {
-  code:string;box?:string|undefined;path?:string|undefined;axis?:'inline'|'block'|undefined;variant?:number;scrollbarProfile?:string;
+  code:string;box?:string|undefined;path?:string|undefined;hoveredPath?:string;axis?:'inline'|'block'|undefined;variant?:number;scrollbarProfile?:string;
   domain:string;failure:string;available?:LayoutAffine;required?:LayoutAffine|number;
 }
 export interface LayoutModel<Scope extends Pick<LayoutSummary['scope'],'axis'> = LayoutSummary['scope']> {
@@ -11,7 +11,7 @@ export interface LayoutModel<Scope extends Pick<LayoutSummary['scope'],'axis'> =
 export interface LayoutProof {
   version:1;component:string;status:'verified'|'violated'|'unknown';complete:boolean;assumptions:string[];
   solver:{engine:'z3-wasm';version?:string;result:'sat'|'unsat'|'unknown'};diagnostics:LayoutDiagnostic[];
-  witness?:{obligationIndex?:number;code:string;box?:string|undefined;path?:string|undefined;axis?:'inline'|'block'|undefined;variant?:number;scrollbarProfile?:string;
+  witness?:{obligationIndex?:number;code:string;box?:string|undefined;path?:string|undefined;hoveredPath?:string;axis?:'inline'|'block'|undefined;variant?:number;scrollbarProfile?:string;
     viewport:number;viewportExact:string;viewportHeight?:number;viewportHeightExact?:string;available?:number;required?:number;availableExact?:string;requiredExact?:string};
 }
 export type LayoutSolverAPI=Pick<Awaited<ReturnType<typeof import('z3-solver').init>>,'Context'> & Partial<Pick<Awaited<ReturnType<typeof import('z3-solver').init>>,'getVersionString'>>;
@@ -86,7 +86,7 @@ async function verifyOneModel(model:LayoutModel<Pick<LayoutSummary["scope"],"axi
       if(obligation.available && (!obligation.required || typeof obligation.required!=='object')) throw Error('Missing required witness expression');
       const evaluate=(expr:LayoutAffine)=>add(add(mul(rational(expr.coefficient),w),mul(rational(expr.heightCoefficient ?? '0'),h)),rational(expr.constant));
       return {...base,status:model.complete ? 'violated' : 'unknown',witness:{obligationIndex:Number(index.numerator),code:obligation.code,box:obligation.box,path:obligation.path,axis:obligation.axis,
-        ...(obligation.variant!==undefined ? {variant:obligation.variant} : {}),...(obligation.scrollbarProfile ? {scrollbarProfile:obligation.scrollbarProfile} : {}),
+        ...(obligation.hoveredPath ? {hoveredPath:obligation.hoveredPath} : {}),...(obligation.variant!==undefined ? {variant:obligation.variant} : {}),...(obligation.scrollbarProfile ? {scrollbarProfile:obligation.scrollbarProfile} : {}),
         viewport:number(w),viewportExact:exact(w),...(model.scope.axis==='both' ? {viewportHeight:number(h),viewportHeightExact:exact(h)} : {}),
         ...(obligation.available && typeof obligation.required==='object' ? {available:number(evaluate(obligation.available)),availableExact:exact(evaluate(obligation.available)),required:number(evaluate(obligation.required)),requiredExact:exact(evaluate(obligation.required))} : {}),
       }};

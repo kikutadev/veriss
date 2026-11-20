@@ -112,7 +112,7 @@ export const PositionedGrid=freeze({...SafeGrid,id:'positioned-grid/1',positioni
 const isArray=(v:unknown):boolean=>Array.isArray(v);
 const object=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>value!==null && typeof value==='object' && !Array.isArray(value) && Object.keys(value).every(key=>keys.includes(key));
 const identity=(row:LayoutScenarioIdentity)=>JSON.stringify([row.variant ?? null,row.scrollbarProfile ?? null]);
-const metadata=(row:LayoutScenarioIdentity & {box?:string;path?:string})=>({box:row.box,path:row.path,...(row.variant!==undefined ? {variant:row.variant} : {}),...(row.scrollbarProfile!==undefined ? {scrollbarProfile:row.scrollbarProfile} : {})});
+const metadata=(row:LayoutScenarioIdentity & {box?:string;path?:string;hoveredPath?:string})=>({box:row.box,path:row.path,...(row.hoveredPath ? {hoveredPath:row.hoveredPath} : {}),...(row.variant!==undefined ? {variant:row.variant} : {}),...(row.scrollbarProfile!==undefined ? {scrollbarProfile:row.scrollbarProfile} : {})});
 const unknown=(code:string,message:string):LayoutDiagnostic=>({code,severity:'unknown',message});
 
 const nonnegative=(v:unknown):v is number=>typeof v==='number' && Number.isFinite(v) && v>=0 && v<=1_000_000;

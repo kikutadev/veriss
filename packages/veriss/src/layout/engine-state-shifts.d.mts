@@ -11,7 +11,7 @@ type ShiftSize = LayoutSummary['sizes'][number] & {
         region: Region;
     };
 };
-type ShiftReport = Pick<LayoutSummary, 'status' | 'diagnostics'> & {
+type ShiftReport = Pick<LayoutSummary, 'status' | 'diagnostics' | 'checks'> & {
     sizes: readonly ShiftSize[];
 };
 interface ShiftInput {
@@ -38,7 +38,8 @@ export interface AnimatedBox {
     scrollDriven?: boolean;
     style: Readonly<Record<string, unknown>>;
 }
-export declare function checkHoverShifts({ root, rules, block, sizes, diagnostics, ranges, analyze }: ShiftInput & {
+export declare function checkHoverShifts({ root, rules, block, sizes, diagnostics, checks, ranges, analyze }: ShiftInput & {
+    checks: LayoutSummary['checks'];
     root: ShiftBox;
     rules: readonly CSSRule[];
     analyze: (path: string) => ShiftReport;

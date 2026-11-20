@@ -278,6 +278,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
         readonly variant?: number;
         readonly scrollbarProfile?: string;
         readonly devicePixelRatio?: number | undefined | undefined;
+        readonly hoveredPath?: string;
         readonly box: string;
         readonly path: string;
         readonly code: string;
@@ -1476,6 +1477,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
         readonly variant?: number;
         readonly scrollbarProfile?: string;
         readonly devicePixelRatio?: number | undefined | undefined;
+        readonly hoveredPath?: string;
         readonly box: string;
         readonly path: string;
         readonly code: string;

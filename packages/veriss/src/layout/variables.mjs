@@ -225,3 +225,44 @@ export function substituteVariables(expression, environment, spend) {
     // Whitespace preserves CSS tokens: Number(40) + Ident(px) is never Dimension(40px).
     return value.tokens.join(' ').trim();
 }
+const pureColor = /^(?:color|background-color|border-(?:(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end)-)?color|outline-color|text-decoration-color|caret-color|fill|stroke)$/;
+const lengthConsumer = /^(?:(?:min-|max-)?(?:width|height|inline-size|block-size)|(?:margin|padding)(?:-(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end))?|(?:row-|column-)?gap)$/;
+export function stateVariableDependencies(rules) {
+    const edges = new Map(), reads = new Map(), queue = [];
+    const add = (map, key, value) => {
+        let bucket = map.get(key);
+        if (!bucket) {
+            bucket = new Set();
+            map.set(key, bucket);
+        }
+        bucket.add(value);
+    };
+    for (const rule of rules)
+        for (const d of rule.declarations) {
+            if (d.expression && d.property)
+                for (const ref of d.expression.references)
+                    add(edges, ref, d.property);
+            if (d.pending && !pureColor.test(d.pending.property))
+                for (const ref of d.pending.expression.references)
+                    add(reads, ref, rule.unmodeledVariableConsumer ? 'inline text: ' + d.pending.property : d.pending.property);
+        }
+    const reverse = new Map();
+    for (const [from, tos] of edges)
+        for (const to of tos)
+            add(reverse, to, from);
+    for (const [name, props] of reads)
+        for (const prop of props)
+            queue.push([name, prop]);
+    for (let i = 0; i < queue.length; i++) {
+        if (queue.length > 65536)
+            limit('State-dependent custom property dependency limit exceeded');
+        const [name, prop] = queue[i];
+        for (const source of reverse.get(name) ?? []) {
+            if (reads.get(source)?.has(prop))
+                continue;
+            add(reads, source, prop);
+            queue.push([source, prop]);
+        }
+    }
+    return { reads, onlyLengths: (name) => [...(reads.get(name) ?? [])].every(p => lengthConsumer.test(p)) };
+}

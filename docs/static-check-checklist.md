@@ -474,3 +474,12 @@
 
 
 - [x] **H9 補足: 片軸依存の精密化**: 明示された paint-only transition と通常 block で無効な grid track 宣言のみを除外し、幅520pxの境界と他の viewport で横位置・幅を比較する。viewport-fixed の intrinsic width を除外し、明示 height と bottom 12px / -1px で縦位置・高さと違反を比較する。3ブラウザー照合は `e2e/layout-partial-geometry.spec.mjs`、all/幅 transition、Grid/Flex、auto height、transform/contain 等の拒否対照は `packages/adapter-core/test/partial-geometry.test.mjs`。
+
+状態依存 custom property: 既存の token 化済み var() の参照（fallback を含む）から
+幾何等の consumer までの may-depend 閉包を求める。直接/間接の length-only hover は
+既存の hover re-layout の対象として、始点の移動だけでなく fit 制約も通常の solver
+へ渡す。静止矩形と hover の制約を混同しない。未決定の focus/active/checked、
+未固定 preference、animation、inline text の幾何依存は Unknown。
+:is() / :where() 内 user-action は従来未モデル化だったため明示的に拒否する。
+純色 consumer と未使用の変数は幾何の依存と分ける。未知の関連を過小評価しない。
+独立した inventory UI の単体テストと Chromium/Firefox/WebKit の hover 操作で対照を確認。

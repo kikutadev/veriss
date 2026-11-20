@@ -31,6 +31,7 @@ export declare function createObligationCollector<Box extends ObligationBox>({ b
     scrollIntent?: 'css' | undefined;
 }): {
     checks: (import("../layout-contracts.d.ts").LayoutScenarioIdentity & {
+        hoveredPath?: string;
         box: string;
         path: string;
         code: string;

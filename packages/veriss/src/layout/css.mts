@@ -729,7 +729,7 @@ export type CSSDeclaration = DeclarationBase & (
 export interface CSSRule extends CSSLocation {
   selectors: Selector[]; declarations: CSSDeclaration[]; contexts: CSSCondition[];
   layer: number | null; layerName?: string|undefined; attached?: boolean; preferences?: CSSPreference[];
-  stateGeometry?: boolean; stateLayout?: boolean; hoverLayout?: boolean;
+  stateGeometry?: boolean; stateLayout?: boolean; hoverLayout?: boolean; variableHover?: boolean; unmodeledVariableConsumer?: boolean;
 }
 interface CSSRuleReference extends CSSLocation {selectors: Selector[]; selector: string}
 interface DependentDeclaration extends CSSRuleReference {contexts: CSSCondition[]; property: string; value: string}
@@ -738,6 +738,8 @@ interface RadiusRule extends CSSRuleReference {zero?: true}
 interface Keyframe {offset: number; props: CSSValueMap; layout?: string; easing?: string}
 interface FontFace extends CSSLocation {family: string; display: string; local: boolean; embedded: boolean; overrides: string[]}
 interface StartingRule extends CSSLocation {selectors: Selector[]; declarations: {property: string; value: string; important: boolean}[]; order: number; contexts: CSSCondition[]}
+export interface AnimatedCustom extends CSSLocation {property:string;name:string}
+export interface AnimatedRead {pending:PendingDeclaration}
 export interface CSSSheet {css: string; file: string}
 export type CSSDiagnostic = (code: string, message: string, line?: number, filename?: string, detail?: Omit<import('../layout-contracts.d.ts').LayoutDiagnostic,'code'|'message'>) => void;
 interface CSSParseOptions {scripting?: 'enabled'|undefined; mediaFeatures?: MediaFeatures|undefined}
@@ -750,6 +752,7 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
   // Findings of the syntax stage, one shape: { code, ...data } (ADR-0016 M3). The rules/syntax-notes.mjs catalog words them.
   const notes: SyntaxNote[] = [], note = (data: SyntaxNote) => { notes.push(data); }, notesOf = <K extends SyntaxNoteCode,>(code: K) => notes.filter((n): n is Extract<SyntaxNote, {code: K}> => n.code === code);
   const dependentDeclarations: DependentDeclaration[] = [], markerSizing: MarkerSizing[] = [], firstPseudo: CSSRuleReference[] = [], radiusRules: RadiusRule[] = [], contentRules: Selector[][] = [], userSelectNone: CSSRuleReference[] = [], rules: CSSRule[] = [], layers: string[] = [], keyframes = new Set<string>(), keyframeFrames = new Map<string, Keyframe[]>(), fontFaces: FontFace[] = [], registered = new Map<string, PropertyRegistration>(), defaultNamespace: CSSLocation[] = [], startingRules: StartingRule[] = [];
+  const animatedCustom:AnimatedCustom[]=[],animatedReads:AnimatedRead[]=[];
   const layerIndex = (name: string) => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope: (Selector & {limit?: Selector}) | null = null;
   const visit = (nodes: ChildNode[], contexts: CSSCondition[], layer: number | null, filename: string, depth = 0, preferences: CSSPreference[] = []): void => {
@@ -798,6 +801,14 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
       }
       if (node.type === 'atrule' && /^(?:-webkit-)?keyframes$/i.test(node.name)) {
         const name = node.params.trim().replace(/^["']|["']$/g, ''); keyframes.add(name);
+        node.walkDecls(d => {
+          if(d.important)return;
+          if(d.prop.startsWith('--'))animatedCustom.push({property:d.prop,line:sourceStart(d).line,file:filename,name});
+          else if(/var\(/i.test(d.value)){
+            try {animatedReads.push({pending:{property:`@keyframes ${name} ${d.prop}`,expression:variableValue(d.value)}});}
+            catch(error){problem(error instanceof Error && 'code' in error && typeof error.code==='string'?error.code:'U_LAYOUT_VARIABLE',error instanceof Error?error.message:String(error),sourceStart(d).line);}
+          }
+        });
         // The paint of each frame (for the flash rule): offsets with their background-color and opacity.
         const frames: Keyframe[] = [];
         for (const frame of node.nodes ?? []) if (frame.type === 'rule') for (const at of frame.selectors) {
@@ -1160,7 +1171,7 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
     if (!notesOf('W_CSS_KEYFRAMES_MISSING').some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) note({code: 'W_CSS_KEYFRAMES_MISSING', name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules };
+  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules, animatedCustom, animatedReads };
 }
 
 // The UA default family and the user's default font size are not author

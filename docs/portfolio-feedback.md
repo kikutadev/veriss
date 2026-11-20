@@ -276,3 +276,13 @@ baf9eb0: primary hover/pointer と prefers-reduced-motion の明示値を一般�
 - 新規単体3件・E2E3件、関連単体247件成功。独立した注文画面で3ブラウザー864矩形一致 (0.1px)。追加の汎用 cascade 対照84ケース中72解析・12 Unknown、1440/1440矩形一致 (0.15px)。Z3対照6環境ケース中5成立・1違反 (coarse の幅130%、320×700で利用可能300px/要求390px)。React/Vue/Svelte の同一再現例も fine 成立/coarse 違反。実ビルド入口の正常対照6/6比較一致、不一致プロファイル3/3拒否かつ証拠0。
 - 既存課題: ancestor の動的 selector と状態による custom property の間接的幾何依存、hover 等での全状態 fit の網羅。固定 media 環境の成立をそれらの成立と混同しない。any-hover/any-pointer・未対応論理式・条件付き cascade layer は未対応。配信コード変更なし。
 - 全gate (baf9eb0): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 405 E2E passed、supervisor exit=0、698 PID追跡・残留0。独立プロセス検査 CLEAN。gate後の変更は文書のみ。
+
+### 状態依存 custom property の健全性
+目標: state/preference による custom property の代入が var() の連鎖や fallback を通じて幾何・表示・アニメーション等へ伝播する場合、静止時の結果を全状態成立として返さない。既存の token 化済み依存を使い、まず安全側の依存閉包を求める。単純 hover は既存 re-layout を利用できる範囲で比較し、他の状態・混在・間接アニメーション等は Unknown。純色のみ・未使用変数は影響を分離する。サイト非依存の対照入力、3ブラウザー、Z3、既存 gate で確認する。
+
+### 状態依存 custom property の検証結果 (2026-11-20)
+ed81485 / d00e811: token 化済み var() の参照・fallback・代入から保守的な依存閉包を計算し、幾何へ伝播する単純 hover の長さ依存を既存 re-layout へ接続。純色・未使用変数は分離、未対応の複合状態・間接アニメーション等は Unknown とする。hover の fit 制約を solver へ渡し、位置不変の幅超過も違反として検出。各再解析は独立した DOM で行い、寸法契約の二重登録を防ぐ。
+- 新規単体10件・3ブラウザー E2E 3件。独立対照16 cascade ケース384/384操作、viewport/gap/長さ条件6ケース576/576操作、未対応状態6ケース36/36操作一致。Z3の判定は22/22期待値一致（成立7、違反13、Unknown2）。最初の layer 対照の期待値は非 layer 宣言の優先順位を反映して修正し、全対照を再実行。
+- 保存済み非ポートフォリオ6製品15入力の3環境再解析、および公開5ページの同一入力再解析で既存判定・診断数不変。今回は検証の健全性改善であり、実サイトの Unknown 解消・新たな全ページ証明ではない。
+- 祖先・兄弟への状態 selector の伝播、複合状態、任意の途中アニメーション、hit-test、全ページ証明は未達。対象上限超過や未モデル化 consumer は Unknown。URL・固有 selector・固有パスによる特例なし。配信コード変更なし。
+- 全gate (d00e811): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 408 E2E passed、supervisor exit=0、692 PID追跡・残留0。初回gateは再解析時の契約重複不具合を確認して中断し、修正後に全gateを再実行。独立プロセス検査 CLEAN。

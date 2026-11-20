@@ -3,6 +3,7 @@ export interface LayoutObligation {
     code: string;
     box?: string | undefined;
     path?: string | undefined;
+    hoveredPath?: string;
     axis?: 'inline' | 'block' | undefined;
     variant?: number;
     scrollbarProfile?: string;
@@ -40,6 +41,7 @@ export interface LayoutProof {
         code: string;
         box?: string | undefined;
         path?: string | undefined;
+        hoveredPath?: string;
         axis?: 'inline' | 'block' | undefined;
         variant?: number;
         scrollbarProfile?: string;

@@ -59,4 +59,20 @@ export declare function substituteDeclaration(expression: VariableExpression, en
     invalid?: never;
 };
 export declare function substituteVariables(expression: VariableExpression, environment: VariableEnvironment, spend?: Spend): string;
+type StateRead = {
+    property?: string;
+    expression?: VariableExpression;
+    pending?: {
+        property: string;
+        expression: VariableExpression;
+    };
+};
+export interface StateVariableRule {
+    declarations: readonly StateRead[];
+    unmodeledVariableConsumer?: boolean;
+}
+export declare function stateVariableDependencies(rules: readonly StateVariableRule[]): {
+    reads: Map<string, Set<string>>;
+    onlyLengths: (name: string) => boolean;
+};
 export {};

@@ -5,18 +5,41 @@ import { matches } from './css.mjs';
 import { intersect } from './integrity.mjs';
 import { easedFrames } from './animation-extremes.mjs';
 import { unitContext, layoutRectangle, firstStartMove, layoutStartMoves, shiftScoreBound, sweptBound } from './engine-geometry.mjs';
-export function checkHoverShifts({ root, rules, block, sizes, diagnostics, ranges, analyze }) {
+export function checkHoverShifts({ root, rules, block, sizes, diagnostics, checks, ranges, analyze }) {
     const hoverRules = rules.filter(rule => rule.hoverLayout);
     const targets = [];
-    (function walk(box) { if (hoverRules.some(rule => rule.selectors.some(selector => matches(selector, box, new Set(['hover'])))))
-        targets.push(box); for (const child of box.children ?? [])
-        walk(child); })(root);
-    for (const target of targets.slice(0, 64)) {
+    (function walk(box, inline = false) {
+        if (hoverRules.some(rule => rule.selectors.some(sel => matches(sel, box, new Set(['hover']))))) {
+            if (inline)
+                diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${box.label}: hovered inline text geometry is not modeled`, box: box.label, path: box.path });
+            else
+                targets.push(box);
+        }
+        for (const child of box.children ?? [])
+            walk(child, inline);
+        for (const child of box.inline ?? [])
+            walk(child, true);
+    })(root);
+    if (targets.length > 64)
+        diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: 'Hover state coverage exceeds 64 targets' });
+    for (const target of targets.length <= 64 ? targets : []) {
         const hover = analyze(target.path);
         if (hover.status === 'unknown') {
             diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: its hovered layout is not decided (${hover.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: target.label, path: target.path });
             continue;
         }
+        if (checks.length + hover.checks.length > 32768) {
+            diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: 'Hover fit obligation limit exceeded', box: target.label, path: target.path });
+            break;
+        }
+        for (const check of hover.checks)
+            checks.push({ ...check, hoveredPath: target.path });
+        for (const finding of hover.diagnostics)
+            if (finding.severity === 'error')
+                diagnostics.push({ ...finding, hovered: target.label, hoveredPath: target.path, message: `${finding.message} (hovering ${target.label})` });
+        const restPaths = new Set(sizes.map(row => row.path)), hoverPaths = new Set(hover.sizes.map(row => row.path));
+        if (restPaths.size !== hoverPaths.size || [...restPaths].some(path => !hoverPaths.has(path)))
+            diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: hovered box coverage differs from base layout`, box: target.label, path: target.path });
         const result = layoutStartMoves(sizes, hover.sizes);
         if (result.undecided) {
             diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: the hovered layout of ${result.undecided.box} cannot be compared (it has no layout rectangle)`, box: target.label, path: target.path });

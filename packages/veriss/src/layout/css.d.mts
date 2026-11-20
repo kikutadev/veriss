@@ -67,6 +67,8 @@ export interface CSSRule extends CSSLocation {
     stateGeometry?: boolean;
     stateLayout?: boolean;
     hoverLayout?: boolean;
+    variableHover?: boolean;
+    unmodeledVariableConsumer?: boolean;
 }
 interface CSSRuleReference extends CSSLocation {
     selectors: Selector[];
@@ -107,6 +109,13 @@ interface StartingRule extends CSSLocation {
     order: number;
     contexts: CSSCondition[];
 }
+export interface AnimatedCustom extends CSSLocation {
+    property: string;
+    name: string;
+}
+export interface AnimatedRead {
+    pending: PendingDeclaration;
+}
 export interface CSSSheet {
     css: string;
     file: string;
@@ -132,6 +141,8 @@ export declare function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: 
     registered: Map<string, PropertyRegistration>;
     defaultNamespace: CSSLocation[];
     startingRules: StartingRule[];
+    animatedCustom: AnimatedCustom[];
+    animatedReads: AnimatedRead[];
 };
 declare const textInitial: {
     'font-family': string;

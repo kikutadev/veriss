@@ -788,6 +788,7 @@ export interface LayoutSummary {
         region?: LayoutRegion;
     })[];
     checks: (LayoutScenarioIdentity & {
+        hoveredPath?: string;
         box: string;
         path: string;
         code: string;
