@@ -22,15 +22,16 @@ def truth(t):
 def cert(c,status):
     payload=tup(*(num(c["point"][k]) for k in ("x","y","den"))) if status=="violated" else seq(c["goals"],truth)
     return tup(model(c["model"]),payload)
-print("import VerissLeanRelation\nopen VerissLean VerissLean.Relation\nset_option maxRecDepth 20000\nset_option maxHeartbeats 10000000")
-i=0
-for path in sys.argv[1:]:
-    for r in json.loads(Path(path).read_text()):
-        print("-- instance "+str(i))
-        print(f"def problem_{i} : Problem := "+problem(r["problem"]))
-        cls="ViolationCertificate" if r["status"]=="violated" else "VerifiedCertificate"
-        method="checkViolated" if r["status"]=="violated" else "checkVerified"
-        print(f"def certificate_{i} : {cls} := "+cert(r["certificate"],r["status"]))
-        print(f"theorem concrete_{i} : problem_{i}.{method} certificate_{i} = true := by decide")
-        print(f"#print axioms concrete_{i}")
-        i+=1
+if __name__ == "__main__":
+    print("import VerissLeanRelation\nopen VerissLean VerissLean.Relation\nset_option maxRecDepth 20000\nset_option maxHeartbeats 10000000")
+    i=0
+    for path in sys.argv[1:]:
+        for r in json.loads(Path(path).read_text()):
+            print("-- instance "+str(i))
+            print(f"def problem_{i} : Problem := "+problem(r["problem"]))
+            cls="ViolationCertificate" if r["status"]=="violated" else "VerifiedCertificate"
+            method="checkViolated" if r["status"]=="violated" else "checkVerified"
+            print(f"def certificate_{i} : {cls} := "+cert(r["certificate"],r["status"]))
+            print(f"theorem concrete_{i} : problem_{i}.{method} certificate_{i} = true := by decide")
+            print(f"#print axioms concrete_{i}")
+            i+=1

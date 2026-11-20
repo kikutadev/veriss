@@ -6,7 +6,7 @@ Independently check the arithmetic of veriss's exported piecewise-affine geometr
 keep the TypeScript migration and npm runtime untouched. Lean 4.19.0 and mathlib
 v4.19.0 (pinned commit and dependency manifest) are optional research dependencies.
 
-The checker accepts a certificate for **one supplied inline geometry model**
+The initial checker accepts a certificate for **one supplied inline geometry model**
 in a rectangular real viewport domain, with integer environment/safe-area
 bounds and exact rational affine coordinates. The Python producer uses
 Fourier–Motzkin elimination to find nonnegative integer combinations of
@@ -26,9 +26,9 @@ of matched affine literals and strict/non-strict guards is proved in Lean.
 JSON decoding, selecting the original report, and the correspondence of that
 report to actual HTML/CSS/browser semantics remain outside the formal theorem.
 The report's original model is the premise, not a theorem about browser behavior.
-The program rejects missing or ambiguous entries. Only inline coordinates
-are checked; arbitrary relational predicates, full layout extraction, native
-browser rounding and timing, and dynamic state reachability are not covered.
+The initial program rejects missing or ambiguous entries and checks only inline
+coordinates. Subsequent milestones below add full relational rectangles,
+reachable cases, composition, motion and restricted source checking.
 No certificate is treated as Unknown, not as a confirmed violation.
 
 ## Reproduce
@@ -320,3 +320,151 @@ semantic theorem is for normalized predicates/geometry; decoding,
 raw CSS/browser correspondence, profile-key provenance and full
 source-model linkage are not formalized end-to-end. This is not a proof
 of concrete UI reachability or of actual browser animations.
+
+
+## Fifth milestone: extraction, composition, finite refinement and motion
+
+Added opt-in research commands, without changing veriss's runtime or TypeScript
+worktrees. All claims refer to the formal fragment or normalized model, never an
+unrestricted browser or arbitrary JavaScript.
+
+### Extraction
+
+`VerissLeanCSS` independently interprets explicit left/top, width/height,
+padding and solid-border widths for a viewport-anchored rectangle with zero
+margins, definite containing block, horizontal-tb/ltr and no unmodeled geometry
+dependencies. Lengths are exact linear combinations of px/vw/vh/percent, with
+a common positive denominator. Padding percentages use the viewport width
+basis even for the block axis. Both content-box and border-box are handled;
+a possible negative used size or border-box clamping is rejected unless
+the no-clamp admissibility proof holds throughout the viewport domain.
+`AnchoredStyle.extraction_exact` proves exact field equality for every row
+and model coverage for all real-valued viewports in the domain. Matching uses
+cross multiplication of affine coefficients, not measurements.
+
+`css-plan STYLE REPORT STATE PROFILE TARGET` and
+`css-check STYLE REPORT STATE PROFILE TARGET CERTIFICATE` select the original
+full DOM evidence and reconstruct obligations for model validity and source
+admissibility. STYLE is a JSON object:
+- version 1, kind "viewport-anchored-computed-style", position "absolute"
+  or "fixed", borderBox boolean, inline and block axis objects.
+- Each axis has offset, size, padBefore, padAfter, borderBefore, borderAfter.
+- Each length is {px,vw,vh,percent,den} (integer numerators, positive integer
+  denominator). Unsupported or missing evidence remains Unknown.
+
+`css-source-plan SOURCE REPORT STATE PROFILE` and
+`css-source-check SOURCE REPORT STATE PROFILE CERTIFICATE` also require
+the original complete HTML and author CSS strings to match the independently
+rendered closed grammar. SOURCE is {version:1,root,target,html,css,style}.
+This is restricted literal source binding, not arbitrary CSS parsing:
+one empty absolute child of a definite viewport-sized root, simple ASCII
+IDs, standards-mode HTML, fixed complete stylesheet grammar with physical
+longhands and single integer-unit lengths, no other declarations, CSS
+sources or scripts. Canonical HTML and CSS forms are in
+`canonicalHTML` and `AnchoredStyle.canonicalCSS`; the caller must supply
+the actual source, not substitute a generated lookalike for the source bytes.
+`SourceFragment.exact` combines grammar binding with the exact formal geometry
+theorem. The supplied HTML/CSS must be the actual code selected by the caller.
+The existing browser correspondence/UA/scrollbar assumptions remain.
+Noncanonical whitespace and extra harmless CSS are conservatively rejected.
+The current veriss producer does not expose some fixed/viewport-unit geometries;
+the checker explicitly rejects those rather than inventing evidence.
+
+The plan result contains {plan,admissibility}; use `create_model(plan)` and
+`prove` for each of the admissibility cases to construct
+{model,admissibility}. See `test_css.py`.
+
+### Composition
+
+`VerissLeanComposition` supports one full two-axis rectangle per piece,
+one parent and one child, identity or affine allocation/translation.
+It proves exact substitution of child coordinates and strict/closed guards,
+source model domain inclusion, coordinate agreement of each feasible pair,
+and the parent goal from the transported child guarantee. The parent domain
+must admit an exact positive witness; empty or contradictory domains fail.
+The checker separately verifies the child's certificate, parent model, allocation,
+binding and implication certificates. The arbitrary normalized parent and
+child Problem inputs are not automatically tied to original component sources.
+
+`composition-plan INPUT` / `composition-check INPUT CERTIFICATE` accepts
+{transfer:{width,height,inlineStart,blockStart},parent,child,parentPoint}.
+Transfer fields are exact Scaled values, parent/child are normalized Problems,
+parentPoint is an exact rational Point. This is the normalized mathematical
+C1/C2 core, not the complete existing composition import/adapter protocol.
+C3 (higher-dimensional abstract implication), C4 (DAG dependency binding and
+cache evaluation), C5 (opaque source-backed children) remain open. The new
+checker does not establish any speedup; the parent geometry is still required.
+
+### Finite dispatch
+
+`VerissLeanFinite` models closed boolean assignments and render choices
+independently of the state enumerator. `Machine.reach_refines` proves every
+reachable normalized valuation maps to a reachable declared graph state,
+and `Machine.edge_sound` rejects invented dispatch edges.
+`finite-check INPUT` expects {machine,graph,variants}. See test_finite.py
+for the normalized schema: variable list and initial values, literal or
+variable/negation assignment, partial render choices and attached buttons,
+state ID/valuation/render mapping. It independently compares all enabled
+dispatches with the graph. Test fixtures use actual React/Vue/Svelte
+adapter output and compare rendered button inventories. The source AST and
+HTML parser/inventory are external inputs; this is not source-to-AST
+validation, actual browser action success or general JS semantics.
+
+### Motion
+
+`VerissLeanMotion` independently regenerates the before/after full rectangle
+evidence and viewport-fit obligations for an event case selected from the
+original ObligationIR. `Model.continuous_fit` proves that both endpoint
+models cover the declared viewport and the linearly interpolated rectangle
+stays within the safe-area bounds for **every real time**, provided all
+coordinates share the checked progress trace and the viewport does not
+change. It is a new fit claim, not a proof of the selected original event
+contract (such as stable).
+
+`motion-plan INPUT` / `motion-check INPUT CERTIFICATE` accepts
+{obligation,key,target,trace}; the key must be a regenerated reachable
+event case. Trace is as in Time, with exact rational knots at integer times.
+The producer creates {before,after} verified certificates from the plans.
+The model does not infer the actual CSS animation/timing or enforce shared
+progress at runtime. Unknown CSS easing, independent progress, transforms
+and intermediate layout changes remain unmodeled.
+
+### Reproduce
+
+From this directory, after installing the pinned toolchain and existing
+veriss dependencies, with CHECKER the wrapper described above:
+
+```sh
+lake build VerissLean
+for n in css composition finite motion; do
+  python3 test_$n.py CHECKER OUTPUT_DIR/$n
+done
+python3 kernel_research.py OUTPUT_DIR > Concrete.lean
+lake env lean Concrete.lean
+lake env lean StateTest.lean
+lake env lean TimeTest.lean
+python3 test_state.py CHECKER OUTPUT_DIR/state
+python3 test_relational.py CHECKER OUTPUT_DIR/relational
+python3 kernel_relational.py OUTPUT_DIR/state/transition-kernel-input.json \
+  OUTPUT_DIR/relational/kernel-input.json > RegressionConcrete.lean
+lake env lean RegressionConcrete.lean
+```
+
+The independent producer fixtures, positive checks, and modified negative
+inputs are retained as scripts, not just result logs.
+
+2026-11-21 fifth-milestone validation: 58 new integration fixtures passed
+(20 CSS including 7 canonical-source, 14 composition, 13 finite dispatch,
+11 motion). Four representative concrete certificates were checked by
+Lean kernel reduction (`by decide`), and the new audited semantic theorems
+depend only on standard Lean axioms (`propext`, `Classical.choice`,
+`Quot.sound`, or subsets). The full browser/production gate and the
+previous real-site replay dataset were not rerun in this research pass.
+
+Remaining to meet the full design: general CSS selector/cascade/AST
+binding (X0/X1), additional lengths/clamps/layout/axis projection
+(X2–X5), actual adapter source-to-normalized-state validation (S5),
+existing import binding and multi-child abstract proof composition
+(C1–C5), CSS timing extraction, complete profile provenance and
+full TypeScript opt-in export/adapter integration. None of those are
+implied by a successful normalized or canonical-fragment check.

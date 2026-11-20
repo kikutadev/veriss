@@ -435,32 +435,25 @@ JSON/AST の decoder を信頼する範囲を記録し、受理済み型付き I
 
 ## 6. 実装ロードマップと担当境界
 
-実装状況（第四段階）: S1–S4 の宣言グラフ・全キーの完全性、
-before/after の型付き幾何参照、stable/event predicate、対象結合、
-profile 有効経路と有理数反例、正負の全件判定を実装済み。
-正規化 row の直積被覆と全到達ケースの定理を追加した。
-実 IR との統合 fixture および保存済み2レポートの再生で確認。
-実装 JS からの StateIR 導出 (S5)、原 CSS・profile-key provenance、
-時間導出、コンポーネント合成は未実装。前回の正規化述語の意味保存・
-共有進捗の時間安全定理は継続して有効。
-全 prior 46 ケースの再生と browser gate は未再実行。
-実行手順、詳細テスト、信頼境界は README.md を正本とする。
+実装状況（第五段階）: S1–S4 の宣言グラフ、必須ケース、遷移前後の
+幾何、到達経路付き反例に加え、S5 の normalized boolean dispatch の
+forward simulation と逆向き辺検証、C1/C2 の単一矩形 normalized
+合成（affine 代入・割当・幾何等値・含意）、X2/X3 の明示位置・明示
+サイズ・padding/border の exact box model、および X0b の閉じた
+canonical HTML/CSS 文字列照合を実装。時間は元 ObligationIR の
+到達イベントと両 endpoint 証拠から全 viewport・全実数時刻の
+共有進捗補間に対する安全領域内の fit を検算できるようにした。
+これらは個別の model/fragment checker であり、任意 JS/CSS/UA
+の全域同値性を定理にしたわけではない。
+実行手順、検証結果、正確な信頼境界は README.md を正本とする。
 
-次の着手候補: C1（同一座標系の子 proof の独立結合検査）と
-X2（正規化長さ・box model の意味論）。実際の CSS 抽出の保証には
-X0/X1 と source binding も必要。S5 は有限 boolean machine の
-forward simulation と render variant 対応を独立に進める。
+次の作業: 既存 exporter からの source-to-normalized AST/DOM
+binding (S5)、一般 selector/cascade の X0/X1 と実 CSS の部分抽出
+X2–X5、既存 composition import との結合・多子の抽象含意
+C1–C5、CSS timing の source binding、環境 provenance を進める。
+TypeScript 移行と競合しない opt-in の接続には先に schema の
+照合が必要。全体完了の条件は第0節・第6.1節を変更しない。
 TypeScript 作業ツリーは変更しない。
-
-今回の着手 (第五段階): X2/X3 の viewport-fixed 明示 left/top・
-width/height、padding/border、content-box/border-box の閉じた computed
-style subset から独立した実数 box 意味論を定義し、既存 EvidenceIR の
-全 row に対する等値証明と寸法・被覆を検算する。CSS の完全な cascade、
-祖先 containing block、raw parser はこの段階では信頼前提であり
-CSS source verified と呼ばない。次に C2 の exact affine 代入、有限
-state refinement の基礎を追加する。受入は kernel 定理、実 producer
-fixture、改変拒否、既存回帰。未完の X0/X1/X4、C1–C4、
-時間 source binding は完了扱いしない。
 
 | 順序 | 作業束 | 入力依存 | 完了成果 |
 |---|---|---|---|

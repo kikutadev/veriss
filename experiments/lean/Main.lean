@@ -1,5 +1,9 @@
 import VerissLeanStateProof
 import VerissLeanTime
+import VerissLeanCSS
+import VerissLeanComposition
+import VerissLeanFinite
+import VerissLeanMotion
 open Lean VerissLean
 
 def readJson (file : String) : IO (Except String Json) := do
@@ -78,8 +82,93 @@ def batch (file : String) : IO UInt32 := do
       Json.mkObj [("code",toJson code),("result",data)])).compress
     return (if results.any (·.1 == 2) then 2 else if results.any (·.1 == 1) then 1 else 0)
 
+def cssInput (style report state profile target : String) : IO (Except String (CSS.AnchoredStyle × Relation.Problem)) := do
+  let a ← readJson style
+  let b ← readJson report
+  return do
+    let s ← a >>= CSS.readStyle
+    let p ← b >>= fun raw => CSS.sourceProblem raw state profile target
+    return (s,p)
+
+def fragmentInput (source report state profile : String) : IO (Except String (CSS.SourceFragment × Relation.Problem)) := do
+  let a ← readJson source
+  let b ← readJson report
+  return do
+    let s ← a >>= CSS.readFragment
+    let p ← b >>= fun raw => CSS.sourceProblem raw state profile s.target
+    return (s,p)
+
 def main (args : List String) : IO UInt32 := do
   match args with
+  | ["motion-plan",file] =>
+    match (← readJson file) >>= Motion.readRequest >>= Motion.Request.model with
+    | .error msg => fail msg
+    | .ok m =>
+      IO.println m.plan.compress
+      return 0
+  | ["motion-check",file,cert] =>
+    match ((← readJson file) >>= Motion.readRequest >>= Motion.Request.model),
+      ((← readJson cert) >>= fromJson? (α := Motion.Certificate)) with
+    | .ok m, .ok c =>
+      if m.check c then
+        IO.println "Verified: viewport fit for the declared shared-progress motion model"
+        return 0
+      else fail "Invalid motion or endpoint certificate"
+    | .error msg, _ | _, .error msg => fail msg
+  | ["finite-check",file] =>
+    match (← readJson file) >>= Finite.readInput with
+    | .error msg => fail msg
+    | .ok i =>
+      if i.check then
+        IO.println "Verified: declared finite dispatch machine refines state graph (not JS source)"
+        return 0
+      else fail "Invalid finite machine, render mapping or transitions"
+  | ["composition-plan",file] =>
+    match (← readJson file) >>= fromJson? (α := Composition.CompositionInput) with
+    | .error msg => fail msg
+    | .ok i =>
+      if !i.valid then return ← fail "Unsupported composition shape"
+      IO.println i.plan.compress
+      return 0
+  | ["composition-check",file,cert] =>
+    match ((← readJson file) >>= fromJson? (α := Composition.CompositionInput)),
+      ((← readJson cert) >>= fromJson? (α := Composition.CompositionCertificate)) with
+    | .ok i, .ok c =>
+      if i.check c then
+        IO.println "Verified: normalized one-rectangle affine composition (not CSS source)"
+        return 0
+      else fail "Invalid composition certificate or geometry correspondence"
+    | .error msg, _ | _, .error msg => fail msg
+  | ["css-source-plan",source,report,state,profile] =>
+    match ← fragmentInput source report state profile with
+    | .error msg => fail msg
+    | .ok (s,p) =>
+      IO.println (CSS.extractionPlan s.style p).compress
+      return 0
+  | ["css-source-check",source,report,state,profile,cert] =>
+    match (← fragmentInput source report state profile),
+      ((← readJson cert) >>= fromJson? (α := CSS.ExtractionCertificate)) with
+    | .ok (s,p), .ok c =>
+      if s.check p c then
+        IO.println "Verified: canonical HTML/CSS fragment and its exact formal geometry"
+        return 0
+      else fail "Invalid source extraction certificate"
+    | .error msg, _ | _, .error msg => fail msg
+  | ["css-plan",style,report,state,profile,target] =>
+    match ← cssInput style report state profile target with
+    | .error msg => fail msg
+    | .ok (s,p) =>
+      IO.println (CSS.extractionPlan s p).compress
+      return 0
+  | ["css-check",style,report,state,profile,target,cert] =>
+    match (← cssInput style report state profile target),
+      ((← readJson cert) >>= fromJson? (α := CSS.ExtractionCertificate)) with
+    | .ok (s,p), .ok c =>
+      if s.check p c then
+        IO.println "Verified: declared viewport-anchored computed style matches evidence (not raw CSS)"
+        return 0
+      else fail "Invalid extraction certificate or mismatched geometry"
+    | .error msg, _ | _, .error msg => fail msg
   | ["time-domain",file] =>
     match (← readJson file) >>= fromJson? (α := Time.Trace) with
     | .error msg => fail msg
@@ -122,4 +211,4 @@ def main (args : List String) : IO UInt32 := do
   | ["violate",report,state,profile,contract,file] => relational "violate" report state profile contract (some file)
   | [file] => checkFile file none
   | ["report",report,state,profile,target,file] => checkFile file (some (report,state,profile,target))
-  | _ => fail "usage: time-domain TRACE.json, state-cases OBLIGATION.json, state-plan OBLIGATION.json, state-proofs OBLIGATION.json CERTIFICATES.json, plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"
+  | _ => fail "usage: css-source-plan|css-source-check SOURCE REPORT STATE PROFILE [CERTIFICATE], motion-plan|motion-check INPUT [CERTIFICATE], finite-check INPUT, composition-plan|composition-check INPUT [CERTIFICATE], css-plan|css-check STYLE REPORT STATE PROFILE TARGET [CERTIFICATE], time-domain TRACE.json, state-cases OBLIGATION.json, state-plan OBLIGATION.json, state-proofs OBLIGATION.json CERTIFICATES.json, plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"
