@@ -20,13 +20,13 @@ export interface SyntaxNotePayloads {
   W_CSS_MEDIA_AND_SPACE: NoteSource & { params: string; written?: string };
   W_CSS_MEDIA_INVALID_LENGTH: NoteSource & { params: string; value: string };
   W_CSS_MEDIA_VAR: NoteSource & { params: string };
-  W_CSS_GRID_AREAS_INVALID: NoteSource & { selector: string; why: string };
+  W_CSS_GRID_AREAS_INVALID: NoteSource & { selector: string; value: string; why: string };
   W_CSS_PLACEHOLDER_IGNORED: NoteSource & { property: string; selector: string };
   W_CSS_SELECTION_IGNORED: NoteSource & { property: string; selector: string };
   W_CSS_VISITED_IGNORED: NoteSource & { property: string; selector: string };
   W_CSS_TRANSITION_NO_DURATION: NoteSource & { item: string; selector: string };
   W_CSS_DUPLICATE_DECLARATION: NoteSource & { dead: string; kept: string; property: string; same: boolean; selector: string };
-  W_CSS_KEYFRAMES_MISSING: NoteSource & { name: string; selector?: string };
+  W_CSS_KEYFRAMES_MISSING: NoteSource & { name: string; selector?: string | undefined };
   W_CSS_IMPORT_IGNORED: NoteSource & { nested: boolean; params: string };
   W_CSS_KEYFRAME_IMPORTANT: NoteSource & { name: string; property: string };
   W_CSS_TRANSITION_DISPLAY: NoteSource & { selector: string };

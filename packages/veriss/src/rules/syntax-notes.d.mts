@@ -95,6 +95,7 @@ export interface SyntaxNotePayloads {
     };
     W_CSS_GRID_AREAS_INVALID: NoteSource & {
         selector: string;
+        value: string;
         why: string;
     };
     W_CSS_PLACEHOLDER_IGNORED: NoteSource & {
@@ -122,7 +123,7 @@ export interface SyntaxNotePayloads {
     };
     W_CSS_KEYFRAMES_MISSING: NoteSource & {
         name: string;
-        selector?: string;
+        selector?: string | undefined;
     };
     W_CSS_IMPORT_IGNORED: NoteSource & {
         nested: boolean;
