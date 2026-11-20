@@ -2360,7 +2360,7 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
     // does nothing there. A replaced element (img, video, …) takes it even when inline.
     if (!box.pseudo && sources['aspect-ratio'] && String(values['aspect-ratio']) !== 'auto') {
         const tablePart = ['td', 'th', 'tr', 'thead', 'tbody', 'tfoot', 'col', 'colgroup'].includes(box.tag) && ['ua', 'table-cell', 'table-row', 'table-row-group', 'table-header-group', 'table-footer-group', 'table-column', 'table-column-group'].includes(String(values.display));
-        const inline = String(values.display) === 'inline' && !['img', 'video', 'canvas', 'iframe', 'embed', 'object', 'svg', 'input', 'select', 'textarea', 'button'].includes(box.tag);
+        const inline = String(values.display) === 'inline' && !blockified && !['img', 'video', 'canvas', 'iframe', 'embed', 'object', 'svg', 'input', 'select', 'textarea', 'button'].includes(box.tag);
         if (tablePart || inline) {
             drop(metadata, 'aspect-ratio', 'aspect-ratio', values['aspect-ratio'], { where: tablePart ? 'table' : 'inline' });
             values['aspect-ratio'] = 'auto';

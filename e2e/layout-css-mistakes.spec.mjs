@@ -1073,6 +1073,20 @@ test('F98: aspect-ratio does nothing on table cells and rows or on non-replaced 
     expect(r.status).toBe('verified');
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('aspect-ratio'))).toBe(true);
 });
+test('F98: a span blockified by grid or flex retains its aspect ratio', async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 200 });
+    const html = '<html lang="en"><body><main class="p"><span class="s"></span></main></body></html>';
+    for (const display of ['grid', 'flex']) {
+        const css = '*{margin:0;box-sizing:border-box}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{display:' + display + ';align-items:start;grid-template-columns:100px}.s{display:inline;width:50px;aspect-ratio:2}';
+        const report = analyzeHTML(html, { name: 'P', css, viewport: { min: 400, max: 400, height: { min: 200, max: 200 } } });
+        expect(report.status).toBe('verified');
+        expect((report.layoutWarnings ?? []).some(w => w.box === '.s' && w.properties?.includes('aspect-ratio') && w.code === 'W_LAYOUT_DECLARATION_INERT')).toBe(false);
+        await page.setContent('<!doctype html>' + html.replace('<body>', '<head><style>' + css + '</style></head><body>'));
+        const height = await page.locator('.s').evaluate(el => el.getBoundingClientRect().height);
+        expect(height).toBe(25);
+        expect(Number(report.sizes.find(s => s.box === '.s')?.blockSize?.constant)).toBe(height);
+    }
+});
 test('F99, F100: an invalid unquoted font-family or a font shorthand without size or family drops the declaration', async ({ page }) => {
     const computed = async (decl) => {
         await page.setContent(`<!doctype html><html lang="en"><head><style>.a{font-size:30px;font-family:monospace}.a{${decl}}</style></head><body><div class="a">x</div></body></html>`);

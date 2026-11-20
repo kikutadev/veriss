@@ -1061,6 +1061,20 @@ test('F98: aspect-ratio on a table cell or row, or on a non-replaced inline elem
   assert.deepEqual(inert(run('img{aspect-ratio:1;width:50px}', '<div class="a"><img src="x.png" alt="x"></div>')), []);
 });
 
+test('F98: dropped aspect-ratio in a measured text run is reported; a blockified grid item keeps its ratio', () => {
+  const text = '<html lang="en"><body><p class="t">Some <span class="s">marked</span> text</p></body></html>';
+  const options = {name:'P', css:'*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.t{font-size:16px;line-height:24px;width:300px}.s{background:#fc0}', viewport:{min:400,max:400,height:{min:200,max:200}},boxes:{'.t':{minInlineSize:0,intrinsicBlockSize:24}}};
+  const base = analyzeHTML(text,options);
+  const withRatio = analyzeHTML(text,{...options,css:options.css+'.s{aspect-ratio:1}'});
+  assert.equal(withRatio.status,base.status);
+  assert.deepEqual(withRatio.sizes,base.sizes);
+  assert.ok(codes(withRatio,'W_LAYOUT_DECLARATION_INERT').some(w=>w.box==='.s' && w.properties?.includes('aspect-ratio')));
+  const grid = run('.a{display:grid;grid-template-columns:100px;height:auto}.s{display:inline;width:50px;aspect-ratio:2}', '<div class="a"><span class="s"></span></div>');
+  assert.equal(grid.status,'verified');
+  assert.equal(grid.sizes.find(s=>s.box==='.s')?.blockSize?.constant,'25');
+  assert.equal(codes(grid,'W_LAYOUT_DECLARATION_INERT').some(w=>w.box==='.s' && w.properties?.includes('aspect-ratio')),false);
+});
+
 test('F99, F100: an invalid font-family or font shorthand drops the declaration (F99 was applied)', () => {
   const size = (css:string) => { const r = run(`.a{font-size:30px;width:1em}${css}`); return [r.status, r.sizes?.find(s => s.box === '.a')?.rect!.inlineSize!.constant, codes(r, 'W_CSS_FONT_INVALID').length]; };
   assert.deepEqual(size('.a{font:16px Font Awesome 5 Free}'), ['verified', '30', 1]);

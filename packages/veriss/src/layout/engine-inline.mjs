@@ -2,6 +2,7 @@
 import { q, div, cmp, add, sub, mul } from './linear.mjs';
 import { scalar, sum, diff, times, asAffine, clip } from './region.mjs';
 import { matches, px } from './css.mjs';
+import { droppedOf } from './dropped.mjs';
 import { compileSelector } from './selectors.mjs';
 import { paintFacts } from './accessibility.mjs';
 const zero = q(0);
@@ -226,7 +227,8 @@ export function createInlineSolver({ styles, edgeValue, generatedTexts, layoutWa
                 firstPseudoInert(child, style);
                 if (!['img', 'video', 'canvas', 'iframe', 'svg', 'input', 'button', 'select', 'textarea'].includes(child.tag) && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === child.path)) {
                     const initial = { 'inline-size': ['auto'], 'block-size': ['auto'], 'min-inline-size': ['auto', '0', '0px'], 'min-block-size': ['auto', '0', '0px'], 'max-inline-size': ['none'], 'max-block-size': ['none'], 'margin-top': ['0', '0px', 'auto'], 'margin-bottom': ['0', '0px', 'auto'], 'aspect-ratio': ['auto'], transform: ['none'], translate: ['none'], rotate: ['none'], scale: ['none'] };
-                    const written = Object.keys(initial).filter(key => style.$sources?.[key] && !initial[key].includes(String(style[key])));
+                    const dropped = new Set(droppedOf(style, 'aspect-ratio').map(d => d.property));
+                    const written = Object.keys(initial).filter(key => style.$sources?.[key] && (dropped.has(key) || !initial[key].includes(String(style[key]))));
                     if (written.length)
                         layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: child.label, path: child.path, properties: written,
                             css: written.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
