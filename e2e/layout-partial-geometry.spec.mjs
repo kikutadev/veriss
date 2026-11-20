@@ -148,3 +148,30 @@ test('incremental independent extraction reuses only unchanged validated source 
  expect(session.domGeometry(dependency)).toEqual(domGeometry(dependency));
  expect(session.domGeometry(dependency).every(e=>!e.rows?.length)).toBe(true);
 });
+
+test('axis-specific evidence matches original content-dependent block flow',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1920,height:{min:320,max:1080}}};
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header><kbd>native</kbd></header><main id="shell"><kbd>native</kbd><section id="panel"><kbd>unknown height</kbd></section></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}header{height:73px}#shell{max-width:800px;margin:0 auto;padding-inline:clamp(20px,5vw,76px)}#panel{width:100%;height:auto;padding-bottom:calc(94px + env(safe-area-inset-bottom))}body:has(.absent) #shell{width:10px}@media (max-width:500px){#shell{padding-inline:16px}}';
+ const evidence=domGeometry({state:'screen',profile,html:source,css:style,targets:['shell','panel']});
+ expect(evidence.every(e=>e.axes?.join(',')==='inline'&&e.rows?.length),JSON.stringify(evidence)).toBe(true);
+ const model={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[
+  {id:'inline',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'panel',field:'inlineEnd'},right:{environment:'safeRight'}}},
+  {id:'both',kind:'within-viewport',target:'panel'}
+ ]};
+ expect(verifyUI({model,evidence}).contracts.map(c=>c.status)).toEqual(['verified','unknown']);
+ for(const width of [320,400,500,501,799,800,801,1520,1920])for(const height of [390,900]){
+   await page.setViewportSize({width,height});
+   await page.setContent(source.replace('</head>','<style>'+style+'</style></head>'));
+   for(const e of evidence){
+     const actual=await page.locator('#'+e.target).evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.width]});
+     const rows=e.rows.filter(r=>r.constraints.every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+     expect(rows).not.toHaveLength(0);
+     for(const row of rows){
+       expect(actual[0]).toBeCloseTo(value(row.rect.inlineStart,width,height),1);
+       expect(actual[1]).toBeCloseTo(value(row.rect.inlineSize,width,height),1);
+       expect(row.rect.blockSize).toBeUndefined();
+     }
+   }
+ }
+});

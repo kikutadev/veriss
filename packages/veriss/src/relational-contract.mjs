@@ -26,7 +26,7 @@ function minusRegion(region,cs) {
   return out;
 }
 // All built-in linear relations lower to the same serializable predicate AST.
-const equal=(a,b)=>axes.flatMap(k=>{const d=diff(a[k],b[k]);return [[[d,true]],[[neg(d),true]]]});
+const equal=(a,b,fields=axes)=>fields.flatMap(k=>{const d=diff(a[k],b[k]);return [[[d,true]],[[neg(d),true]]]});
 const compare=(relation,left,right)=>({op:'compare',relation,left,right});
 const all=items=>({op:'all',items}),any=items=>({op:'any',items});
 const ref=(target,field,endpoint)=>({target,field,...(endpoint?{endpoint}:{})});
@@ -76,32 +76,52 @@ function reachableIn(model,profile){
  for(const s of states)for(const t of transitions)if(t.from===s&&!seen.has(t.to)){seen.add(t.to);states.push(t.to)}
  return {states,edges:transitions.filter(t=>seen.has(t.from))};
 }
-function prepare(entry,domain,budget) {
+// Derive requirements from the expanded predicate, never from claimant-provided
+// evidence metadata. End coordinates require both start and size.
+function requiredFields(predicate,refs) {
+ const need=refs.map(()=>new Set());
+ if(!predicate)return refs.map(()=>axes);
+ function visit(o){
+  if(!o||typeof o!=='object')return;
+  if(Object.hasOwn(o,'target')){
+   const i=refs.findIndex(([endpoint,target])=>target===o.target&&endpoint===(o.endpoint??'before'));
+   if(i<0)throw Error('Missing predicate target');
+   if(o.field.endsWith('End'))for(const suffix of ['Start','Size'])need[i].add(o.field.replace(/End$/,suffix));
+   else need[i].add(o.field);
+  }else Object.values(o).forEach(visit);
+ }
+ visit(predicate);return need.map(s=>[...s]);
+}
+const evidenceFields=e=>e?.axes===undefined?axes:axes.filter(k=>e.axes.some(a=>k.startsWith(a)));
+function prepare(entry,domain,budget,required=axes) {
   if(!entry)throw Error('missing geometry evidence');
   if(entry.reason)throw Error(entry.reason);
   if(!entry.rows?.length||entry.rows.length>128)throw Error('geometry row limit or empty geometry');
+  const fields=evidenceFields(entry);
+  if(required.some(k=>!fields.includes(k)))throw Error('Required geometry axis not proved');
   const rows=entry.rows.map(row=>{
     if(!list(row.constraints??[],64))throw Error('region constraint limit');
     const cs=(row.constraints??[]).map(c=>{if(typeof c.strict!=='boolean')throw Error('invalid strict constraint');return [affine(c),c.strict]});
-    const rect=Object.fromEntries(axes.map(k=>[k,affine(row.rect[k])]));
+    if(!row.rect||Object.keys(row.rect).length!==fields.length||fields.some(k=>!Object.hasOwn(row.rect,k)))throw Error('Geometry does not match declared axes');
+    const rect=Object.fromEntries(fields.map(k=>[k,affine(row.rect[k])]));
     return {cs,rect,region:cond(domain,cs)};
   }).filter(r=>r.region);
   let gaps=[domain];
   for(const row of rows){
     if((budget.left-=gaps.length*Math.max(1,row.cs.length))<0)throw Error('coverage budget exceeded');
     gaps=gaps.flatMap(g=>minusRegion(g,row.cs));if(gaps.length>256)throw Error('coverage region limit exceeded');
-    for(const k of ['inlineSize','blockSize'])if(clip(row.region,neg(row.rect[k]),true))throw Error('negative rectangle dimension');
+    for(const k of fields.filter(k=>k.endsWith('Size')))if(clip(row.region,neg(row.rect[k]),true))throw Error('negative rectangle dimension');
     if(!gaps.length)break;
   }
   if(gaps.length)throw Error('geometry does not cover profile');
   // Even redundant rows must have valid dimensions and agree on shared domains.
   for(let i=0;i<rows.length;i++){
     const a=rows[i];
-    for(const k of ['inlineSize','blockSize'])if(clip(a.region,neg(a.rect[k]),true))throw Error('negative rectangle dimension');
+    for(const k of fields.filter(k=>k.endsWith('Size')))if(clip(a.region,neg(a.rect[k]),true))throw Error('negative rectangle dimension');
     for(const b of rows.slice(i+1)){
       if(--budget.left<0)throw Error('consistency budget exceeded');
       const both=cond(a.region,b.cs);
-      if(both&&equal(a.rect,b.rect).some(p=>cond(both,p)))throw Error('contradictory geometry');
+      if(both&&equal(a.rect,b.rect,fields).some(p=>cond(both,p)))throw Error('contradictory geometry');
     }
   }
   return rows;
@@ -229,7 +249,8 @@ function evaluateRelational({model,evidence=[],observations=[],compiledCases,cac
         const remaining=budget.left;
         let covered=false;
         try{
-          const groups=used.map(e=>prepare(e,domain,budget));covered=true;
+          const fields=requiredFields(predicate,refs);
+          const groups=used.map((e,i)=>prepare(e,domain,budget,fields[i]));covered=true;
           const bad=cross(domain,groups,budget,(reg,rects)=>failure(c,p,predicate,refs,reg,rects,budget));
           if(!bad)cache?.set(cacheKey,remaining-budget.left);
           cases.push({...meta,coverage:{status:'verified'},status:bad?'violated':'verified',...(bad?{witness:{width:exact(bad.x),height:exact(bad.y)}}:{})});
@@ -276,7 +297,7 @@ export function createEnvironmentIR(profiles) {
 }
 export function createEvidenceIR(entries) {
  ensure(list(entries,4096),'Evidence limit exceeded');
- ensure(entries.every(e=>own(e,['state','profile','profileKey','target','source','assumptions','rows','reason'])&&id(e.state)&&id(e.profile)&&id(e.target)&&['dom','local-dom','scene','external'].includes(e.source)&&Array.isArray(e.assumptions)&&e.assumptions.every(a=>typeof a==='string'&&a.trim())&&(e.source==='dom'||e.assumptions.length)),'Invalid geometry evidence');
+ ensure(entries.every(e=>own(e,['state','profile','profileKey','target','source','assumptions','rows','reason','axes'])&&(e.axes===undefined||Array.isArray(e.axes)&&e.axes.length===1&&['inline','block'].includes(e.axes[0]))&&id(e.state)&&id(e.profile)&&id(e.target)&&['dom','local-dom','scene','external'].includes(e.source)&&Array.isArray(e.assumptions)&&e.assumptions.every(a=>typeof a==='string'&&a.trim())&&(e.source==='dom'||e.assumptions.length)),'Invalid geometry evidence');
  return immutable({version:1,kind:'evidence',entries});
 }
 export function createRelationalContractIR(input) {
@@ -395,6 +416,7 @@ export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_
      dependencies.push({component:child.source.contract.component,contract:child.claim.id,bind:child.bind});
     }
     if(!premises.length||!refs.every(([,t])=>covered.has(t)))continue;
+    if(refs.some(([,t])=>parentFacts.get(factKey(s,p.id,t))?.axes!==undefined))continue;
     // Bound extra solver work for a single call and reuse an identical
     // symbolic implication across state cases.
     const key=JSON.stringify([p,premises,predicate]);

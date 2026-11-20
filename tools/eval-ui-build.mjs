@@ -100,7 +100,7 @@ for(const profile of profiles){
 const invalid=new Set();
 for(const o of observations.filter(o=>o.rects))for(const e of evidence.filter(e=>e.state===o.state&&e.profile===o.profile&&e.rows?.length)){
  const {width,height}=o,actual=o.rects[e.target],rows=e.rows.filter(r=>(r.constraints??[]).every(c=>c.strict?at(c,width,height)>0:at(c,width,height)>=0));
- const ok=!!actual&&rows.length>0&&rows.every(r=>['inlineStart','blockStart','inlineSize','blockSize'].every((k,i)=>Math.abs(at(r.rect[k],width,height)-actual[['x','y','width','height'][i]])<0.5));
+ const ok=!!actual&&rows.length>0&&rows.every(r=>['inlineStart','blockStart','inlineSize','blockSize'].every((k,i)=>!Object.hasOwn(r.rect,k)||Math.abs(at(r.rect[k],width,height)-actual[['x','y','width','height'][i]])<0.5));
  comparisons.push({state:o.state,profile:o.profile,target:e.target,width,height,ok});
  if(!ok)invalid.add(e);
 }

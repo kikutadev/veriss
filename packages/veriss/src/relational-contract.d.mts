@@ -38,7 +38,8 @@ export interface RelationalContractInput {
 export type RelationalContractIR=Frozen<{version:1;kind:'contract';component:string;profile:{id:'relational/1'};contracts:Relation[]}>;
 export interface GeometryEvidence {
   state:string;profile:string;profileKey?:string;target:string;source:'dom'|'local-dom'|'scene'|'external';assumptions:readonly string[];
-  rows?:readonly {rect:LayoutRectangle;constraints?:readonly (LayoutAffine & {strict:boolean})[]}[];reason?:string;
+  axes?:readonly ['inline']|readonly ['block'];
+  rows?:readonly {rect:Partial<LayoutRectangle>;constraints?:readonly (LayoutAffine & {strict:boolean})[]}[];reason?:string;
 }
 export type EvidenceIR=Frozen<{version:1;kind:'evidence';entries:GeometryEvidence[]}>;
 export interface RelationalImplementation {state:StateIR;environment:EnvironmentIR;evidence:EvidenceIR}

@@ -106,3 +106,24 @@ test('a resolved overflow is not confused with parser or coverage failure',async
  assert.equal(unresolved.status,'unknown');
  assert.equal(createLayoutIR(unresolved).geometryComplete,false);
 });
+
+test('inline-only projection proves widths and positions without pretending to know height',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header><kbd>native</kbd></header><main id="shell"><kbd>native</kbd><section id="panel"><kbd>unknown height</kbd></section></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}#shell{max-width:800px;margin:0 auto;padding-inline:clamp(20px,5vw,76px)}#panel{width:100%;height:auto;padding-bottom:calc(94px + env(safe-area-inset-bottom))}';
+ const evidence=check(source,style,['shell','panel']);
+ assert.ok(evidence.every(e=>e.rows?.length&&e.axes?.join(',')==='inline'),JSON.stringify(evidence));
+ assert.ok(evidence.every(e=>e.rows.every(r=>!Object.hasOwn(r.rect,'blockSize')&&!Object.hasOwn(r.rect,'blockStart'))));
+ const h={op:'compare',relation:'le',left:{target:'panel',field:'inlineEnd'},right:{environment:'safeRight'}};
+ const model={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[
+  {id:'horizontal',kind:'predicate',predicate:h},
+  {id:'vertical',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'panel',field:'blockEnd'},right:{environment:'safeBottom'}}},
+  {id:'all',kind:'within-viewport',target:'panel'}
+ ]};
+ assert.deepEqual(verifyUI({model,evidence}).contracts.map(c=>c.status),['verified','unknown','unknown']);
+ for(const extra of ['#shell{display:flex}','#shell{aspect-ratio:1/1}','#shell{float:left}','header{float:left}','@keyframes float-away{to{float:left}}','#shell{transform:scale(2)}','#panel{width:10ch}','#panel{position:absolute;left:0}','#shell:has(kbd){width:10px}']){
+  assert.ok(!check(source,style+extra,['panel'])[0].rows?.length,extra);
+ }
+ assert.ok(!check(source.replace('<header>','<header style="float:left">'),style,['panel'])[0].rows?.length);
+ const e=check(source,style+'#panel{width:200%}',['panel'])[0];
+ assert.equal(verifyUI({model,evidence:[e]}).contracts[0].status,'violated');
+});

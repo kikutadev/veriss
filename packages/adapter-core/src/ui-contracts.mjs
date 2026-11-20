@@ -92,9 +92,19 @@ function extractGeometry({state,profile,html,css,targets,local,boxes,knownFonts,
   }
   function fallback(entry,p){
     if(p.result)return p.result;
+    let axisError;
+    if(!p.limit)try{
+      const target=entry.target,binding=Object.hasOwn(bindings,target)?bindings[target]:undefined;
+      const reduced=projectIndependentGeometry(html,css,target,profile,binding,true);
+      const layout=analyze('projected',{html:reduced.html,css:reduced.css},()=>createLayoutIR(analyzeProjectedGeometry(reduced,options)));
+      const [result]=layoutGeometry({state,profile,layout,targets:[target],paths:{[target]:reduced.path},local:{assumptions:reduced.assumptions}});
+      if(result.rows?.length)return {...result,axes:['inline'],rows:result.rows.map(r=>({...r,rect:{inlineStart:r.rect.inlineStart,inlineSize:r.rect.inlineSize}}))};
+      axisError=result.reason??'No projected inline geometry';
+    }catch(e){axisError=e.message}
+
     if(p.limit)return {...base(entry.target),reason:'Automatic projection target budget exceeded'};
     const {rows,...rest}=entry;
-    return {...rest,reason:(entry.reason??'Geometry incomplete')+'; automatic projection: '+p.error};
+    return {...rest,reason:(entry.reason??'Geometry incomplete')+'; automatic projection: '+p.error+(axisError?'; inline projection: '+axisError:'')};
   }
   if(preferIndependent){
     // Opt-in: seek a closed independent rectangle first; full-layout
