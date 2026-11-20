@@ -221,3 +221,5 @@ GALLERY は色・背景の transition を含む cascade の縮約未対応、HOM
 ゲーム・サイト配信コード変更なし。
 
 軸独立版の全gate: 6単体群 fail=0、component-lint 4評価不変、3ブラウザー369 E2E passed、supervisor exit=0（660 PID追跡、残留0）。並行開発の有限状態解析・永続キャッシュ・割当写像による合成を保持するため fork main f99ab46 を取り込み d135ca9 に統合した。統合後の関連単体32件成功、実ビルド保存済み15 snapshotから再抽出した21証拠はすべて統合前と完全一致。
+
+統合後 d135ca9 の全gate: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 381 E2E passed、supervisor exit=0、654 PID追跡・残留0。gate中の変更はこの検証記録のみ。
