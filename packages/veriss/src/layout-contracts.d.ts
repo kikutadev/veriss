@@ -606,6 +606,7 @@ export interface LayoutWarning {
     axes?: string[];
     sides?: string[];
     keyframes?: string;
+    counter?: string;
     needs?: number;
     area?: string;
     focused?: string;

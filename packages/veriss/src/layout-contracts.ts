@@ -199,7 +199,7 @@ export interface LayoutWarning {
   property?:string|undefined;min?:number;max?:number;media?:string;attributes?:string[];tag?:string;
   inset?:number;value?:string|undefined;family?:string;display?:string;fallback?:string;inheritedFrom?:string;scroller?:string;
   blockSize?:string|undefined;fontSize?:string|undefined;lineHeight?:string|undefined;intervals?:[number,number][];
-  state?:string|undefined;browsers?:{aligns:string[];ignores:string[]};loserAt?:string;winnerAt?:string;winner?:string;axes?:string[];sides?:string[];keyframes?:string;needs?:number;area?:string;focused?:string;focusedPath?:string;field?:string;delta?:string;lines?:number;ancestor?:string;items?:string[];side?:'top'|'bottom';boxes?:string[];query?:string;name?:string;reason?:string;
+  state?:string|undefined;browsers?:{aligns:string[];ignores:string[]};loserAt?:string;winnerAt?:string;winner?:string;axes?:string[];sides?:string[];keyframes?:string;counter?:string;needs?:number;area?:string;focused?:string;focusedPath?:string;field?:string;delta?:string;lines?:number;ancestor?:string;items?:string[];side?:'top'|'bottom';boxes?:string[];query?:string;name?:string;reason?:string;
   parent?:string;srcset?:string|undefined;sizes?:string;marker?:string;clippedBy?:string;
   naturalWidth?:number;natural?:string;basis?:'file'|'attributes';stretched?:'wider'|'taller';
   columns?:string|undefined;width?:number|string|undefined;properties?:string[]|undefined;scrollbar?:number;
