@@ -5,9 +5,9 @@ import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {strict as assert} from 'node:assert';
 import {chromium,firefox,webkit} from 'playwright';
-import {analyzeHTML} from '../packages/veriss/src/html.mjs';
-import {createLayoutIR,layoutGeometry} from '../packages/veriss/src/layout-contract.mjs';
-import {verifyInterpolatedPredicate} from '../packages/veriss/src/transitions.mjs';
+import {analyzeHTML} from '../../../packages/veriss/src/html.mjs';
+import {createLayoutIR,layoutGeometry} from '../../../packages/veriss/src/layout-contract.mjs';
+import {verifyInterpolatedPredicate} from '../../../packages/veriss/src/transitions.mjs';
 
 const [snapshotDir,buildDir,mode]=process.argv.slice(2);
 assert(mode===undefined||mode==='--home-only','Unknown audit option');

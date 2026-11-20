@@ -284,10 +284,13 @@ ABOUT/WORKS/ARTICLES 各7幅、HOME (#selected-work 直接遷移) 5幅、H=844�
 外部通信遮断、safe-area 0、overlay、DPR1。HOME のフルヒーロー遷移、内部リンク全配置、
 縦方向、viewport 変更中、複数の非同期進捗、CSSからの補間/縮約自動導出は未証明。
 既存レビュー済み入力と現在のローカルビルドの実測は別の証拠。
-再実行: `node tools/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist`、
+再実行: `node tools/ui-build-examples/portfolio-pages/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist`、
 HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラウザー supervisor 下で行う。
 新規3ブラウザー E2E 3件（各27フレーム）、関連単体13件成功。
 各実測 supervisor 残留0。サイト本体・配信コードは変更なし。
+
+### 汎用性の監査
+サイト固有セレクタ・寸法・入力ハッシュ・運用パスを package の実装へ持ち込まない。対象サイトの実測スクリプトは利用例として隔離し、別のUIの正常/違反/Unknown を共通 API で再現する。転用できない局所モデルはアプリ側の前提付き証拠であって一般解析機能ではない。各ブランチのテストに加えて統合版の gate を確認する。
 
 ### CSS 幅遷移の自動検証
 既存の有界アフィン不変条件を利用して、閉じた CSS と前後 DOM の幅遷移から補間条件を導出する。まず独立した fixed 幅と、中心/片側アンカーおよび通常 block/明示 stretch の直下子に限定する。既存 cascade と幾何抽出を再利用し、曖昧な遷移、複数の幾何プロパティ、未知の祖先依存、非対応長さの組合せは Unknown。実測による証拠の捏造は禁止。単体・3 UA・全 gate を通して統合する。
