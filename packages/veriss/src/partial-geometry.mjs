@@ -1,6 +1,7 @@
 // Automatic, deliberately conservative dependency slicing for independent rectangles.
 // The original whole-document report is never changed. No stylesheet or node is
 // discarded on the basis of an Unknown diagnostic alone.
+import {parseCondition} from './layout/conditions.mjs';
 import {parse,serialize} from 'parse5';
 import postcss from 'postcss';
 import * as csstree from 'css-tree';
@@ -284,7 +285,16 @@ export function projectIndependentGeometry(html,css,target,profile,binding,axis=
         const name=node.name.toLowerCase();
         if(['font-face','keyframes','-webkit-keyframes','charset','page','counter-style','font-palette-values','view-transition'].includes(name)){node.remove();continue}
         if(['media','supports','container','starting-style','scope'].includes(name)&&node.nodes){
-          visit(node,true,unsafeCondition||name!=='media',depth+1);
+          let activeConditional=true;
+          if(name==='media'&&profile.mediaFeatures!==undefined){
+            // Resolve only parsed, explicitly fixed screen media. The kept
+            // CSS still runs through the core cascade with the same profile.
+            let condition;
+            try{condition=parseCondition(node.params,'media',profile.mediaFeatures)}catch{/* unresolved: keep conservatively */}
+            if(condition&&condition.groups.length===0){node.remove();continue}
+            if(condition?.groups.some(g=>g.length===0))activeConditional=false;
+          }
+          visit(node,conditional||activeConditional,unsafeCondition||name!=='media',depth+1);
           if(!node.nodes.length)node.remove();
           continue;
         }

@@ -684,7 +684,7 @@ function flexShorthand(value) {
   return [['flex-grow', factors[0] ?? '1'], ['flex-shrink', factors[1] ?? '1'], ['flex-basis', basis ?? '0%']];
 }
 
-export function parseLayoutCSS(sheets, diagnostic, {scripting} = {}) {
+export function parseLayoutCSS(sheets, diagnostic, {scripting,mediaFeatures} = {}) {
   // Findings of the syntax stage, one shape: { code, ...data } (ADR-0016 M3). The rules/syntax-notes.mjs catalog words them.
   const notes = [], note = (code, data) => { notes.push({ code, ...data }); }, notesOf = code => notes.filter(n => n.code === code);
   const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [];
@@ -855,7 +855,7 @@ export function parseLayoutCSS(sheets, diagnostic, {scripting} = {}) {
           continue;
         }
         try {
-          const condition = parseCondition(node.params, node.name.toLowerCase());
+          const condition = parseCondition(node.params, node.name.toLowerCase(),mediaFeatures);
           const wanted = condition.groups.flat().filter(atom => atom.preference);
           if (wanted.length) {
             if (condition.groups.length !== 1 || wanted.length !== condition.groups[0].length || new Set(wanted.map(atom => atom.feature)).size !== wanted.length) throw new Error('Preference media queries (prefers-*, forced-colors) must be a single group of distinct preferences, without size features');

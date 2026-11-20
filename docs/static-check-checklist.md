@@ -62,6 +62,9 @@
   隣接する非空の block sibling の正の margin は max で相殺し、Grid/Flex は相殺しない。
   Flex の外寸と shrink の基準となる内寸を分離。3ブラウザーで幅・高さの境界、伸縮・折り返し、固定行、overflow の対照を照合した。
   親子/空箱の可変 margin 相殺、可変主軸 margin と %/content basis の組合せ、負の可変 margin、位置指定・native box と両軸未指定は Unknown。
+  明示的な mediaFeatures の hover / pointer / prefers-reduced-motion は、サイズ条件と
+  組み合わせて領域を分割する。別の業務ツールバー UI で 3 ブラウザーの
+  matchMedia と矩形を照合。未指定条件と固定環境を区別し、異なる環境の証拠を再利用しない。
 - [x] **D3. inline の中の行の配置**: 文字の行と inline の箱の位置。大きい。
   最初の一歩として、測った文字の中の inline の箱(`inlineBounds`)を `text-align: center`・`right`・`end` でも出す(以前は start と
   left だけ)。行の幅の区間で外接・内接をずらし、改行が揺れる幅は除く(ADR-0013)。3 つのブラウザーで一致。

@@ -265,6 +265,18 @@ f538ba2: 非負の viewport 依存 margin を既存の厳密な区分アフィ�
 - 親子/空箱の相殺、負の可変 margin、intrinsic contribution、可変主軸 margin と %/content basis の組合せ等は Unknown を維持。HOME キャラクターの負値 clamp も未対応。配信コード変更なし。
 - 全gate (f538ba2): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 402 E2E passed、supervisor exit=0、717 PID追跡・残留0。独立プロセス検査 CLEAN。gate後のコード変更なし。
 
+### 汎用性レビューと明示 media 環境
+ポートフォリオ等の URL・固有セレクター・ブレークポイントをコアへ持ち込まず、実問題は CSS 意味論から定義した再現可能な対照入力へ一般化する。既存コアのサイト固有依存を監査し、次に primary hover/pointer と reduced-motion の明示環境を既存の media query の領域分割へ接続する。未指定は推測せず、サイズとの AND/コンマ OR・ネスト・非成立枝・証拠の環境不一致をテストする。全アクセシビリティ状態の検査と固定 reduced-motion の幾何検査は混同しない。外部サイトと無関係なフォーム/ツールバー等の3ブラウザー対照を通し、全 gate 後に統合する。
+
+### 明示 media 環境の検証結果 (2026-11-20)
+baf9eb0: primary hover/pointer と prefers-reduced-motion の明示値を一般の EnvironmentIR・領域分割・cascade・証拠キーに接続。未指定の能力を幅・UA・入力方法から推測しない。サイズとの AND/コンマ OR・ネスト、固定環境で非成立の枝、環境不一致の証拠を検査。実ビルド捕捉では matchMedia で全指定条件を照合してから証拠化する。
+- コアの URL・対象サイト固有 selector/id・ローカルパス等を監査し、該当する依存を追加していないことを確認。サイト固有の契約と再現用入力は別管理。
+- 保存済み実入力15件、非ポートフォリオ6製品の再解析で media 診断32→15 (SPEX 9→3、MiniTools 3→0、Cinema UI 0→0、Sumi no Tachi 18→12、RPG Simulator 0→0、Voxel Tide Defense 2→0)。既存契約判定不変。新しい実ページ計測・全製品の完全証明ではない。
+- 同一公開5ページの両軸解析で未指定 Unknown163→明示 desktop138/touch reduced148、media 診断15→0。全ページは依然 Unknown。固定環境の幾何チェックを全アクセシビリティ状態の検査とはみなさない。
+- 新規単体3件・E2E3件、関連単体247件成功。独立した注文画面で3ブラウザー864矩形一致 (0.1px)。追加の汎用 cascade 対照84ケース中72解析・12 Unknown、1440/1440矩形一致 (0.15px)。Z3対照6環境ケース中5成立・1違反 (coarse の幅130%、320×700で利用可能300px/要求390px)。React/Vue/Svelte の同一再現例も fine 成立/coarse 違反。実ビルド入口の正常対照6/6比較一致、不一致プロファイル3/3拒否かつ証拠0。
+- 既存課題: ancestor の動的 selector と状態による custom property の間接的幾何依存、hover 等での全状態 fit の網羅。固定 media 環境の成立をそれらの成立と混同しない。any-hover/any-pointer・未対応論理式・条件付き cascade layer は未対応。配信コード変更なし。
+- 全gate (baf9eb0): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 405 E2E passed、supervisor exit=0、698 PID追跡・残留0。独立プロセス検査 CLEAN。gate後の変更は文書のみ。
+
 ### 固定配置の状態と遷移の監査
 対象は既存 island panel の横収容。実際の開閉を複数 viewport/UA で測り、初期の非表示状態だけを評価していた不足を解消する。静止状態の証拠と途中フレームの観測を分ける。汎用エンジンを迂回して実測値から連続領域の証明を捏造しない。
 

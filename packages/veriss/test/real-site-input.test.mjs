@@ -280,3 +280,30 @@ test('responsive margins refuse undecided containing and through-collapse depend
   for(const [html,css] of cases)assert.equal(analyzeHTML(html,{...options,css:reset+css}).status,'unknown',css);
   assert.equal(analyzeHTML('<main><div class="a"></div></main>',{viewport:{min:320,max:1600},css:reset+'main{display:grid;grid-template-columns:minmax(0,1fr)}.a{margin-top:5vw}'}).status,'unknown');
 });
+
+test('explicit media environment resolves interaction capabilities and reduced motion with width and height',()=>{
+  const html='<main><div id="panel"></div></main>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}#panel{height:40px;width:100%}@media (hover:hover) and (min-width:600px),(pointer:coarse) and (min-height:700px){#panel{width:50%}}@media (prefers-reduced-motion:reduce){#panel{height:80px}@media (min-width:800px){#panel{height:100px}}}';
+  const viewport={min:320,max:1200,height:{min:320,max:1000}};
+  const run=mediaFeatures=>analyzeHTML(html,{css,viewport,integrity:true,...(mediaFeatures?{mediaFeatures}:{})});
+  assert.equal(run().status,'unknown');
+  for(const features of [
+    {hover:'hover',pointer:'fine','prefers-reduced-motion':'no-preference'},
+    {hover:'none',pointer:'coarse','prefers-reduced-motion':'reduce'},
+    {hover:'none',pointer:'none','prefers-reduced-motion':'reduce'}
+  ]){
+    const r=run(features);
+    assert.equal(r.status,'verified',JSON.stringify(r.diagnostics));
+    assert.deepEqual(r.scope.mediaFeatures,features);
+    const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+    for(const w of [320,599,600,799,800,1200])for(const h of [320,699,700,1000]){
+      const at=a=>rat(a.constant)+rat(a.coefficient)*w+rat(a.heightCoefficient)*h;
+      const row=r.sizes.find(s=>s.box==='#panel'&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8));
+      assert.ok(row?.rect);
+      assert.equal(at(row.rect.inlineSize),w*((features.hover==='hover'&&w>=600||features.pointer==='coarse'&&h>=700)?.5:1));
+      assert.equal(at(row.rect.blockSize),features['prefers-reduced-motion']==='reduce'?(w>=800?100:80):40);
+    }
+  }
+  assert.throws(()=>run({hover:'sometimes'}),/mediaFeatures/);
+  assert.equal(run({hover:'hover',pointer:'fine'}).status,'unknown');
+});

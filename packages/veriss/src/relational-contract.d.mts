@@ -1,4 +1,4 @@
-import type {LayoutAffine,LayoutRectangle,LayoutScrollbarProfile,LayoutBoxContract} from './layout-contracts.d.ts';
+import type {LayoutAffine,LayoutRectangle,LayoutScrollbarProfile,LayoutBoxContract,MediaFeatures} from './layout-contracts.d.ts';
 import type {LayoutSolverAPI} from './layout-z3.mjs';
 import type {LayoutIR} from './layout-contract.mjs';
 type Frozen<T> = T extends object ? {readonly [K in keyof T]:Frozen<T[K]>} : T;
@@ -9,6 +9,7 @@ export interface StateInput {initial:string;states:readonly string[];transitions
 export type StateIR=Frozen<StateInput & {version:1;kind:'state'}>;
 export interface EnvironmentProfile {
   id:string; viewport:{min:number;max:number;height:{min:number;max:number}};
+  mediaFeatures?:MediaFeatures;
   safeArea?:Partial<Record<'top'|'right'|'bottom'|'left',number>>;
   ua?:'chromium'|'firefox'|'webkit'; dpr?:number; scrollbar?:LayoutScrollbarProfile;
   input?:'touch'|'mouse'|'keyboard'|'mixed'; fontProfile?:string; assumptions?:readonly string[];

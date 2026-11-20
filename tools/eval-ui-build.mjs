@@ -56,11 +56,15 @@ for(const profile of profiles){
  const browser=await engine.launch({headless:true,timeout:15000});
  try{
   for(const [width,height] of config.points){
-   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',deviceScaleFactor:profile.dpr??1});
+   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',deviceScaleFactor:profile.dpr??1,...(profile.mediaFeatures?.['prefers-reduced-motion']?{reducedMotion:profile.mediaFeatures['prefers-reduced-motion']}: {}),...(profile.mediaFeatures?.pointer==='coarse'?{hasTouch:true}: {})});
    try{
     const page=await context.newPage();
     await page.route('**/*',async route=>{try{await route.fulfill({path:fileFor(route.request().url())})}catch{await route.abort()}});
     await page.goto(origin+(config.path??'/'),{waitUntil:'domcontentloaded',timeout:15000});
+    if(profile.mediaFeatures){
+     const mediaMatches=await page.evaluate(features=>Object.entries(features).every(([key,value])=>matchMedia('('+key+': '+value+')').matches),profile.mediaFeatures);
+     if(!mediaMatches)throw Error('Browser mediaFeatures do not match declared profile');
+    }
     for(const screen of config.screens){
      try{
       if(screen.click)await page.locator(screen.click).click({timeout:10000});
