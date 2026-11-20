@@ -196,3 +196,26 @@ gate: 6単体群 fail=0、component-lint 4評価不変、357 E2E passed (Chromiu
 
 ### 軸独立証拠の設計
 既存 relational/1 の矩形証拠を明示的な軸の部分証拠へ拡張する。未証明の軸を0等で補わず、述語が参照する軸ごとに被覆・矛盾・非負寸法を検査する。まず通常block flow・overlay scrollbar・閉じたカスケードの横方向に限定し、高さ・内容の依存から分離する。既存の厳密レイアウト計算、キャッシュと合成を利用し、不足する軸への証明は拒否する。単体・3ブラウザ照合・実ビルド・全gateを確認する。
+
+### 軸独立証拠の実入力評価 (2026-11-20)
+
+66b3f7e: 既存 relational/1 の証拠に axes を明示し、参照される座標のみで片軸契約の証明を行う。元 DOM/CSS に対して通常 block flow の横軸を自動抽出し、純粋に縦軸の宣言と内容を縮約する。float・aspect-ratio・依存する Flex/Grid・未解決の動的条件/外部 CSS は拒否。元 report を書き換えない。単純な html/body の :has() は元 DOM の存在判定と同じ詳細度で固定。ブラウザーの実測値は丸めずに厳密な有理数へ変換し、述語が要求する座標を比較する。
+
+`tools/ui-build-examples/portfolio-pages/` の5設定、ローカル dist、Chromium/Firefox/WebKit、profile 幅320–1920 高さ320–1080、DPR 1、overlay、safe area 0、外部通信遮断。実測4点/環境。同一捕捉入力で旧版 45673c6 （関係エンジンと射影は 72330bc と同じ。旧 adapter は非キャッシュ実行）と比較。
+
+| ページ・対象 | 旧版 | 軸独立 | 実測の契約 |
+| --- | --- | --- | --- |
+| HOME main-content | Unknown | verified (3/3環境) | 12/12 |
+| HOME mobile-island-panel | Unknown | Unknown | 12/12 |
+| HOME selected-work | Unknown | Unknown | 12/12 |
+| ABOUT main-content | Unknown | verified (3/3環境) | 12/12 |
+| WORKS main-content | Unknown | verified (3/3環境) | 12/12 |
+| ARTICLES main-content | Unknown | verified (3/3環境) | 12/12 |
+| GALLERY main | Unknown | Unknown | 12/12 |
+
+7契約中 verified 0→4、Unknown 7→3。3環境では21件中12件成立・9件Unknown。
+局所モデルと実ブラウザー座標照合48/48、契約観測84/84、捕捉エラー0。
+ABOUT・WORKS・ARTICLES は exit=0、HOME と GALLERY は未証明があるため exit=2。全QA supervisor 残留0。
+GALLERY は色・背景の transition を含む cascade の縮約未対応、HOME island は祖先/対象 markup、selected-work は grid 依存。縦軸の独立外部証拠は直接検証できるが、縦軸の自動縮約、全ページの全要素・全状態の証明は未達。既知の未証明座標に0を与えない。
+関連単体22件、新規3ブラウザー6 E2E 成功。片軸の外部 block 証拠についても、欠落軸・負寸法・矛盾・被覆不足を拒否する対照を別途確認。4ページ/WebKit の単回計測では非キャッシュ2.20s、セッション初回1.77s、再実行1.55s（並行QA負荷あり、一般性能保証ではない）。証拠行一致、4 projected cache hits。
+ゲーム・サイト配信コード変更なし。

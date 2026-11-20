@@ -175,7 +175,7 @@ input / fontProfile は環境識別子で、未対応の pointer/hover media 分
   float（除外する兄弟/子孫、inline style、keyframe も検査）、aspect ratio、Flex/Grid の祖先、
   未解決の相対配置・動的条件、外部 CSS を拒否する。
   明示的に block 軸だけに作用する宣言と子・兄弟の内容を除外して既存エンジンで計算するが、
-  証拠に高さ・縦位置を含めない。一意な html/body に対する単一 class/id の存在を問う :has()
+  証拠に高さ・縦位置を含めない。一意な html/body に対する単純な class/id 選択肢の存在を問う :has()
   は元 DOM の成否を固定し、存在しない class/id とその否定で元と同じ詳細度を保つ。
   DOM 状態の変化や複雑な :has() は自動証明しない。独立した縦軸の自動縮約は未対応。
   元の全ページ report、他の契約、見た目・hit-test・アクセシビリティの検査結果は変更しない。
