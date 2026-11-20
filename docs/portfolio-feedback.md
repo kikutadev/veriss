@@ -315,3 +315,5 @@ HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラ
 ### 閉じた CSS 幅遷移の検証結果
 `verifyCSSWidthTransition` は固定配置の幅、同一条件の前後 CSS、通常 block/縦向き Flex の直接子の横伸張を検査し、元の geometry/relational engine を再利用する。幅以外の変動する配置、外部 CSS、非対応な selector や easing、相反する min/max の枝などは Unknown。5 単体テストと Chromium/Firefox/WebKit の 3 E2E を確認。
 レビュー済み portfolio island の CSS から実際の transition 宣言を抽出し、閉じたコンポーネント射影に対して 3/3 UA の自動導出を確認。連続する同じ media 条件に分割されたコンパイル済み CSS にも対応。射影と元ページの同値性は引き続きレビュー前提であり、全ページの自動縮約・全アニメーションの証明ではない。配信コード変更なし。
+
+追加の3 UA差分計測: max の拡大/違反、min の縮小、右寄せ、左寄せ違反、反対方向の枝の6条件。幅6点・5成立/違反モデルで720フレーム、正常モデルの逸脱0、違反モデルのはみ出し27フレーム。反対方向の枝は3/3 UA Unknown。監督 runner exit 0、14 PID、残留0。レビュー済み射影のみの再実行は `node tools/ui-build-examples/portfolio-pages/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist --proof-only`。

@@ -475,3 +475,5 @@
 - [x] **H9 補足: 有界アフィン遷移**: 端点の比較の conjunction から、明示した共通進捗の条件下で途中の不変条件を検査する。端点不足・違反、overshoot・未知 easing、非凸述語を拒否/検出し、3 UA の実際の幅 interpolation と比較する (`relational-contract.test.mjs`, `layout-partial-geometry.spec.mjs`)。DOM/CSSから共通補間を自動導出したと扱わない。
 
 - [x] **H9 補足: 他サイトでの独立幾何**: outline / font smoothing / active animation がない timing metadata と、実際の geometry-changing focus/animation を分離する。設定フォームの3 UA照合、2領域の共通進捗と非同期の重なり対照を `layout-partial-geometry.spec.mjs` に追加。3アプリの未変更ビルドで同一 snapshot 比較、成立3→18/27環境、矩形72/72一致。
+
+- [x] **H9 補足: CSS 幅遷移の自動導出**: 閉じた fixed / column Flex コンポーネントの実 CSS から同方向の幅枝と明示 transition を検査し、途中の横収容を3 UAで照合。非対応 selector・子の寸法依存・逆方向の枝・未対応 easing を対照にした。単体 `css-width-transition.test.mjs`、E2E `layout-partial-geometry.spec.mjs`。レビュー済みコンポーネント射影の外部同値性は別条件。

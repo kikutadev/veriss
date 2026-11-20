@@ -319,3 +319,31 @@ const proof = verifyInterpolatedPredicate({
     assumptions:['All referenced inline coordinates share bounded progress at a fixed viewport.']}
 });
 ```
+
+### 閉じた CSS コンポーネントの幅遷移
+
+`verifyCSSWidthTransition` は上記の不変条件計算を再利用し、対応する CSS から
+共通アフィン進捗の条件を検査する。呼出側から座標や数値進捗の仮定を渡す必要はない。
+
+```js
+import {verifyCSSWidthTransition} from '@mizchi/veriss/transitions';
+const proof = verifyCSSWidthTransition({
+  html, css, profile,
+  target: 'dock', stateAttribute: 'data-expanded', from: 'false', to: 'true',
+  predicate: {op:'compare', relation:'le',
+    left:{target:'dock',field:'inlineEnd'}, right:{environment:'safeRight'}}
+});
+```
+
+入力は単一の viewport-fixed 要素と通常 block の直接の葉要素からなる標準 HTML、
+外部入力を含まない完全な CSS。対象 ID の通常規則と data 属性の遷移先規則の
+幅宣言を対にする。同じ条件の幅 media 規則が連続している場合は順序を保って扱う。
+親は明示的な高さ、片側の横/縦アンカー、border-box と余白0。
+縦 Flex の場合は子の min-width:0 を要求し、column-reverse は横軸の証明だけに限り
+column に射影する。定数 px、vw と px の加減算、対応する min/max の枝で
+係数が等しく各枝が同方向に変化する場合を扱う。幅以外の幾何プロパティが
+状態や media 条件によって変動する場合は拒否する。
+既存の解析器で端点の幾何を得て、横軸だけを使って不変条件を判定する。
+閉じた規則からの導出であり、任意のページからこのコンポーネントを安全に
+切り出すことや、実際の JS が宣言された状態遷移に従うことはまだ保証しない。
+縦横の同時アニメーション、未知の selector、時間の overshoot、viewport 変更中は Unknown。
