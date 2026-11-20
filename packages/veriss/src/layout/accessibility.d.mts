@@ -238,7 +238,7 @@ interface RangeFacts {
     heightRange?: LayoutRange;
     region?: LayoutRegion;
 }
-type DiagnosticDetails = {
+export type AccessibilityDiagnosticDetails = {
     rule: string;
     other?: string;
     cover?: string;
@@ -291,7 +291,9 @@ interface DiagnosticIdentity extends RangeFacts {
     path: string;
     box: string;
 }
-export interface AccessibilityFinding extends DiagnosticIdentity, DiagnosticDetails {
+export interface AccessibilityFinding extends DiagnosticIdentity, AccessibilityDiagnosticDetails {
+    /** Added during report assembly, after rule profile filtering. */
+    tier?: string;
     severity: 'error' | 'warning' | 'unknown';
     message: string;
     source: SourceSpan | undefined;
@@ -303,7 +305,7 @@ export interface AccessibilityFinding extends DiagnosticIdentity, DiagnosticDeta
         viewportHeightExact?: string;
     };
 }
-export interface AccessibilityExemption extends DiagnosticIdentity, DiagnosticDetails {
+export interface AccessibilityExemption extends DiagnosticIdentity, AccessibilityDiagnosticDetails {
     reason: string;
     equivalent?: string;
 }

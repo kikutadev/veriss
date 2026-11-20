@@ -88,13 +88,13 @@ async function verifyOneModel(model, api, { timeoutMs = 5000 } = {}) {
             const obligation = model.obligations[Number(index.numerator)];
             if (index.denominator !== 1n || !obligation)
                 return unknown('Invalid counterexample selector', 'sat');
-            if (obligation.available && !obligation.required)
+            if (obligation.available && (!obligation.required || typeof obligation.required !== 'object'))
                 throw Error('Missing required witness expression');
             const evaluate = (expr) => add(add(mul(rational(expr.coefficient), w), mul(rational(expr.heightCoefficient ?? '0'), h)), rational(expr.constant));
             return { ...base, status: model.complete ? 'violated' : 'unknown', witness: { obligationIndex: Number(index.numerator), code: obligation.code, box: obligation.box, path: obligation.path, axis: obligation.axis,
                     ...(obligation.variant !== undefined ? { variant: obligation.variant } : {}), ...(obligation.scrollbarProfile ? { scrollbarProfile: obligation.scrollbarProfile } : {}),
                     viewport: number(w), viewportExact: exact(w), ...(model.scope.axis === 'both' ? { viewportHeight: number(h), viewportHeightExact: exact(h) } : {}),
-                    ...(obligation.available && obligation.required ? { available: number(evaluate(obligation.available)), availableExact: exact(evaluate(obligation.available)), required: number(evaluate(obligation.required)), requiredExact: exact(evaluate(obligation.required)) } : {}),
+                    ...(obligation.available && typeof obligation.required === 'object' ? { available: number(evaluate(obligation.available)), availableExact: exact(evaluate(obligation.available)), required: number(evaluate(obligation.required)), requiredExact: exact(evaluate(obligation.required)) } : {}),
                 } };
         }
         finally {

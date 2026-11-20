@@ -231,7 +231,7 @@ interface FocusPiece { region: Region; origin: Origin; inline: Affine2; block: A
 interface Hit { region: Region; other: Geometry | null; reason?: string }
 interface FlashFrame { offset: number; props: Record<string, string | undefined> }
 interface RangeFacts { range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion }
-type DiagnosticDetails = {
+export type AccessibilityDiagnosticDetails = {
   rule: string; other?: string; cover?: string; before?: string; previous?: string; outer?: string; reference?: string; id?: string; name?: string;
   ratio?: number; required?: number; foreground?: Color; background?: Color; control?: string; fontSize?: number;
   clipper?: string; coverBox?: string; scroller?: string; axis?: 'inline'|'block'; part?: string; edge?: string; layer?: string; also?: string; first?: string;
@@ -240,12 +240,14 @@ type DiagnosticDetails = {
   perSecond?: number; accessKey?: string; target?: string; controls?: string; dialog?: string; message?: string;
 };
 interface DiagnosticIdentity extends RangeFacts { code: string; path: string; box: string }
-export interface AccessibilityFinding extends DiagnosticIdentity, DiagnosticDetails {
+export interface AccessibilityFinding extends DiagnosticIdentity, AccessibilityDiagnosticDetails {
+  /** Added during report assembly, after rule profile filtering. */
+  tier?:string;
   severity: 'error' | 'warning' | 'unknown'; message: string; source: SourceSpan | undefined;
   regionConstraints?: LayoutRegion['constraints'];
   witness: { viewport: number; viewportExact: string; viewportHeight?: number; viewportHeightExact?: string };
 }
-export interface AccessibilityExemption extends DiagnosticIdentity, DiagnosticDetails {
+export interface AccessibilityExemption extends DiagnosticIdentity, AccessibilityDiagnosticDetails {
   reason: string; equivalent?: string;
 }
 export interface AccessibilityInput {
@@ -410,7 +412,7 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }: Acce
   geometry = geometry.filter(row => !row.box.pseudo);
   const witness = (region: Region) => { const p = sample(region); return { viewport: number(p.x), viewportExact: exact(p.x), ...(block ? { viewportHeight: number(p.y), viewportHeightExact: exact(p.y) } : {}) }; };
   // `region` keeps the exact constraints: a 2-D region (e.g. width > height) is not the product of its two ranges.
-  const report = (list: AccessibilityFinding[], code: string, severity: AccessibilityFinding['severity'], message: string, row: {box: AccessibilityBox; path: string}, region: Region, extra: DiagnosticDetails) => list.push({ code, severity, message, box: row.box.label, path: row.path, source: row.box.source, ...ranges(region), ...(block ? { regionConstraints: serialize(region).constraints } : {}), witness: witness(region), ...extra });
+  const report = (list: AccessibilityFinding[], code: string, severity: AccessibilityFinding['severity'], message: string, row: {box: AccessibilityBox; path: string}, region: Region, extra: AccessibilityDiagnosticDetails) => list.push({ code, severity, message, box: row.box.label, path: row.path, source: row.box.source, ...ranges(region), ...(block ? { regionConstraints: serialize(region).constraints } : {}), witness: witness(region), ...extra });
   const visible = (row: RowFacts) => row.paint.visibility === 'visible';
   // Interactive: buttons, links with href (or a dynamic one), and form fields (not type=hidden or disabled-hidden).
   const field = (box: AccessibilityBox) => includes(['select', 'textarea'], box.tag) || (box.tag === 'input' && box.inputType !== 'hidden');

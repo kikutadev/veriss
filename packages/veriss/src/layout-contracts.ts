@@ -124,7 +124,7 @@ export interface LayoutRange {
 }
 export interface LayoutAnimationPaint {name:string;duration:string;count:string;playState:string;direction:string}
 export interface LayoutAnimationScoreBound {window:number;perIteration:number;iterations:number;startJump?:number;endJump?:number;viewport:{width:number;height:number};assumes:string}
-export interface LayoutDiagnostic {
+export interface LayoutDiagnostic extends Omit<import('./layout/accessibility.mjs').AccessibilityDiagnosticDetails,'rule'|'animation'|'message'> {
   variant?: number; scrollbarProfile?: string; devicePixelRatio?:number|undefined;
   code: string; severity: 'error' | 'unknown' | 'warning'; message: string;
   box?: string; path?: string; range?: LayoutRange;

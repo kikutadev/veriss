@@ -9,7 +9,7 @@ export interface LayoutObligation {
     domain: string;
     failure: string;
     available?: LayoutAffine;
-    required?: LayoutAffine;
+    required?: LayoutAffine | number;
 }
 export interface LayoutModel<Scope extends Pick<LayoutSummary['scope'], 'axis'> = LayoutSummary['scope']> {
     version: 1;

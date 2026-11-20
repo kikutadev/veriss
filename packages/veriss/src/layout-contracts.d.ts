@@ -332,7 +332,7 @@ export interface LayoutAnimationScoreBound {
     };
     assumes: string;
 }
-export interface LayoutDiagnostic {
+export interface LayoutDiagnostic extends Omit<import('./layout/accessibility.mjs').AccessibilityDiagnosticDetails, 'rule' | 'animation' | 'message'> {
     variant?: number;
     scrollbarProfile?: string;
     devicePixelRatio?: number | undefined;
