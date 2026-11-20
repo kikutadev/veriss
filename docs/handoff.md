@@ -135,3 +135,12 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - 最終 gate (3ブラウザーE2E/既存eval)、Git依存導入、性能比較は今回未実施。既存 main を変更せず、remote へ push していない。残るエンジン本体・手書き宣言・テスト/補助スクリプトの移行が必要。
 
 第五段階の方針: 残る engine のインライン境界・生成コンテンツ・幾何行の形成を優先して型付けし、計測プロファイルと内部座標を明示する。実測根拠のない補完をしない。再帰 solve/finish の型境界へつなげる。
+
+第五段階の結果 (実装 b3f0062):
+- engine-inline に生成テキスト、インラインの実測上下限、改行境界の幾何を分離し、計測証拠の型を公開スキーマに追加した。
+- engine-settled-style に確定スタイルの警告を分離。engine-finish に finish 全体を移し、親子のサイズ制約・幾何行・RTL・変換・アニメーション・公開レポートの座標証拠を型付けした。$shown の非列挙属性は維持。
+- engine-normalize に割合サイズと auto の解決、Flex の主軸サイズ、インライン折り畳みを分離。engine-fallback に Unknown 時のスタイル検査・マークアップアクセシビリティ検査を移した。
+- engine.mjs は 1908 → 1064 行 (844行減)。元の実装70ファイル中69ファイルの完全移行という状況は変わらない。再帰 solve の主要ループと全体のオーケストレーション、手書き engine.d.mts が残る。JS 呼び出し側と TypeScript 境界の接続を完全な型検査にしたわけではない。従来の診断リストに含まれる placeholder 警告と公開診断型の差も、全体移行時に整理する。
+- pnpm build:ts / check:ts / test / git diff --check 成功。全867件 (root 29, verifier 742, adapter-core 66, Vue 6, React 12, Svelte 12)、失敗・skip 0。
+- e98f09a のクリーンな worktree と analyzeHTML を同一入力82件で比較し、JSON 化した全レポートが82/82一致 (verified 49, violated 15, unknown 18)。Grid/Flex/block、RTL、位置指定、変換、条件付きCSS、疑似要素、アクセシビリティと Unknown のフォールバックを含む。全入力での同値性やブラウザーとの照合を証明するものではない。
+- 最終 gate、性能比較、Git 依存導入検証は未実施。main への統合・リモート push は行っていない。
