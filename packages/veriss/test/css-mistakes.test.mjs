@@ -1382,8 +1382,21 @@ test('F126: an axis written visible (or clip) beside a scrolling one computes to
   const hit = css => codes(run(css), 'W_CSS_OVERFLOW_PROMOTED');
   assert.match(hit('.a{overflow-x:hidden;overflow-y:visible}')[0]?.message ?? '', /overflow-y: visible computes to auto.*write overflow-x: clip/);
   assert.equal(hit('.a{overflow:hidden visible}').length, 1);
-  assert.match(hit('.a{overflow-x:auto;overflow-y:clip}')[0]?.message ?? '', /computes to hidden/);
   for (const css of ['.a{overflow-x:hidden}', '.a{overflow-x:clip;overflow-y:visible}', '.a{overflow:hidden}', '.a{overflow:auto}']) assert.equal(hit(css).length, 0, css);
+  // clip beside hidden / auto / scroll: Firefox (157) and WebKit (27.2) compute it to hidden, Chromium (156) keeps clip
+  // (measured with getComputedStyle, every pair). Whether the box scrolls on that axis differs by browser: the warning
+  // says which browser does what, and the layout is Unknown (not hidden, as it once was taken to be everywhere).
+  for (const css of ['.a{overflow-x:auto;overflow-y:clip}', '.a{overflow:clip hidden}', '.a{overflow-x:scroll;overflow-y:clip}']) {
+    const r = run(css), [w] = codes(r, 'W_CSS_OVERFLOW_PROMOTED');
+    assert.ok(w, css);
+    assert.deepEqual(w.browsers, { hidden: ['firefox', 'webkit'], clip: ['chromium'] }, css);
+    assert.match(w.message, /Firefox and Safari.*Chrome/, css);
+    assert.ok(r.diagnostics.some(d => d.code === 'U_LAYOUT_BROWSER' && /clip/.test(d.message)), css);
+  }
+  // visible beside a scrolling axis computes to auto in all three: still verified, and no browsers note.
+  const visible = run('.a{overflow-x:hidden;overflow-y:visible}');
+  assert.equal(codes(visible, 'W_CSS_OVERFLOW_PROMOTED')[0].browsers, undefined);
+  assert.ok(!visible.diagnostics.some(d => d.code === 'U_LAYOUT_BROWSER'));
 });
 
 test('F127: box-sizing on html or body alone is not inherited by the elements that size with padding', () => {
@@ -1433,4 +1446,31 @@ test('F132: a -moz- or -ms- selector in a list drops the whole rule where it is 
   assert.equal(hit('.a:hover:-moz-any(b),.a{color:red}').length, 1);
   for (const css of ['.a:is(:-moz-focusring,.x),.a{color:red}', '.a:where(:-moz-focusring),.a{color:red}', '.a::-webkit-input-placeholder,.a{color:red}', '.a::-moz-selection{color:red}', '.a,.b{color:red}'])
     assert.equal(hit(css).length, 0, css);
+});
+
+test('F133: a container query unit with no query container for its axis is a small-viewport unit', () => {
+  const nest = '<div class="g"><div class="p"><div class="a"></div></div></div>';
+  const hit = (css, html = nest) => codes(run(css, html), 'W_CSS_CONTAINER_UNIT_VIEWPORT');
+  // No container: cqw is svw, cqh is svh (measured in Chromium, Firefox and WebKit: the same boxes).
+  const [w] = hit('.a{width:50cqw}');
+  assert.ok(w); assert.deepEqual(w.units, ['cqw']); assert.match(w.message, /svw/);
+  assert.match(hit('.a{height:30cqh}')[0]?.message ?? '', /svh/);
+  for (const css of ['.a{font-size:5cqi}', '.a{width:calc(100% - 10cqw)}', '.a{padding-block:2cqb}'])
+    assert.equal(hit(css).length, 1, css);
+  // An inline-size container gives the inline axis only: cqh / cqb still fall back to the viewport; cqw does not.
+  assert.equal(hit('.p{container-type:inline-size}.a{height:30cqh}').length, 1);
+  assert.match(hit('.p{container-type:inline-size}.a{height:30cqh}')[0].message, /container-type: size/);
+  assert.equal(hit('.p{container-type:inline-size}.a{width:50cqw}').length, 0);
+  assert.equal(hit('.g{container-type:inline-size}.a{width:50cqw}').length, 0);
+  assert.equal(hit('.p{container-type:size;height:100px}.a{height:30cqh}').length, 0);
+  assert.equal(hit('.p{container:card / inline-size}.a{width:50cqw}').length, 0);
+  // A container name alone is not a container; the element's own container-type does not count (it queries ancestors).
+  assert.equal(hit('.p{container-name:card}.a{width:50cqw}').length, 1);
+  assert.equal(hit('.a{container-type:inline-size;width:50cqw}').length, 1);
+  // A container that a state or a media query sets may be there: not reported.
+  assert.equal(hit('@media (min-width:600px){.p{container-type:inline-size}}.a{width:50cqw}').length, 0);
+  assert.equal(hit('.g:hover .p{container-type:inline-size}.a{width:50cqw}').length, 0);
+  // Not a unit: a name or a string with the letters in it.
+  assert.equal(hit('.a{animation-name:cqw}@keyframes cqw{to{opacity:.5}}').length, 0);
+  assert.equal(hit('.a{width:50svw}').length, 0);
 });

@@ -99,6 +99,7 @@ export const recommended = {
   W_CSS_SCROLLBAR_WEBKIT_IGNORED: ['warning', 'style scrollbars with scrollbar-width / scrollbar-color: Chrome ignores ::-webkit-scrollbar on an element that sets them'],
   W_CSS_SCROLLBAR_FIREFOX_SHOWN: ['warning', 'add scrollbar-width: none: Firefox does not take ::-webkit-scrollbar'],
   W_CSS_STATE_SHADOWED: ['warning', 'put the :hover / :focus / :active rule after the rules it overrides (links: :link, :visited, :hover, :active), or make it more specific'],
+  W_CSS_CONTAINER_UNIT_VIEWPORT: ['warning', 'give the ancestor it should measure container-type: inline-size (size for cqh / cqb), or write the svw / svh unit if the viewport is meant: with no container the unit is the small viewport'],
   W_CSS_SELECTOR_LIST_VENDOR: ['warning', 'put a -moz- / -ms- selector in a rule of its own: browsers that do not know it drop the whole selector list'],
   W_CSS_GRID_TRACKS_INVALID: ['warning', 'fix the grid track list: repeat(auto-fill) takes fixed sizes (minmax(200px, 1fr)), minmax() cannot start with fr, and a repeat count is a positive whole number'],
   W_CSS_COUNTER_UNUSED: ['warning', 'show the counter with content: counter(name), or remove the counter-reset / -increment / -set'],

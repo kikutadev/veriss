@@ -261,7 +261,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     anonymous.forEach((child, k) => { if (runs[k]) { child.contract = runs[k]; child.contractSelector = `${box.contractSelector} text ${k}`; } });
   }
   const styleSources = [...(options.reset ?? []).map((sheet, index) => ({ ...sheet, kind: 'reset', file: sheet.file ?? `<reset:${index}>` })), { css: options.css, kind: 'app', file: options.cssFile ?? '<css>' },...inlineSheets];
-  const { rules, layers, notes = [], keyframes: keyframeNames = new Set(), dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
+  const { rules, layers, notes = [], keyframes: keyframeNames = new Set(), dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, registered = new Map(), defaultNamespace = [], startingRules = [], unreadContainers = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
   });
@@ -471,7 +471,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // CSS mistakes found on one box's computed style (rules/css-mistakes.mjs, ADR-0016 M5).
   const { firstInert, firstPseudoInert, dialogMarginReset, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
     report: { warnings: layoutWarnings, unknown, diagnostics, ranges },
-    facts: { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles },
+    facts: { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles, unreadContainers },
     tools: { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: box => focusableBox(box) },
   });
   function styles(box, region, ancestors, inherited, emit, gridItem = true, state) {

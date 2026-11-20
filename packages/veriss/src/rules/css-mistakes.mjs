@@ -7,7 +7,7 @@
 // The checks are unchanged; M6 moves the ones still inside the layout (solve) here.
 export function createCssMistakes({ report, facts, tools }) {
   const { warnings: layoutWarnings, unknown, diagnostics, ranges } = report;
-  const { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles } = facts;
+  const { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles, unreadContainers = [] } = facts;
   const { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: focusableBox } = tools;
   const neverRendered = new Set(['template', 'script', 'style', 'link', 'meta']);
   // F37: a box ::first-letter / ::first-line selects, and the boxes proven to have none (not a block container).
@@ -231,16 +231,67 @@ export function createCssMistakes({ report, facts, tools }) {
       ...(src ? { css: [{ property: 'text-indent', file: src.file, line: src.line, selector: src.selector }] } : {}),
       message: `${box.label}: text-indent: ${value}${from ? ` (inherited from ${from.box.label})` : ''} indents the selected option twice in Firefox and once in Chrome and Safari, so the text sits in a different place. Use padding-inline-start on the select${from ? `, and text-indent: 0 on it` : ' instead'}` });
   }
-  // F126: overflow-x: hidden with overflow-y: visible (or the other way round, or clip beside auto) does not keep that
-  // axis visible: it computes to auto (clip to hidden), so the box scrolls or clips on both axes (measured in Chromium,
-  // Firefox and WebKit). overflow: clip on the axis to cut keeps the other visible.
+  // F126: overflow-x: hidden with overflow-y: visible (or the other way round) does not keep that axis visible: it
+  // computes to auto, so the box scrolls or clips on both axes (measured in Chromium, Firefox and WebKit). overflow: clip
+  // on the axis to cut keeps the other visible. clip beside hidden / auto / scroll computes to hidden in Firefox (157) and
+  // WebKit (27.2) but stays clip in Chromium (156; getComputedStyle, every pair): reported with the browsers, and the
+  // layout is Unknown.
   function overflowPromoted(box, style) {
     for (const p of style.$overflowPromoted ?? []) {
       if (layoutWarnings.some(w => w.code === 'W_CSS_OVERFLOW_PROMOTED' && w.path === box.path && w.property === p.property)) continue;
-      const axis = p.property.slice(-1), otherAxis = axis === 'x' ? 'y' : 'x', becomes = p.written === 'visible' ? 'auto' : 'hidden';
-      layoutWarnings.push({ code: 'W_CSS_OVERFLOW_PROMOTED', severity: 'warning', box: box.label, path: box.path, property: p.property, css: [{ property: p.property, file: p.source.file, line: p.source.line, selector: p.source.selector }],
-        message: `${box.label}: overflow-${axis}: ${p.written} computes to ${becomes} because overflow-${otherAxis} is ${p.other}: a box cannot scroll or clip on one axis and stay ${p.written} on the other, so it ${becomes === 'auto' ? `scrolls (or clips) its overflow on the ${axis} axis too` : `clips on the ${axis} axis too`}. To cut only the ${otherAxis} axis, write overflow-${otherAxis}: clip` });
+      const axis = p.property.slice(-1), otherAxis = axis === 'x' ? 'y' : 'x';
+      const css = [{ property: p.property, file: p.source.file, line: p.source.line, selector: p.source.selector }];
+      if (p.written === 'clip') {
+        layoutWarnings.push({ code: 'W_CSS_OVERFLOW_PROMOTED', severity: 'warning', box: box.label, path: box.path, property: p.property, css, browsers: { hidden: ['firefox', 'webkit'], clip: ['chromium'] },
+          message: `${box.label}: overflow-${axis}: clip beside overflow-${otherAxis}: ${p.other} computes to hidden in Firefox and Safari (the box becomes scrollable on the ${axis} axis too) but stays clip in Chrome, so the page differs by browser. Write the same value on both axes (overflow: ${p.other}), or overflow-${otherAxis}: clip to cut only that axis` });
+        // Whether the box scrolls on that axis differs by browser: its layout is not decided (the style keeps hidden).
+        if (!diagnostics.some(d => d.code === 'U_LAYOUT_BROWSER' && d.path === box.path))
+          unknown('U_LAYOUT_BROWSER', `${box.label}: ${p.property}: clip beside a scrolling overflow (${p.other}) computes to hidden in Firefox and Safari but stays clip in Chrome, so whether it scrolls on that axis differs by browser`, p.source.line, box, p.source.file);
+        continue;
+      }
+      layoutWarnings.push({ code: 'W_CSS_OVERFLOW_PROMOTED', severity: 'warning', box: box.label, path: box.path, property: p.property, css,
+        message: `${box.label}: overflow-${axis}: ${p.written} computes to auto because overflow-${otherAxis} is ${p.other}: a box cannot scroll or clip on one axis and stay ${p.written} on the other, so it scrolls (or clips) its overflow on the ${axis} axis too. To cut only the ${otherAxis} axis, write overflow-${otherAxis}: clip` });
     }
+  }
+  // F133: a container query length unit (cqw, cqi, cqh, cqb) with no query container for its axis among the ancestors
+  // is the small-viewport unit (svw, svi, svh, svb): width: 50cqw with no container is 50svw, and cqh inside a
+  // container-type: inline-size container is svh (only size containers give the block axis). Measured in Chromium,
+  // Firefox and WebKit: the same boxes as with the sv unit, the element's own container-type not counting, a container
+  // name alone not making a container; and a container (inline-size, the shorthand, a grandparent) changes the box.
+  // A container-type set by any rule that may match the ancestor (another state or media query) counts as there, and a
+  // rule that sets one with a selector the analysis cannot match (.card:hover .body) leaves it undecided: not reported.
+  // Horizontal writing modes only (cqw is the inline axis there).
+  const containerUnit = /(?<![\w.-])(?:\d+\.?\d*|\.\d+)(cqw|cqi|cqh|cqb)(?![\w-])/gi;
+  const containerTypes = { inline: ['inline-size', 'size'], block: ['size'] };
+  function containerUnitViewport(box, style, ancestors) {
+    if (layoutWarnings.some(w => w.code === 'W_CSS_CONTAINER_UNIT_VIEWPORT' && w.path === box.path)) return;
+    const found = new Map();
+    for (const [key, src] of Object.entries(style.$sources ?? {})) {
+      const text = String(src?.specified ?? '').replace(/url\([^)]*\)|"[^"]*"|'[^']*'/g, '');
+      for (const m of text.matchAll(containerUnit)) { const unit = m[1].toLowerCase(); if (!found.has(unit)) found.set(unit, { key, src }); }
+    }
+    // Declarations the style stage could not read (a shorthand expanded to px lengths, padding: 2cqi): the rules that
+    // match the box with no state or condition.
+    for (const rule of rules) if (rule.unmodeled && !rule.contexts?.length && rule.selectors?.some(sel => !sel.state && !sel.pseudoElement && matches(sel, box)))
+      for (const d of rule.unmodeled) for (const m of d.specified.replace(/url\([^)]*\)|"[^"]*"|'[^']*'/g, '').matchAll(containerUnit)) {
+        const unit = m[1].toLowerCase(); if (!found.has(unit)) found.set(unit, { key: d.property, src: d });
+      }
+    if (!found.size || unreadContainers.length) return;
+    if ([style, ...ancestors.map(a => a.style)].some(s => s && s['writing-mode'] && s['writing-mode'] !== 'horizontal-tb')) return;
+    const may = (a, axis) => containerTypes[axis].includes(String(a.style?.['container-type'] ?? '').toLowerCase())
+      || rules.some(rule => rule.declarations?.some(d => d.property === 'container-type' && containerTypes[axis].includes(String(d.value).trim().toLowerCase()))
+        && rule.selectors?.some(sel => !sel.pseudoElement && matches(sel, a.box, new Set(sel.state ? [sel.state] : []))));
+    const axisOf = unit => ['cqw', 'cqi'].includes(unit) ? 'inline' : 'block';
+    const missing = [...found].filter(([unit]) => !ancestors.some(a => may(a, axisOf(unit))));
+    if (!missing.length) return;
+    const fallback = { cqw: 'svw', cqi: 'svi', cqh: 'svh', cqb: 'svb' }, inlineOnly = ancestors.some(a => may(a, 'inline'));
+    const said = missing.map(([unit, { key, src }]) => `${key}: ${src.specified} (${unit} is ${fallback[unit]})`).join(', ');
+    const why = missing.some(([unit]) => axisOf(unit) === 'block') && inlineOnly
+      ? 'its container has container-type: inline-size, which gives the inline axis only (cqh and cqb need container-type: size)'
+      : 'no ancestor has container-type: inline-size or size (a container-name alone, or the element\'s own container-type, does not count)';
+    layoutWarnings.push({ code: 'W_CSS_CONTAINER_UNIT_VIEWPORT', severity: 'warning', box: box.label, path: box.path, units: missing.map(([unit]) => unit),
+      css: missing.map(([, { key, src }]) => ({ property: key, file: src.file, line: src.line, selector: src.selector })),
+      message: `${box.label}: ${said}: ${why}, so the unit measures the small viewport, not a container. Give the ancestor it should measure container-type: ${missing.some(([unit]) => axisOf(unit) === 'block') ? 'size (and a height)' : 'inline-size'}, or write the ${fallback[missing[0][0]]} unit if the viewport is meant` });
   }
   // F129: a <dialog> is centred by the UA's margin: auto (with inset 0 for a modal); a reset such as * { margin: 0 }
   // that reaches it puts it at the top-left corner (measured in Chromium, Firefox and WebKit, open and showModal()).
@@ -282,6 +333,7 @@ export function createCssMistakes({ report, facts, tools }) {
     stateShadowed(box, style, ancestors, inherited, r);
     dialogMarginReset(box, style);
     overflowPromoted(box, style);
+    containerUnitViewport(box, style, ancestors);
     selectIndent(box, style, ancestors);
     optionInert(box, style, ancestors);
     brStyled(box, style);
@@ -748,5 +800,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, stateShadowed, dialogMarginReset, overflowPromoted, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, stateShadowed, dialogMarginReset, overflowPromoted, containerUnitViewport, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }
