@@ -57,8 +57,10 @@ function matchPart(t,n){
     return typeof v==='string'&&/^[A-Za-z0-9_-]+$/.test(v)?a[k]===v:null;
   }
   if(t.type==='PseudoClassSelector'&&t.name==='root'&&!t.children)return n.tagName==='html';
-  if(t.type==='PseudoClassSelector'&&['is','where'].includes(t.name)&&t.children?.[0]?.type==='SelectorList')
-    return t.children[0].children.reduce((a,sel)=>triOr(a,matchSelector(sel,n)),false);
+  if(t.type==='PseudoClassSelector'&&['is','where','not'].includes(t.name)&&t.children?.[0]?.type==='SelectorList'){
+    const result=t.children[0].children.reduce((a,sel)=>triOr(a,matchSelector(sel,n)),false);
+    return t.name==='not'&&result!==null?!result:result;
+  }
   // Prove non-match of simple descendant presence queries against the
   // original DOM. A matching :has is still rejected by staticSelector:
   // deleting the witness could change the cascade.
@@ -98,14 +100,14 @@ const staticSelector=s=>s.children.every((t,i)=>isGeneratedPseudo(t)?i===s.child
   t.type==='TypeSelector'?t.name==='*'||ascii.test(t.name):
   ['IdSelector','ClassSelector'].includes(t.type)?ascii.test(t.name):
   t.type==='PseudoClassSelector'?(t.name==='root'&&!t.children||
-    ['is','where'].includes(t.name)&&t.children?.[0]?.type==='SelectorList'&&t.children[0].children.every(sel=>!generatedSelector(sel)&&staticSelector(sel))):
+    ['is','where','not'].includes(t.name)&&t.children?.[0]?.type==='SelectorList'&&t.children[0].children.every(sel=>!generatedSelector(sel)&&staticSelector(sel))):
   t.type==='AttributeSelector'&&/^[a-z][a-z0-9_-]*$/.test(t.name?.name??'')&&!t.flags&&
     (t.matcher===null||dataAttr.test(t.name?.name??'')&&t.matcher==='='&&/^[A-Za-z0-9_-]+$/.test(t.value?.value??t.value?.name??'')));
 function declarations(nodes){
   if(nodes.some(n=>!['decl','comment'].includes(n.type)))refuse('CSS nesting is not a closed independent projection');
   return nodes.filter(n=>n.type==='decl');
 }
-const ignorable=d=>d.prop.toLowerCase()==='scroll-behavior'||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
+const ignorable=d=>/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
 function validateDecl(d){
   const p=d.prop.toLowerCase(),v=d.value.trim();
   if(ignorable(d))return false;
@@ -166,8 +168,8 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
   if(children(head).some(n=>!['meta','title'].includes(n.tagName)))refuse('Document head has an unresolved stylesheet or rendering dependency');
   const elements=walk(root);
   if(elements.some(n=>['style','link','base'].includes(n.tagName)||n.tagName==='template'&&Object.hasOwn(attrs(n),'shadowrootmode')))refuse('Document has unresolved style sources or exceeds projection limit');
-  if(binding!==undefined&&!(typeof binding==='string'&&/^[.#][A-Za-z_][A-Za-z0-9_-]*$/.test(binding)))refuse('Partial target binding requires a simple id or class selector');
-  const matches=elements.filter(n=>binding?.startsWith('.')?(attrs(n).class??'').split(/[\t\n\r\f ]+/).includes(binding.slice(1)):attrs(n).id===(binding?.slice(1)??target));
+  if(binding!==undefined&&!(typeof binding==='string'&&(/^[.#][A-Za-z_][A-Za-z0-9_-]*$/.test(binding)||allowed.has(binding))))refuse('Partial target binding requires a simple id, class or supported tag selector');
+  const matches=elements.filter(n=>binding?.startsWith('.')?(attrs(n).class??'').split(/[\t\n\r\f ]+/).includes(binding.slice(1)):binding&&!binding.startsWith('#')?n.namespaceURI===HTML&&n.tagName===binding:attrs(n).id===(binding?.slice(1)??target));
   if(matches.length!==1)refuse('DOM target not unique');
   const chain=[];for(let n=matches[0];n?.tagName;n=n.parentNode)chain.unshift(n);
   if(chain.length<3||chain.length>32||chain[0]!==root||chain[1]!==body||chain.some(n=>n.namespaceURI!==HTML||!allowed.has(n.tagName)||!plainAttrs(n)))refuse('Unsupported ancestor or target markup');
@@ -182,7 +184,7 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
     // A float in an omitted sibling (even nested inside another flow block)
     // can narrow or displace a BFC. Check the complete cascade, including
     // keyframes and inline styles, before dropping any DOM nodes.
-    const floatDecl=d=>/^(?:float|(?:-[a-z]+-)?float)$/i.test(d.prop)&&d.value.trim().toLowerCase()!=='none';
+    const floatDecl=d=>d.prop.includes('\\')||/^(?:float|(?:-[a-z]+-)?float)$/i.test(d.prop)&&d.value.trim().toLowerCase()!=='none';
     sheet.walkDecls(d=>{if(floatDecl(d))refuse('Inline projection has a possible float dependency')});
     for(const n of elements)if(attrs(n).style){
       const style=postcss.parse('*{'+attrs(n).style+'}');
@@ -195,6 +197,39 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
   // never drop mixed shorthands such as padding, margin or border.
   const onlyBlock=d=>inlineOnly&&/^(?:height|min-height|max-height|block-size|min-block-size|max-block-size|top|bottom|(?:padding|margin)-(?:top|bottom|block(?:-start|-end)?)|border-(?:top|bottom|block(?:-start|-end)?)(?:-width|-style|-color)?)$/i.test(d.prop);
   const discard=d=>ignorable(d)||onlyBlock(d);
+  // html/body are unique in this standards HTML document. Freeze a simple
+  // root :has() against the *original* DOM. A never-matching class/ID (or
+  // its negation) has precisely the same specificity as the original
+  // class/ID argument; no DOM attributes are added. Leave non-root or
+  // complex :has() dependencies unresolved.
+  const marker='__veriss_projection_absent__';
+  const markerAbsent=!elements.some(n=>attrs(n).id===marker||(attrs(n).class??'').split(/[\t\n\r\f ]+/).includes(marker));
+  function freezeRootHas(selectors){
+    if(!inlineOnly||!markerAbsent)return false;
+    let changed=false;
+    for(const selector of selectors){
+      let start=0;
+      while(start<selector.children.length){
+        let end=start;
+        while(end<selector.children.length&&selector.children[end].type!=='Combinator')end++;
+        const compound=selector.children.slice(start,end);
+        const tag=compound.find(t=>t.type==='TypeSelector'&&['html','body'].includes(t.name.toLowerCase()));
+        if(tag&&compound.every(t=>t.type!=='PseudoElementSelector')){
+          const subject=tag.name.toLowerCase()==='html'?root:body;
+          for(let i=start;i<end;i++){
+            const t=selector.children[i],branches=t.children?.[0]?.children;
+            if(t.type!=='PseudoClassSelector'||t.name!=='has'||t.children?.[0]?.type!=='SelectorList'||!branches?.length||!branches.every(s=>s.children.length===1&&['ClassSelector','IdSelector'].includes(s.children[0].type)&&ascii.test(s.children[0].name)))continue;
+            const atom={type:branches.some(s=>s.children[0].type==='IdSelector')?'IdSelector':'ClassSelector',name:marker};
+            const present=walk(subject).slice(1).some(n=>branches.some(s=>matchPart(s.children[0],n)===true));
+            selector.children[i]=present?{type:'PseudoClassSelector',name:'not',children:[{type:'SelectorList',children:[{type:'Selector',children:[atom]}]}]}:atom;
+            changed=true;
+          }
+        }
+        start=end+1;
+      }
+    }
+    return changed;
+  }
   let ruleCount=0;
   function visit(container,conditional=false,unsafeCondition=false,depth=0){
     if(depth>32)refuse('CSS projection nesting limit');
@@ -219,6 +254,7 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
       // Parse all selector branches before pruning: a branch with unknown
       // syntax may invalidate its entire comma-separated rule.
       let selectors;try{selectors=csstree.toPlainObject(csstree.parse(node.selector,{context:'selectorList'})).children}catch{refuse('Unparsed CSS selector '+node.selector)}
+      if(freezeRootHas(selectors))node.selector=csstree.generate(csstree.fromPlainObject(structuredClone({type:'SelectorList',children:selectors})));
       if(selectors.every(s=>s.children.length===1&&s.children[0].type==='PseudoElementSelector'&&/^view-transition(?:-group|-image-pair|-old|-new)?$/.test(s.children[0].name))){node.remove();continue}
       for(const script of inertScripts)if(geometryDecls.some(d=>!/^(?:box-sizing|(?:margin|padding)(?:-[\w-]+)?|border(?:-[\w-]+)?)$/i.test(d.prop))&&selectors.some(sel=>matchSelector(sel,script)!==false))inertScripts.delete(script);
       // Do not count pseudo rules as size guarantees; inspect their possible
@@ -301,7 +337,7 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
     n.childNodes=(n.childNodes??[]).filter(c=>c===next||n===root&&c===head);
   }
   return {html:serialize(doc),css:sheet.toString(),path:'Document'+'/0'.repeat(chain.length-1),
-    assumptions:[...(inlineOnly?['Only inline start and size are proved: block-axis-only declarations and omitted block-flow siblings and descendants may change vertical position or height. Overlay scrollbars and absence of intrinsic/float/aspect-ratio dependencies are required.']:[]),'Automatically derived independent rectangle for '+(binding??'#'+target)+': retained original ancestor chain and matching layout cascade; removed rules have no possible subject in the retained chain or are non-geometric for explicit font-independent dimensions.','Closed, settled, scripting-enabled document; overlay scrollbars, unscrolled horizontal-tb/ltr CSS pixels; geometry only, not clipping, paint, hit testing, or full-document correctness.']};
+    assumptions:[...(inlineOnly?['Only inline start and size are proved; supported root descendant-presence selectors are fixed to the supplied DOM. Block-axis-only declarations and omitted block-flow siblings and descendants may change vertical position or height. Overlay scrollbars and absence of intrinsic/float/aspect-ratio dependencies are required.']:[]),'Automatically derived independent rectangle for '+(binding??'#'+target)+': retained original ancestor chain and matching layout cascade; removed rules have no possible subject in the retained chain or are non-geometric for explicit font-independent dimensions.','Closed, settled, scripting-enabled document; overlay scrollbars, unscrolled horizontal-tb/ltr CSS pixels; geometry only, not clipping, paint, hit testing, or full-document correctness.']};
 }
 
 // Use the engine's existing initial-scroll re-analysis; no scroll-dependent

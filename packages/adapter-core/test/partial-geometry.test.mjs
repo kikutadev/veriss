@@ -127,3 +127,16 @@ test('inline-only projection proves widths and positions without pretending to k
  const e=check(source,style+'#panel{width:200%}',['panel'])[0];
  assert.equal(verifyUI({model,evidence:[e]}).contracts[0].status,'violated');
 });
+
+test('snapshot root descendant presence is frozen without losing selector specificity',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header class="journey"><kbd>native</kbd></header><main><kbd>unknown height</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}body:has(.journey) main{max-width:380px}body main{max-width:520px;margin:0 auto}';
+ const opts={state:'screen',profile,html:source,css:style,targets:['shell'],bindings:{shell:'main'}};
+ const [present]=domGeometry(opts);
+ const test=(e,limit)=>verifyUI({model:{version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[{id:'width',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'shell',field:'inlineSize'},right:limit}}]},evidence:[e]}).status;
+ assert.equal(test(present,'380'),'verified',JSON.stringify(present));
+ const [absent]=domGeometry({...opts,html:source.replace(' class="journey"','')});
+ assert.equal(test(absent,'380'),'violated');
+ assert.ok(!domGeometry({...opts,css:style+String.raw`header{fl\6f at:left}`})[0].rows?.length);
+ assert.ok(!domGeometry({...opts,html:source.replace('</main>','</main><main></main>')})[0].rows?.length);
+});

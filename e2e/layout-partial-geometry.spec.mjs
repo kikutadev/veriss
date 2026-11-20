@@ -175,3 +175,27 @@ test('axis-specific evidence matches original content-dependent block flow',asyn
    }
  }
 });
+
+test('root descendant presence keeps selector priority in an inline projection',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const html=present=>'<!doctype html><html lang="en"><head><title>T</title></head><body><header'+(present?' class="journey"':'')+'><kbd>native</kbd></header><main><kbd>unknown height</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}body:has(.journey) main{max-width:380px}body main{max-width:520px;margin:0 auto}';
+ for(const present of [true,false]){
+   const [e]=domGeometry({state:'screen',profile,html:html(present),css:style,targets:['shell'],bindings:{shell:'main'}});
+   expect(e.axes).toEqual(['inline']);
+   expect(e.rows?.length??0,JSON.stringify(e)).toBeGreaterThan(0);
+   for(const width of [320,379,380,381,519,520,521,1000]){
+     const height=700;
+     await page.setViewportSize({width,height});
+     await page.setContent(html(present).replace('</head>','<style>'+style+'</style></head>'));
+     const actual=await page.locator('main').evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.width]});
+     expect(actual[1]).toBe(Math.min(width,present?380:520));
+     const rows=e.rows.filter(r=>r.constraints.every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+     expect(rows).not.toHaveLength(0);
+     for(const row of rows){
+       expect(actual[0]).toBeCloseTo(value(row.rect.inlineStart,width,height),1);
+       expect(actual[1]).toBeCloseTo(value(row.rect.inlineSize,width,height),1);
+     }
+   }
+ }
+});
