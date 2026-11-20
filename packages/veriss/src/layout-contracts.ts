@@ -175,7 +175,10 @@ export interface LayoutWarning {
   /** Syntax warnings can cite several author declarations. */
   css?:{file:string;line:number;column?:number}|{file:string;line:number;property:string;selector?:string}[];
   property?:string|undefined;min?:number;max?:number;media?:string;attributes?:string[];tag?:string;
-  range?:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion;
+  parent?:string;srcset?:string|undefined;sizes?:string;marker?:string;clippedBy?:string;
+  naturalWidth?:number;natural?:string;basis?:'file'|'attributes';stretched?:'wider'|'taller';
+  columns?:string|undefined;width?:number|string|undefined;properties?:string[]|undefined;scrollbar?:number;
+  range?:LayoutRange|undefined;heightRange?:LayoutRange;region?:LayoutRegion;
   rule?:string;selector?:string|undefined;file?:string;line?:number;hint?:string;
   source?:SourceSpan|number|undefined;
 }
