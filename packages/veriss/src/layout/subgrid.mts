@@ -11,7 +11,7 @@ export const trackArea = (values: readonly Affine2[], gap: Rational | Affine2, s
   sum(values.slice(start, start + span).reduce(sum, scalar(0)), times(asAffine(gap), q(Math.max(0, span - 1))));
 
 /** A child borrows the actual track vector, never the parent's fr definitions. */
-export function trackSlice<Box>(values: readonly Affine2[], gap: Rational, box: Box, start: number, span: number): SharedTracks<Box> {
+export function trackSlice<Box,Gap extends Rational|Affine2>(values: readonly Affine2[], gap: Gap, box: Box, start: number, span: number): Omit<SharedTracks<Box>,'gap'> & {gap:Gap} {
   return { values: values.slice(start, start + span), gap, box, startLine: start + 1 };
 }
 

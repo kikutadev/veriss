@@ -6,7 +6,9 @@ export declare const gapSize: (value: string, parent?: {
 } | null) => Rational;
 export declare const trackArea: (values: readonly Affine2[], gap: Rational | Affine2, start: number, span: number) => Affine2;
 /** A child borrows the actual track vector, never the parent's fr definitions. */
-export declare function trackSlice<Box>(values: readonly Affine2[], gap: Rational, box: Box, start: number, span: number): SharedTracks<Box>;
+export declare function trackSlice<Box, Gap extends Rational | Affine2>(values: readonly Affine2[], gap: Gap, box: Box, start: number, span: number): Omit<SharedTracks<Box>, 'gap'> & {
+    gap: Gap;
+};
 /** Insets affect outer tracks; gap differences are centered on shared lines.
  * Keep signed affine lengths here. The engine splits out negative regions as
  * unknown instead of assuming a CSS track-collapse algorithm. */
