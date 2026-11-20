@@ -4,7 +4,7 @@ import type {NoShiftProof} from './transitions.mjs';
 type Source = {start:number;end?:number};
 interface Range {min?:number;max?:number;minExact?:string;maxExact?:string;minInclusive?:boolean;maxInclusive?:boolean}
 interface CSSLocation {file:string;line?:number;column?:number}
-interface CSSOrigin extends CSSLocation {specified:string;conditions?:readonly {kind:string;name?:string;params:string;css:CSSLocation}[]}
+interface CSSOrigin extends CSSLocation {specified:string|undefined;conditions?:readonly {kind:string;name?:string;params:string;css:CSSLocation}[]}
 interface ExplanationFact {
   kind?:string;origin?:string;axis?:string;hostInset?:number;box?:string;property?:string;value?:string|number|undefined;derivedFrom?:string;selector?:string|undefined;
   css?:CSSOrigin;overridden?:readonly {css:CSSOrigin}[];dormant?:readonly {css:CSSOrigin}[];

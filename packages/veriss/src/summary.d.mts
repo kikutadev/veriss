@@ -18,7 +18,7 @@ interface CSSLocation {
     column?: number;
 }
 interface CSSOrigin extends CSSLocation {
-    specified: string;
+    specified: string | undefined;
     conditions?: readonly {
         kind: string;
         name?: string;

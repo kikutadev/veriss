@@ -412,8 +412,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -429,8 +429,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -447,8 +447,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -472,8 +472,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -490,8 +490,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -531,8 +531,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -548,8 +548,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -566,8 +566,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -591,8 +591,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -609,8 +609,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -731,8 +731,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -748,8 +748,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -766,8 +766,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -791,8 +791,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -809,8 +809,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -850,8 +850,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -867,8 +867,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -885,8 +885,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -910,8 +910,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -928,8 +928,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1404,8 +1404,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -1421,8 +1421,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1439,8 +1439,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1464,8 +1464,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1482,8 +1482,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1523,8 +1523,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -1540,8 +1540,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1558,8 +1558,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1583,8 +1583,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1601,8 +1601,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1762,8 +1762,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -1779,8 +1779,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1797,8 +1797,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1822,8 +1822,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1840,8 +1840,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1881,8 +1881,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                         readonly file: string;
                         readonly line: number;
                         readonly selector: string;
-                        readonly layer?: string;
-                        readonly specified: string;
+                        readonly layer?: string | undefined | undefined;
+                        readonly specified: string | undefined;
                         readonly conditions?: readonly {
                             readonly kind: "media" | "container";
                             readonly name?: string;
@@ -1898,8 +1898,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1916,8 +1916,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1941,8 +1941,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;
@@ -1959,8 +1959,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                             readonly file: string;
                             readonly line: number;
                             readonly selector: string;
-                            readonly layer?: string;
-                            readonly specified: string;
+                            readonly layer?: string | undefined | undefined;
+                            readonly specified: string | undefined;
                             readonly conditions?: readonly {
                                 readonly kind: "media" | "container";
                                 readonly name?: string;

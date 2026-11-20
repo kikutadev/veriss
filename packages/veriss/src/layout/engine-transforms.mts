@@ -9,10 +9,10 @@ import { px } from './css.mjs';
 
 const zero = q(0), one = q(1), minusOne = q(-1);
 interface TransformStyle {
-  transform?: string;
-  position?: string;
-  'font-size'?: string;
-  top?: string; bottom?: string; left?: string; right?: string;
+  transform?: string | undefined;
+  position?: string | undefined;
+  'font-size'?: string | undefined;
+  top?: string | undefined; bottom?: string | undefined; left?: string | undefined; right?: string | undefined;
 }
 interface PaintRect { origin: Dimensions | null; inline: Affine2 | null; block: Affine2 | null }
 export const offset = (origin: Dimensions | null, inline: Affine2, block: Affine2): Dimensions | null =>

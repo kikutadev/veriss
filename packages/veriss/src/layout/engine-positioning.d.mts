@@ -4,8 +4,8 @@ import type { createEdgeSolver, EdgeStyle } from './engine-edges.mjs';
 import type { Dimensions, Axis, DimensionValue, SharedTracks } from './engine-types.mjs';
 import type { LayoutDiagnostic, LayoutRange, LayoutRegion, LayoutSubgrid, SourceSpan } from '../layout-contracts.d.ts';
 type OriginStyle = Record<'left' | 'right' | 'top' | 'bottom' | 'position' | 'overflow-x' | 'overflow-y' | 'grid-template-columns' | 'grid-template-rows', string> & {
-    transform?: string;
-    'font-size'?: string;
+    transform?: string | undefined;
+    'font-size'?: string | undefined;
 };
 interface OriginAvailable {
     inline: Affine2;

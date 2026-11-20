@@ -42,7 +42,8 @@ export function checkAnimationShifts({ block, sizes, diagnostics, ranges, animat
         let complete = true; // keyframe layouts for the score bound
         // The keyframes and the frames at the easing's extremes (an overshoot carries a value past its keyframes).
         const logical = { width: 'inline-size', height: 'block-size', 'min-width': 'min-inline-size', 'min-height': 'min-block-size', 'max-width': 'max-inline-size', 'max-height': 'max-block-size' };
-        const eased = easedFrames(keyframeFrames.get(entry.name), { easing: entry.easing, rem: unitContext.rootFontSize ? number(unitContext.rootFontSize) : undefined, base: new Proxy({}, { get: (_, key) => { const property = String(key); const v = entry.style[logical[property] ?? property]; return entry.position === 'relative' && ['top', 'bottom', 'left', 'right'].includes(property) && v === 'auto' ? '0px' : v; } }) });
+        const eased = easedFrames(keyframeFrames.get(entry.name), { easing: entry.easing, rem: unitContext.rootFontSize ? number(unitContext.rootFontSize) : undefined, base: new Proxy({}, { get: (_, key) => { const property = String(key); const v = entry.style[logical[property] ?? property]; if (v !== undefined && typeof v !== 'string' && typeof v !== 'number')
+                    return undefined; return entry.position === 'relative' && ['top', 'bottom', 'left', 'right'].includes(property) && v === 'auto' ? '0px' : v; } }) });
         if (eased.unknown !== undefined) {
             diagnostics.push({ code: 'U_LAYOUT_ANIMATION_SHIFT', severity: 'unknown', message: `${entry.box.label}: animation ${entry.name}: ${eased.unknown}`, box: entry.box.label, path: entry.box.path });
             continue;

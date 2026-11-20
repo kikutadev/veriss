@@ -2,13 +2,13 @@ import type { Rational } from './linear.mjs';
 import type { Affine2 } from './region.mjs';
 import type { Dimensions } from './engine-types.mjs';
 interface TransformStyle {
-    transform?: string;
-    position?: string;
-    'font-size'?: string;
-    top?: string;
-    bottom?: string;
-    left?: string;
-    right?: string;
+    transform?: string | undefined;
+    position?: string | undefined;
+    'font-size'?: string | undefined;
+    top?: string | undefined;
+    bottom?: string | undefined;
+    left?: string | undefined;
+    right?: string | undefined;
 }
 interface PaintRect {
     origin: Dimensions | null;

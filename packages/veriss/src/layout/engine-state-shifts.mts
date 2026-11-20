@@ -26,7 +26,7 @@ interface ShiftInput {
 }
 export interface AnimatedBox {
   box:ShiftBox;region:Region;name:string;position:string;duration:string;count:string;direction:string;
-  easing?:string;delay?:string;fill?:string;scrollDriven?:boolean;style:Readonly<Record<string,string|number|undefined>>;
+  easing?:string;delay?:string;fill?:string;scrollDriven?:boolean;style:Readonly<Record<string,unknown>>;
 }
 export function checkHoverShifts({root,rules,block,sizes,diagnostics,ranges,analyze}:ShiftInput & {
   root:ShiftBox;rules:readonly CSSRule[];analyze:(path:string)=>ShiftReport;
@@ -61,7 +61,7 @@ export function checkAnimationShifts({block,sizes,diagnostics,ranges,animated,ke
     const states: {offset:number;sizes:readonly ShiftSize[]}[] = []; let complete = true; // keyframe layouts for the score bound
     // The keyframes and the frames at the easing's extremes (an overshoot carries a value past its keyframes).
     const logical:Record<string,string> = { width: 'inline-size', height: 'block-size', 'min-width': 'min-inline-size', 'min-height': 'min-block-size', 'max-width': 'max-inline-size', 'max-height': 'max-block-size' };
-    const eased = easedFrames(keyframeFrames.get(entry.name)!, { easing: entry.easing, rem: unitContext.rootFontSize ? number(unitContext.rootFontSize) : undefined, base: new Proxy<Record<string,string|number|undefined>>({}, { get: (_, key) => { const property=String(key); const v = entry.style[logical[property] ?? property]; return entry.position === 'relative' && ['top', 'bottom', 'left', 'right'].includes(property) && v === 'auto' ? '0px' : v; } }) });
+    const eased = easedFrames(keyframeFrames.get(entry.name)!, { easing: entry.easing, rem: unitContext.rootFontSize ? number(unitContext.rootFontSize) : undefined, base: new Proxy<Record<string,string|number|undefined>>({}, { get: (_, key) => { const property=String(key); const v = entry.style[logical[property] ?? property]; if(v!==undefined&&typeof v!=='string'&&typeof v!=='number')return undefined; return entry.position === 'relative' && ['top', 'bottom', 'left', 'right'].includes(property) && v === 'auto' ? '0px' : v; } }) });
     if (eased.unknown!==undefined) { diagnostics.push({ code: 'U_LAYOUT_ANIMATION_SHIFT', severity: 'unknown', message: `${entry.box.label}: animation ${entry.name}: ${eased.unknown}`, box: entry.box.label, path: entry.box.path }); continue; }
     for (const frame of eased.frames) {
       const layout=frame.layout!;
@@ -80,7 +80,7 @@ export function checkAnimationShifts({block,sizes,diagnostics,ranges,animated,ke
       let offsetsOnly = false;
       if (entry.position === 'relative' && entry.style.direction !== 'rtl') {
         offsetsOnly = layout.split(';').filter(d => d.trim()).every(d => ['top', 'bottom', 'left', 'right'].includes(d.split(':')[0]!.trim().toLowerCase()) && /^\s*(?:-?(?:\d+(?:\.\d+)?|\.\d+)px|0)\s*$/.test(d.split(':').slice(1).join(':')));
-        const pxOf = (v:string|number|undefined) => v === 'auto' || v === undefined ? 0 : /^-?(?:\d+(?:\.\d+)?|\.\d+)px$|^0$/.test(String(v)) ? Number.parseFloat(String(v)) || 0 : null;
+        const pxOf = (v:unknown) => v === 'auto' || v === undefined ? 0 : /^-?(?:\d+(?:\.\d+)?|\.\d+)px$|^0$/.test(String(v)) ? Number.parseFloat(String(v)) || 0 : null;
         const own = (side:string) => entry.style[side] ?? 'auto';
         for (const decl of layout.split(';')) {
           const [prop, ...rest] = decl.split(':'), name = prop!.trim().toLowerCase(), value = rest.join(':').trim();

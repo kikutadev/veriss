@@ -405,8 +405,8 @@ export interface LayoutCSSOrigin {
     file: string;
     line: number;
     selector: string;
-    layer?: string;
-    specified: string;
+    layer?: string | undefined;
+    specified: string | undefined;
     conditions?: LayoutCSSCondition[];
 }
 export type LayoutExplanationFact = {
@@ -734,9 +734,9 @@ export interface LayoutSummary {
             file: string;
             line: number;
             selector: string;
-            layer?: string;
-            specified: string;
-        };
+            layer?: string | undefined;
+            specified: string | undefined;
+        } | undefined;
     })[];
     queries: (LayoutScenarioIdentity & {
         box: string;

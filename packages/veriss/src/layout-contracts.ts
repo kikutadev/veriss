@@ -150,7 +150,7 @@ export interface LayoutIntegrityOptions {
 }
 export interface LayoutIntegrityRow { code: string; severity: 'error' | 'warning'; rule: string; message: string; box: string; path: string; range: LayoutRange; heightRange?: LayoutRange; other?: string; parent?: string; axis?: 'inline' | 'block'; reason?: string }
 export interface LayoutCSSCondition { kind:'media'|'container'; name?:string; params:string; css:{file:string;line:number} }
-export interface LayoutCSSOrigin { file:string; line:number; selector:string; layer?:string; specified:string; conditions?:LayoutCSSCondition[] }
+export interface LayoutCSSOrigin { file:string; line:number; selector:string; layer?:string|undefined; specified:string|undefined; conditions?:LayoutCSSCondition[] }
 export type LayoutExplanationFact =
   | { path:string; box:string; owner?:string|undefined; property:string; value:string|undefined; origin:'author'; css:LayoutCSSOrigin; overridden?:{css:LayoutCSSOrigin}[]; dormant?:{css:LayoutCSSOrigin}[] }
   | { path:string; box:string; owner?:string|undefined; property:string; value:string|undefined; origin:'default'; overridden?:{css:LayoutCSSOrigin}[]; dormant?:{css:LayoutCSSOrigin}[] }
@@ -232,7 +232,7 @@ export interface LayoutSummary {
   diagnostics: LayoutDiagnostic[];
   policies: (LayoutScenarioIdentity & { box: string; path: string; axis: 'inline' | 'block'; overflow: 'fit' | 'scroll' | 'clip' | 'visible'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion })[];
   checks: (LayoutScenarioIdentity & { box: string; path: string; code: string; axis: 'inline' | 'block'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; available: LayoutAffine; required: LayoutAffine; enforced: boolean })[];
-  sizes: (LayoutScenarioIdentity & LayoutPosition & { box: string; path: string; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; allocatedInlineSize:LayoutAffine;allocatedBlockSize?:LayoutAffine;inlineSize: LayoutAffine; blockSize?: LayoutAffine;contentInlineSize:LayoutAffine;contentBlockSize?:LayoutAffine;paddingInlineSize?:LayoutAffine;paddingBlockSize?:LayoutAffine; boxSizing: 'border-box' | 'content-box'; boxSizingSource?: { file: string; line: number; selector: string; layer?: string; specified: string } })[];
+  sizes: (LayoutScenarioIdentity & LayoutPosition & { box: string; path: string; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; allocatedInlineSize:LayoutAffine;allocatedBlockSize?:LayoutAffine;inlineSize: LayoutAffine; blockSize?: LayoutAffine;contentInlineSize:LayoutAffine;contentBlockSize?:LayoutAffine;paddingInlineSize?:LayoutAffine;paddingBlockSize?:LayoutAffine; boxSizing: 'border-box' | 'content-box'; boxSizingSource?: { file: string; line: number; selector: string; layer?: string|undefined; specified: string|undefined }|undefined })[];
   queries: (LayoutScenarioIdentity & { box: string; path: string; range: LayoutRange; heightRange?:LayoutRange;region?:LayoutRegion;name?: string|undefined; target?: string|undefined; targetPath?: string|undefined; matched: boolean })[];
   /** Resolved shared tracks, local line numbering, effective gap and edge insets. Build-only. */
   subgrids: LayoutSubgrid[];

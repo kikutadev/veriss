@@ -13,7 +13,7 @@ import type {Dimensions, Axis, Side, DimensionValue, SharedTracks} from './engin
 import type {LayoutDiagnostic, LayoutRange, LayoutRegion, LayoutSubgrid, SourceSpan} from '../layout-contracts.d.ts';
 
 const zero=q(0);
-type OriginStyle = Record<'left'|'right'|'top'|'bottom'|'position'|'overflow-x'|'overflow-y'|'grid-template-columns'|'grid-template-rows', string> & {transform?: string; 'font-size'?: string};
+type OriginStyle = Record<'left'|'right'|'top'|'bottom'|'position'|'overflow-x'|'overflow-y'|'grid-template-columns'|'grid-template-rows', string> & {transform?: string|undefined; 'font-size'?: string|undefined};
 interface OriginAvailable { inline: Affine2; block?: Affine2 | null; origin?: Dimensions | null; root?: boolean; alignBlock?: Rational; alignInline?: Rational; containingBlock?: Dimensions & {origin?: Dimensions | null} }
 interface OriginAncestor {clipped?: boolean; subgrid?: boolean}
 interface GridBox {label: string; path: string; source?: SourceSpan | undefined}

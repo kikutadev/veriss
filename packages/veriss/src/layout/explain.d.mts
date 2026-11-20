@@ -15,11 +15,11 @@ interface ContractBox extends ExplanationBox {
     contract: LayoutBoxContract;
     contractSelector?: string | undefined;
 }
-export interface ExplanationStyle extends Partial<Record<ExplanationProperty, string>> {
+export interface ExplanationStyle extends Partial<Record<ExplanationProperty, string | undefined>> {
     position?: string;
-    $sources: Readonly<Partial<Record<ExplanationProperty, LayoutCSSOrigin>>>;
-    $dormant?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[]>>>;
-    $overridden?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[]>>>;
+    $sources: Readonly<Partial<Record<ExplanationProperty, LayoutCSSOrigin | undefined>>>;
+    $dormant?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[] | undefined>>>;
+    $overridden?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[] | undefined>>>;
 }
 export type ExplanationFact = LayoutExplanationFact;
 export type Explanation = LayoutExplanation;

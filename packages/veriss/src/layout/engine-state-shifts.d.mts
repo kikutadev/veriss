@@ -59,7 +59,7 @@ export interface AnimatedBox {
     delay?: string;
     fill?: string;
     scrollDriven?: boolean;
-    style: Readonly<Record<string, string | number | undefined>>;
+    style: Readonly<Record<string, unknown>>;
 }
 export declare function checkHoverShifts({ root, rules, block, sizes, diagnostics, ranges, analyze }: ShiftInput & {
     root: ShiftBox;
