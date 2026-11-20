@@ -301,6 +301,25 @@ export interface LayoutRange {
     minExact: string;
     maxExact: string;
 }
+export interface LayoutAnimationPaint {
+    name: string;
+    duration: string;
+    count: string;
+    playState: string;
+    direction: string;
+}
+export interface LayoutAnimationScoreBound {
+    window: number;
+    perIteration: number;
+    iterations: number;
+    startJump?: number;
+    endJump?: number;
+    viewport: {
+        width: number;
+        height: number;
+    };
+    assumes: string;
+}
 export interface LayoutDiagnostic {
     variant?: number;
     scrollbarProfile?: string;
@@ -355,6 +374,23 @@ export interface LayoutDiagnostic {
         available?: number;
         required?: number;
     };
+    /** Exact start displacement evidence, when a state changes layout. */
+    hovered?: string;
+    hoveredPath?: string;
+    animated?: string;
+    animatedPath?: string;
+    animation?: string | LayoutAnimationPaint;
+    carousel?: string;
+    carouselPath?: string;
+    from?: string;
+    to?: string;
+    field?: string;
+    delta?: string;
+    offset?: number;
+    scrollDriven?: boolean;
+    scoreBound?: number | LayoutAnimationScoreBound;
+    parent?: string;
+    basis?: readonly ('text' | 'border-box')[];
     /** For a text domain: how many characters fit at the witness (font-derived contracts only). */
     text?: {
         maxLength: number;

@@ -15,13 +15,8 @@ import {unitContext,layoutRectangle,firstStartMove,layoutStartMoves,shiftScoreBo
 type ShiftBox=NormalizedBox & {pseudo?:string|boolean};
 type ShiftSize=LayoutSummary['sizes'][number] & {$shown?:{region:Region}};
 type ShiftReport=Pick<LayoutSummary,'status'|'diagnostics'> & {sizes:readonly ShiftSize[]};
-interface ShiftDiagnostic extends LayoutDiagnostic {
-  hovered?:string;hoveredPath?:string;animated?:string;animatedPath?:string;animation?:string;
-  field?:string;delta?:string;offset?:number;scrollDriven?:boolean;
-  scoreBound?:number|{window:number;perIteration:number;iterations:number;startJump?:number;endJump?:number;viewport:{width:number;height:number};assumes:string};
-}
 interface ShiftInput {
-  block:boolean;sizes:readonly ShiftSize[];diagnostics:ShiftDiagnostic[];
+  block:boolean;sizes:readonly ShiftSize[];diagnostics:LayoutDiagnostic[];
   ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion};
 }
 export interface AnimatedBox {

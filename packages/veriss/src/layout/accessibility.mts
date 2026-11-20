@@ -112,7 +112,7 @@ import type { LayoutBoxContract, LayoutRange, LayoutRegion, SourceSpan } from '.
 
 type CssText = string | undefined;
 type Side = 'top' | 'right' | 'bottom' | 'left';
-interface AnimationPaint { name: string; duration: string; count: string; playState: string; direction: string }
+type AnimationPaint=import('../layout-contracts.d.ts').LayoutAnimationPaint;
 interface TransitionPaint { property: string; duration: string }
 interface CssAnimation extends AnimationPaint { easing: string; delay: string; fill: string; timeline: string }
 interface CssTransition extends TransitionPaint { easing: string; delay: string }

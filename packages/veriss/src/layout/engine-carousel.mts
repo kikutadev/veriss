@@ -6,12 +6,11 @@ import {exact, number} from './linear.mjs';
 import {layoutStartMoves, shiftScoreBound} from './engine-geometry.mjs';
 
 type VariantReport = Pick<LayoutSummary,'status'|'diagnostics'|'sizes'>;
-type CarouselDiagnostic = LayoutDiagnostic & {carousel?:string;carouselPath?:string;from?:string;to?:string;field?:'inlineStart'|'blockStart';delta?:string;scoreBound?:number};
 const role=(box:NormalizedBox,name:string)=>String(box.aria?.['aria-roledescription'] ?? '').trim().toLowerCase()===name;
 export const hasCarousel=(box:NormalizedBox):boolean=>role(box,'carousel')||(box.children??[]).some(hasCarousel);
 
 export function checkCarouselShifts({root,pristine,block,diagnostics,ranges,analyze}:{
-  root:NormalizedBox;pristine:NormalizedBox;block:boolean;diagnostics:CarouselDiagnostic[];
+  root:NormalizedBox;pristine:NormalizedBox;block:boolean;diagnostics:LayoutDiagnostic[];
   ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion};
   analyze:(root:NormalizedBox)=>VariantReport;
 }):void {

@@ -409,6 +409,39 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly available?: number;
             readonly required?: number;
         };
+        readonly hovered?: string;
+        readonly hoveredPath?: string;
+        readonly animated?: string;
+        readonly animatedPath?: string;
+        readonly animation?: string | {
+            readonly name: string;
+            readonly duration: string;
+            readonly count: string;
+            readonly playState: string;
+            readonly direction: string;
+        };
+        readonly carousel?: string;
+        readonly carouselPath?: string;
+        readonly from?: string;
+        readonly to?: string;
+        readonly field?: string;
+        readonly delta?: string;
+        readonly offset?: number;
+        readonly scrollDriven?: boolean;
+        readonly scoreBound?: number | {
+            readonly window: number;
+            readonly perIteration: number;
+            readonly iterations: number;
+            readonly startJump?: number;
+            readonly endJump?: number;
+            readonly viewport: {
+                readonly width: number;
+                readonly height: number;
+            };
+            readonly assumes: string;
+        };
+        readonly parent?: string;
+        readonly basis?: readonly ("text" | "border-box")[];
         readonly text?: {
             readonly maxLength: number;
             readonly fitsUpTo: number;
@@ -747,6 +780,39 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly available?: number;
             readonly required?: number;
         };
+        readonly hovered?: string;
+        readonly hoveredPath?: string;
+        readonly animated?: string;
+        readonly animatedPath?: string;
+        readonly animation?: string | {
+            readonly name: string;
+            readonly duration: string;
+            readonly count: string;
+            readonly playState: string;
+            readonly direction: string;
+        };
+        readonly carousel?: string;
+        readonly carouselPath?: string;
+        readonly from?: string;
+        readonly to?: string;
+        readonly field?: string;
+        readonly delta?: string;
+        readonly offset?: number;
+        readonly scrollDriven?: boolean;
+        readonly scoreBound?: number | {
+            readonly window: number;
+            readonly perIteration: number;
+            readonly iterations: number;
+            readonly startJump?: number;
+            readonly endJump?: number;
+            readonly viewport: {
+                readonly width: number;
+                readonly height: number;
+            };
+            readonly assumes: string;
+        };
+        readonly parent?: string;
+        readonly basis?: readonly ("text" | "border-box")[];
         readonly text?: {
             readonly maxLength: number;
             readonly fitsUpTo: number;
@@ -1439,6 +1505,39 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly available?: number;
             readonly required?: number;
         };
+        readonly hovered?: string;
+        readonly hoveredPath?: string;
+        readonly animated?: string;
+        readonly animatedPath?: string;
+        readonly animation?: string | {
+            readonly name: string;
+            readonly duration: string;
+            readonly count: string;
+            readonly playState: string;
+            readonly direction: string;
+        };
+        readonly carousel?: string;
+        readonly carouselPath?: string;
+        readonly from?: string;
+        readonly to?: string;
+        readonly field?: string;
+        readonly delta?: string;
+        readonly offset?: number;
+        readonly scrollDriven?: boolean;
+        readonly scoreBound?: number | {
+            readonly window: number;
+            readonly perIteration: number;
+            readonly iterations: number;
+            readonly startJump?: number;
+            readonly endJump?: number;
+            readonly viewport: {
+                readonly width: number;
+                readonly height: number;
+            };
+            readonly assumes: string;
+        };
+        readonly parent?: string;
+        readonly basis?: readonly ("text" | "border-box")[];
         readonly text?: {
             readonly maxLength: number;
             readonly fitsUpTo: number;
@@ -1816,6 +1915,39 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly available?: number;
             readonly required?: number;
         };
+        readonly hovered?: string;
+        readonly hoveredPath?: string;
+        readonly animated?: string;
+        readonly animatedPath?: string;
+        readonly animation?: string | {
+            readonly name: string;
+            readonly duration: string;
+            readonly count: string;
+            readonly playState: string;
+            readonly direction: string;
+        };
+        readonly carousel?: string;
+        readonly carouselPath?: string;
+        readonly from?: string;
+        readonly to?: string;
+        readonly field?: string;
+        readonly delta?: string;
+        readonly offset?: number;
+        readonly scrollDriven?: boolean;
+        readonly scoreBound?: number | {
+            readonly window: number;
+            readonly perIteration: number;
+            readonly iterations: number;
+            readonly startJump?: number;
+            readonly endJump?: number;
+            readonly viewport: {
+                readonly width: number;
+                readonly height: number;
+            };
+            readonly assumes: string;
+        };
+        readonly parent?: string;
+        readonly basis?: readonly ("text" | "border-box")[];
         readonly text?: {
             readonly maxLength: number;
             readonly fitsUpTo: number;

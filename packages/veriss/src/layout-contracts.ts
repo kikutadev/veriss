@@ -117,6 +117,8 @@ export interface LayoutRange {
   /** Rational values are authoritative; numeric endpoints are display approximations. */
   minExact: string; maxExact: string;
 }
+export interface LayoutAnimationPaint {name:string;duration:string;count:string;playState:string;direction:string}
+export interface LayoutAnimationScoreBound {window:number;perIteration:number;iterations:number;startJump?:number;endJump?:number;viewport:{width:number;height:number};assumes:string}
 export interface LayoutDiagnostic {
   variant?: number; scrollbarProfile?: string; devicePixelRatio?:number|undefined;
   code: string; severity: 'error' | 'unknown' | 'warning'; message: string;
@@ -128,6 +130,11 @@ export interface LayoutDiagnostic {
   conflict?: {properties:[string,string];longhands:string[]};
   source?: SourceSpan|undefined;
   witness?: { viewport: number; viewportExact: string; viewportHeight?: number; viewportHeightExact?: string; available?: number; required?: number };
+  /** Exact start displacement evidence, when a state changes layout. */
+  hovered?:string;hoveredPath?:string;animated?:string;animatedPath?:string;animation?:string|LayoutAnimationPaint;
+  carousel?:string;carouselPath?:string;from?:string;to?:string;field?:string;delta?:string;offset?:number;scrollDriven?:boolean;
+  scoreBound?:number|LayoutAnimationScoreBound;
+  parent?:string;basis?:readonly ('text'|'border-box')[];
   /** For a text domain: how many characters fit at the witness (font-derived contracts only). */
   text?: { maxLength: number; fitsUpTo: number; widest: string } | { lines: number; fitsLines: number };
   /** Build/debug provenance of both sides (ADR-0002). Never consulted by the proof. */
