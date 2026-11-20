@@ -107,7 +107,20 @@ function declarations(nodes){
   if(nodes.some(n=>!['decl','comment'].includes(n.type)))refuse('CSS nesting is not a closed independent projection');
   return nodes.filter(n=>n.type==='decl');
 }
-const ignorable=d=>/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
+// Only explicit, non-geometric transition names are dispensable. In
+// particular omitted property names mean "all", and custom properties can
+// feed arbitrary layout declarations. Validate the full shorthand first.
+const paintTransitionName=/^(?:none|color|background(?:-color|-image|-position|-size)?|opacity|box-shadow|text-shadow|border(?:-(?:top|right|bottom|left))?-color|border-radius)$/i;
+function paintTransition(d){
+  const p=d.prop.toLowerCase(),v=d.value.trim();
+  if(!['transition','transition-property'].includes(p))return false;
+  if(!csstree.lexer.matchProperty(p,v).matched)return false;
+  return postcss.list.comma(v).every(item=>{
+    const names=postcss.list.space(item).filter(t=>!/^[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:ms|s)$/i.test(t)&&! /^(?:linear|ease|ease-in|ease-out|ease-in-out|step-start|step-end|normal|allow-discrete|(?:cubic-bezier|steps|linear)\(.*\))$/i.test(t));
+    return names.length===1&&paintTransitionName.test(names[0]);
+  });
+}
+const ignorable=d=>paintTransition(d)||/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
 function validateDecl(d){
   const p=d.prop.toLowerCase(),v=d.value.trim();
   if(ignorable(d))return false;
@@ -124,6 +137,7 @@ function validateDecl(d){
 const expand=(r,d)=>{
   const p=d.prop.toLowerCase(),v=d.value.trim();
   if(p==='inset'||p==='overflow'){
+    if(p==='inset')r.push([p,v]);
     const values=postcss.list.space(v),[a,b=a,c=a,e=b]=values;
     if(!a||values.length>(p==='inset'?4:2))refuse('Unsupported '+p+' shorthand');
     if(p==='inset')for(const [k,value] of [['top',a],['right',b],['bottom',c],['left',e]])r.push([k,value]);
@@ -159,7 +173,8 @@ const plainAttrs=n=>n.attrs.every(a=>!a.namespace&&(
 /** Produce a reduced full document for a single rectangle, or throw with a
  * dependency reason. The retained selectors still run through veriss's own
  * cascade and layout engine; we do not calculate CSS dimensions here. */
-export function projectIndependentGeometry(html,css,target,profile,binding,inlineOnly=false){
+export function projectIndependentGeometry(html,css,target,profile,binding,axis=false){
+  const inlineOnly=axis===true||axis==='inline',blockOnly=axis==='block';
   if(typeof html!=='string'||typeof css!=='string'||html.length>1e6||css.length>1e6)refuse('Projection input limit');
   if((profile.scrollbar?.inlineSize??0)!==0||(profile.scrollbar?.blockSize??0)!==0||(profile.scrollbar?.thinInlineSize??0)!==0||(profile.scrollbar?.thinBlockSize??0)!==0)refuse('Projection requires overlay scrollbars');
   const errors=[],doc=parse(html,{scriptingEnabled:true,onParseError:e=>errors.push(e.code)});
@@ -196,7 +211,16 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
   // restricted ordinary-flow profile. Drop them before dependency checking;
   // never drop mixed shorthands such as padding, margin or border.
   const onlyBlock=d=>inlineOnly&&/^(?:height|min-height|max-height|block-size|min-block-size|max-block-size|top|bottom|(?:padding|margin)-(?:top|bottom|block(?:-start|-end)?)|border-(?:top|bottom|block(?:-start|-end)?)(?:-width|-style|-color)?)$/i.test(d.prop);
-  const discard=d=>ignorable(d)||onlyBlock(d);
+  // Track declarations do not affect a normal block. This is conditional
+  // on the later proof that *every* retained element is a normal block;
+  // a possible grid/flex display must still cause refusal.
+  const inactiveTracks=d=>inlineOnly&&/^(?:grid-template(?:-columns|-rows|-areas)?|grid-auto-(?:columns|rows|flow)|grid-(?:row|column)(?:-start|-end)?|grid-area)$/i.test(d.prop);
+  // A viewport-fixed non-replaced box with a definite block size and
+  // anchor does not depend on its horizontal used size. The complete
+  // retained chain is checked below for fixed containing-block creators
+  // and cross-axis sizing. Do not discard mixed shorthands.
+  const onlyInline=d=>blockOnly&&/^(?:width|min-width|max-width|inline-size|min-inline-size|max-inline-size|left|right|(?:padding|margin)-(?:left|right|inline(?:-start|-end)?)|border-(?:left|right|inline(?:-start|-end)?)(?:-width|-style|-color)?)$/i.test(d.prop);
+  const discard=d=>ignorable(d)||onlyBlock(d)||onlyInline(d)||inactiveTracks(d);
   // html/body are unique in this standards HTML document. Freeze a simple
   // root :has() against the *original* DOM. A never-matching class/ID (or
   // its negation) has precisely the same specificity as the original
@@ -205,7 +229,7 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
   const marker='__veriss_projection_absent__';
   const markerAbsent=!elements.some(n=>attrs(n).id===marker||(attrs(n).class??'').split(/[\t\n\r\f ]+/).includes(marker));
   function freezeRootHas(selectors){
-    if(!inlineOnly||!markerAbsent)return false;
+    if(!(inlineOnly||blockOnly)||!markerAbsent)return false;
     let changed=false;
     for(const selector of selectors){
       let start=0;
@@ -315,6 +339,20 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
         refuse('Inline projection requires ordinary width-independent block flow');
       continue;
     }
+    if(blockOnly){
+      if(!blocks.has(n.tagName)||!blockDisplay(rs))refuse('Block projection requires ordinary block ancestors and target');
+      if(last){
+        const signed=v=>compoundLength(v)||v.startsWith('-')&&compoundLength(v.slice(1));
+        if(targetMode!=='fixed'||!axisSize(rs,'height')||!(guaranteed(rs,'top',signed)||guaranteed(rs,'bottom',signed)))refuse('Block projection requires a viewport-fixed box with definite height and block anchor');
+        if(summary(rs,'inset').length||summary(rs,'margin').some(v=>/\bauto\b/.test(v))||['margin-top','margin-bottom','margin-block','margin-block-start','margin-block-end'].some(p=>summary(rs,p).some(v=>/\bauto\b/.test(v))))refuse('Block projection cannot resolve mixed inset or auto block margins');
+        // Use an arbitrary horizontal surrogate only inside the reduced
+        // document. No horizontal coordinate from it may become evidence.
+        const style=n.attrs.find(a=>a.name==='style');
+        const surrogate='width:100px!important;left:0!important;right:auto!important';
+        if(style)style.value+=';'+surrogate;else n.attrs.push({name:'style',value:surrogate});
+      }
+      continue;
+    }
     if(!last&&!blockDisplay(rs))refuse('Ancestor layout depends on omitted flex/grid items');
     if(last){
       if(targetMode==='flow'&&(!axisSize(rs,'height')||!widthIndependent(rs,n)))refuse('Target has content-dependent dimensions');
@@ -337,7 +375,7 @@ export function projectIndependentGeometry(html,css,target,profile,binding,inlin
     n.childNodes=(n.childNodes??[]).filter(c=>c===next||n===root&&c===head);
   }
   return {html:serialize(doc),css:sheet.toString(),path:'Document'+'/0'.repeat(chain.length-1),
-    assumptions:[...(inlineOnly?['Only inline start and size are proved; supported root descendant-presence selectors are fixed to the supplied DOM. Block-axis-only declarations and omitted block-flow siblings and descendants may change vertical position or height. Overlay scrollbars and absence of intrinsic/float/aspect-ratio dependencies are required.']:[]),'Automatically derived independent rectangle for '+(binding??'#'+target)+': retained original ancestor chain and matching layout cascade; removed rules have no possible subject in the retained chain or are non-geometric for explicit font-independent dimensions.','Closed, settled, scripting-enabled document; overlay scrollbars, unscrolled horizontal-tb/ltr CSS pixels; geometry only, not clipping, paint, hit testing, or full-document correctness.']};
+    assumptions:[...(blockOnly?['Only block start and size are proved: explicitly sized viewport-fixed non-replaced target, with no containing-block creator or cross-axis sizing dependency; horizontal declarations were removed and the reduced target uses an arbitrary horizontal surrogate.']:[]),...(inlineOnly?['Only inline start and size are proved; supported root descendant-presence selectors are fixed to the supplied DOM. Block-axis-only declarations and omitted block-flow siblings and descendants may change vertical position or height. Overlay scrollbars and absence of intrinsic/float/aspect-ratio dependencies are required.']:[]),'Automatically derived independent rectangle for '+(binding??'#'+target)+': retained original ancestor chain and matching layout cascade; removed rules have no possible subject in the retained chain or are non-geometric for explicit font-independent dimensions.','Closed, settled, scripting-enabled document; overlay scrollbars, unscrolled horizontal-tb/ltr CSS pixels; geometry only, not clipping, paint, hit testing, or full-document correctness.']};
 }
 
 // Use the engine's existing initial-scroll re-analysis; no scroll-dependent

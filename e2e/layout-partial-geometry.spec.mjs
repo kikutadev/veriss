@@ -238,3 +238,53 @@ test('child proof transfers to a different allocation and affine origin only wit
   }
  }finally{await killThreads(api.em)}
 });
+
+test('paint transitions and inactive grid tracks do not change block inline geometry',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1920,height:{min:320,max:1080}}};
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header><kbd>native</kbd></header><main id="shell"><section id="panel"><kbd>native</kbd></section></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}body{transition:background .18s,color .18s}#shell{display:block;grid-template-columns:1fr 2fr;margin:auto;max-width:520px}#panel{width:100%}';
+ const [e]=domGeometry({state:'screen',profile,html:source,css:style,targets:['panel']});
+ expect(e.axes,JSON.stringify(e)).toEqual(['inline']);
+ for(const width of [320,519,520,521,1920])for(const height of [390,900]){
+  await page.setViewportSize({width,height});
+  await page.setContent(source.replace('</head>','<style>'+style+'</style></head>'));
+  const actual=await page.locator('#panel').evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.width]});
+  const rows=e.rows.filter(r=>r.constraints.every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+  expect(rows.length).toBeGreaterThan(0);
+  for(const row of rows){
+   expect(actual[0]).toBeCloseTo(value(row.rect.inlineStart,width,height),1);
+   expect(actual[1]).toBeCloseTo(value(row.rect.inlineSize,width,height),1);
+  }
+ }
+ for(const extra of ['body{transition:width .2s}','body{transition:all .2s}','#shell{display:grid}']){
+  expect(domGeometry({state:'screen',profile,html:source,css:style+extra,targets:['panel']})[0].rows).toBeUndefined();
+ }
+});
+
+test('fixed block-axis projection preserves vertical coordinates without an intrinsic width model',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1920,height:{min:320,max:1080}}};
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header><kbd>native</kbd></header><main id="shell"><section id="panel"><kbd>native</kbd></section></main></body></html>';
+ const base='*{box-sizing:border-box;margin:0;padding:0}#panel{position:fixed;right:2rem;width:max-content;height:64px;bottom:12px}';
+ const model={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[
+  {id:'bottom',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'panel',field:'blockEnd'},right:{environment:'safeBottom'}}},
+  {id:'both',kind:'within-viewport',target:'panel'}
+ ]};
+ for(const valid of [true,false]){
+  const style=base+(valid?'':'#panel{bottom:-1px}');
+  const evidence=domGeometry({state:'screen',profile,html:source,css:style,targets:['panel']});
+  const e=evidence[0];expect(e.axes,JSON.stringify(e)).toEqual(['block']);
+  expect(verifyUI({model,evidence}).contracts.map(c=>c.status)).toEqual([valid?'verified':'violated','unknown']);
+  for(const width of [320,800,1920])for(const height of [320,390,1080]){
+   await page.setViewportSize({width,height});
+   await page.setContent(source.replace('</head>','<style>'+style+'</style></head>'));
+   const actual=await page.locator('#panel').evaluate(el=>{const r=el.getBoundingClientRect();return [r.y,r.height]});
+   const rows=e.rows.filter(r=>r.constraints.every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+   expect(rows.length).toBeGreaterThan(0);
+   for(const row of rows){
+    expect(actual[0]).toBeCloseTo(value(row.rect.blockStart,width,height),1);
+    expect(actual[1]).toBeCloseTo(value(row.rect.blockSize,width,height),1);
+    expect(row.rect.inlineSize).toBeUndefined();
+   }
+  }
+ }
+});
