@@ -109,3 +109,8 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - Latest integrated code `dd725a6`: `pnpm build:ts`, `pnpm check:ts` and `pnpm test` passed; all 860 existing tests passed with no failures (29 root, 735 verifier, 66 adapter-core, 12 React, 6 Vue, 12 Svelte). Frozen-lockfile installation was checked during this stage.
 - The preceding integrated checkpoint `96fd2b6` completed `tools/gate.sh`: zero failures across all packages, component-lint evaluation unchanged, 405 Playwright tests passed across Chromium, Firefox and WebKit; supervised QA exit 0, remaining processes 0. The later CSS/accessibility/engine extraction integration has passed build, generated-file comparison and unit tests, but its full E2E gate has not been rerun. Do not describe the earlier gate as qualification of the later checkpoint.
 - Before completion: migrate the remaining engine implementation itself, remove its temporary declaration, finish test/auxiliary source coverage, review type boundaries and generated output, run full gate on the final integrated tree and verify no QA browser leftovers. Do not push or merge to main until the final gate passes.
+
+### TypeScript migration / engine refactoring (2026-11-20)
+
+- 継続方針: 残る engine を責務単位で型付けする。実際の幾何・証明ロジックと診断・レポート組み立てを分離し、状態ごとの座標比較を共通化する。未対応領域の Unknown、出力順序、正確な有理数、既存の公開 API を維持する。
+- 検証条件: 既存の全単体テスト、型検査・生成差分に加え、抽出した義務・状態比較について境界値の単体テストと旧実装との出力比較を行う。最終版の gate と Git 依存確認が済むまでは既存 main に統合しない。
