@@ -43,3 +43,10 @@ export function verifyInterpolatedPredicate(input:{
  predicate:import('./relational-contract.mjs').Predicate;
  interpolation:{kind:'shared-affine';easing:string;assumptions:readonly string[]};
 }):{status:'verified'|'violated'|'unknown';reason?:string;assumptions:readonly string[];endpoints?:import('./relational-contract.mjs').RelationalProof;progress?:{min:string;max:string}};
+
+/** Derive a fixed-width interpolation from a closed standards component and
+ * paired explicit CSS state rules. Unsupported dependencies return Unknown. */
+export function verifyCSSWidthTransition(input:{
+ html:string;css:string;profile:import('./relational-contract.mjs').EnvironmentProfile;
+ target:string;stateAttribute:string;from:string;to:string;predicate:import('./relational-contract.mjs').Predicate;
+}):ReturnType<typeof verifyInterpolatedPredicate>&{derivation?:{kind:'fixed-width-transition';groups:readonly {context:string;before:string;after:string}[];easing:string;targets:readonly string[]}};

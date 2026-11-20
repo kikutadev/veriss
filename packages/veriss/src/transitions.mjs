@@ -1,4 +1,6 @@
-import {verifyUI} from './relational-contract.mjs';
+import {verifyUI,layoutGeometry} from './relational-contract.mjs';
+import {deriveWidthTransition} from './layout/width-transition.mjs';
+import {analyzeHTML} from './html.mjs';
 import {expandPredicate} from './layout/relational-predicate.mjs';
 import {easingRange,overshoots} from './layout/easing.mjs';
 // Endpoint relations over extracted CSS geometry, independent of UI syntax.
@@ -149,4 +151,22 @@ export function verifyInterpolatedPredicate({profile,from,to,evidence,predicate,
  if(from===to)return unknown('Distinct endpoint states required');
  const endpoints=verifyUI({model:{version:1,initial:from,states:[from,to],transitions:[{from,event:'interpolate',to}],profiles:[profile],contracts:[{id:'invariant',kind:'predicate',predicate:expanded}]},evidence});
  return {status:endpoints.status,endpoints,assumptions:[...new Set([...assumptions,...endpoints.assumptions,'All referenced coordinates are a shared affine combination of the corresponding endpoint coordinates at the same fixed viewport; progress is bounded in [0,1]. CSS implementation correspondence is not established by this proof.'])],progress:{min:range.min,max:range.max}};
+}
+
+/** Derive the interpolation model from a strictly closed CSS component.
+ * Neither geometry nor interpolation assumptions are caller-supplied. */
+export function verifyCSSWidthTransition(input){
+ try{
+  const {profile,predicate,from,to}=input,derived=deriveWidthTransition(input);
+  const assumptions=['Closed CSS component and supplied data-attribute event, fixed viewport, overlay scrollbar; no external CSS, runtime override or additional concurrent animation. The fixed border-box and normal block or stretched column flex child inline coordinates (column-reverse is projected onto column; block-axis coordinates are discarded) are affine in the sole changing width. Paired width branches share slopes and their offsets move in one direction.'];
+  const evidence=[[from,derived.before],[to,derived.after]].flatMap(([state,html])=>{
+   const layout=createLayoutIR(analyzeHTML(html,{css:derived.css,viewport:profile.viewport,ua:profile.ua,safeArea:profile.safeArea??{},scripting:'enabled',integrity:true,scrollbars:[profile.scrollbar??{name:'overlay',inlineSize:0,blockSize:0}],...(profile.dpr?{devicePixelRatios:[profile.dpr]}:{})}));
+   return layoutGeometry({state,profile,layout,targets:derived.targets,local:{assumptions}}).map(e=>{
+    if(!e.rows?.length)return e;
+    return {...e,axes:['inline'],rows:e.rows.map(r=>({...r,rect:{inlineStart:r.rect.inlineStart,inlineSize:r.rect.inlineSize}}))};
+   });
+  });
+  const result=verifyInterpolatedPredicate({profile,from,to,evidence,predicate,interpolation:{kind:'shared-affine',easing:derived.easing,assumptions}});
+  return {...result,derivation:{kind:derived.kind,groups:derived.groups,easing:derived.easing,targets:derived.targets}};
+ }catch(e){return {status:'unknown',reason:e.message,assumptions:[]}}
 }

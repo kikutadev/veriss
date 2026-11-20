@@ -353,3 +353,36 @@ test('conditional convex transition proof agrees with a shared bounded width int
  }
  expect(verifyInterpolatedPredicate({...input,interpolation:{...input.interpolation,easing:'cubic-bezier(.3,2,.2,1)'}}).status).toBe('unknown');
 });
+
+test('closed CSS width transition derivation covers responsive intermediate geometry',async({page,browserName})=>{
+ const {verifyCSSWidthTransition}=await import('../packages/veriss/src/transitions.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1920,height:{min:320,max:1080}}};
+ const html='<!doctype html><html lang="en"><head><title>QA</title></head><body><section id="tray" data-open="false"><div id="contents"></div><div id="toolbar"></div></section></body></html>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}#tray{display:flex;flex-direction:column-reverse;position:fixed;left:50%;top:0;height:100px;transform:translateX(-50%);width:min(230px,100vw - 24px);transition:width .54s cubic-bezier(.3,.7,.2,1),opacity .2s ease;border:1px solid #333}#tray[data-open=true]{width:min(344px,100vw - 22px);opacity:.9}#contents{height:20px;min-width:0;flex:none}#toolbar{height:40px;min-width:0;flex:none}@media(width>=1025px){#tray{width:258px}#tray[data-open=true]{width:358px}}';
+ const predicate={op:'all',items:['tray','contents','toolbar'].flatMap(target=>[{op:'compare',relation:'ge',left:{target,field:'inlineStart'},right:'0'},{op:'compare',relation:'le',left:{target,field:'inlineEnd'},right:{environment:'width'}}])};
+ const input={html,css,profile,target:'tray',stateAttribute:'data-open',from:'false',to:'true',predicate};
+ const proof=verifyCSSWidthTransition(input);
+ expect(proof.status,JSON.stringify(proof)).toBe('verified');
+ expect(verifyCSSWidthTransition({...input,css:css.replace('translateX(-50%)','none')}).status).toBe('violated');
+ expect(verifyCSSWidthTransition({...input,css:css.replace('.3,.7,.2,1','.3,2,.2,1')}).status).toBe('unknown');
+ for(const width of [320,365,366,367,1024,1025,1920]){
+  await page.setViewportSize({width,height:600});
+  await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
+  const frames=await page.evaluate(()=>{
+   const tray=document.querySelector('#tray'),read=()=>['tray','contents','toolbar'].map(id=>{const r=document.getElementById(id).getBoundingClientRect();return {x:r.x,right:r.right,width:r.width}});
+   const before=read();tray.dataset.open='true';void tray.offsetWidth;
+   const animation=tray.getAnimations().find(a=>a.transitionProperty==='width');
+   if(!animation)throw Error('Expected authored width transition');
+   animation.pause();const frames=[];
+   for(const t of [0,1,27,81,135,270,405,539,540]){animation.currentTime=t;frames.push(read())}
+   return {before,frames};
+  });
+  const end=frames.frames.at(-1);
+  for(const f of frames.frames){
+   expect(f[0].width).toBeGreaterThanOrEqual(frames.before[0].width-.1);
+   expect(f[0].width).toBeLessThanOrEqual(end[0].width+.1);
+   for(const r of f){expect(r.x).toBeGreaterThanOrEqual(0);expect(r.right).toBeLessThanOrEqual(width)}
+   for(const child of f.slice(1)){expect(child.x).toBeCloseTo(f[0].x+1,1);expect(child.width).toBeCloseTo(f[0].width-2,1)}
+  }
+ }
+});
