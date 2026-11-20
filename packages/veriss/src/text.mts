@@ -50,7 +50,7 @@ interface PlacedBounds extends InlineBounds { line: number; lineWidth: Pair }
 type WrappedStep = {atLeastInlineSize: number; below: number | null} & ({split: true} | (PlacedBounds & {lines: number; alignBelow?: number}));
 interface Atomic { k: string; w: number; h: number; at: number; index: number }
 interface LoadedFont { family: string; entry: FontEntry; handle: number; info: FontInfo }
-interface BoxInput { text?: TextContract; textRuns?: BoxInput[]; wrap?: string; minInlineSize?: unknown; intrinsicBlockSize?: unknown; minBlockSize?: unknown }
+interface BoxInput { text?: TextContract; textRuns?: readonly BoxInput[]; wrap?: string; minInlineSize?: unknown; intrinsicBlockSize?: unknown; minBlockSize?: unknown }
 interface GeneratedText { selector?: string | null; kind: string; text: string }
 interface GeneratedResult { generatedText?: GeneratedText[] }
 type TextOptions = { boxes?: Record<string, BoxInput> };

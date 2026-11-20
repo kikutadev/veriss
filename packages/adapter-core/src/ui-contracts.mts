@@ -122,7 +122,7 @@ function extractGeometry({state,profile,html,css,targets,local,boxes,knownFonts,
       // Only the downstream computation for an identical validated projection
       // can be skipped; cached provenance is never used as a dependency proof.
       const p:Projection=projectIndependentGeometry(html,css,target,profile,binding);
-      const layout=analyze('projected',{html:p.html,css:p.css},()=>{const report:LayoutSummary=analyzeProjectedGeometry(p,options);return createLayoutIR(report)});
+      const layout=analyze('projected',{html:p.html,css:p.css},()=>{const report:LayoutSummary=analyzeProjectedGeometry(p,{...options,css:p.css});return createLayoutIR(report)});
       const [result]=layoutGeometry({state,profile,layout,targets:[target],paths:{[target]:p.path},local:{assumptions:p.assumptions}});
       if(!result?.rows?.length)throw Error(result?.reason??'No projected rectangle');
       return {result};
@@ -135,7 +135,7 @@ function extractGeometry({state,profile,html,css,targets,local,boxes,knownFonts,
     if(!p.limit)for(const axis of axes)try{
       const target=entry.target,binding=Object.hasOwn(bindings,target)?bindings[target]:undefined;
       const reduced:Projection=projectIndependentGeometry(html,css,target,profile,binding,axis);
-      const layout=analyze('projected',{html:reduced.html,css:reduced.css},()=>{const report:LayoutSummary=analyzeProjectedGeometry(reduced,options);return createLayoutIR(report)});
+      const layout=analyze('projected',{html:reduced.html,css:reduced.css},()=>{const report:LayoutSummary=analyzeProjectedGeometry(reduced,{...options,css:reduced.css});return createLayoutIR(report)});
       const [result]=layoutGeometry({state,profile,layout,targets:[target],paths:{[target]:reduced.path},local:{assumptions:reduced.assumptions}});
       if(result?.rows?.length){
         const start: keyof LayoutRectangle = axis==='inline'?'inlineStart':'blockStart';

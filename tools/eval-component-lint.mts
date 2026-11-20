@@ -30,7 +30,7 @@ const adapters = {
   '.jsx': {analyze: analyzeReact, expand: expandReact},
 };
 
-type Message={severity:string;code:string;message:string;line?:number};
+type Message={severity:string;code:string;message:string;line?:number|undefined};
 type Break={kind:string;box:string;at:string[];by?:string;via?:string};
 const browser = await chromium.launch();
 const cases = readdirSync(join(scenario, 'cases')).sort().filter(id => !opt.only || opt.only.split(',').includes(id));

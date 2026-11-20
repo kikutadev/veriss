@@ -1,4 +1,5 @@
 // TypeScript source. Run pnpm build:ts to regenerate the adjacent ESM and declarations.
+import type { MediaFeatures } from '../layout-contracts.d.ts';
 import type { Rational } from './linear.mjs';
 import type { RegionRelation } from './region.mjs';
 import postcss from 'postcss';
@@ -10,7 +11,7 @@ export const preferenceValues: Readonly<Record<string, readonly string[]>> = { '
 export const mediaFeatureValues: Readonly<Record<string, readonly string[]>> = Object.freeze({hover:['none','hover'],pointer:['none','coarse','fine'],'prefers-reduced-motion':['no-preference','reduce']});
 export const validMediaFeatures = (v: unknown): v is Record<string, string> | undefined => v === undefined || !!v && Object.getPrototypeOf(v) === Object.prototype &&
   Object.entries(v).every(([k,value])=>Object.hasOwn(mediaFeatureValues,k)&&typeof value === "string" && mediaFeatureValues[k]?.includes(value) === true);
-export const mediaFeatureEntries = (v: Readonly<Record<string, string>> | undefined) => Object.entries(v??{}).sort(([a],[b])=>a.localeCompare(b));
+export const mediaFeatureEntries = (v: MediaFeatures | Readonly<Record<string, string>> | undefined) => Object.entries(v??{}).sort(([a],[b])=>a.localeCompare(b));
 export type ConditionAtom =
   | { feature: string; relation: RegionRelation; value: Rational; orientation?: string; fixed?: never; preference?: never }
   | { feature: string; fixed: boolean; relation?: never; value?: never; orientation?: never; preference?: never }
@@ -22,7 +23,7 @@ export interface ParsedCondition {
   listed: number;
   params: string;
 }
-export function parseCondition(params: string, kind: 'media' | 'container', mediaFeatures?: Readonly<Record<string, string>>): ParsedCondition {
+export function parseCondition(params: string, kind: 'media' | 'container', mediaFeatures?: MediaFeatures | Readonly<Record<string, string>>): ParsedCondition {
   let name: string | undefined;
   // The relation token is captured by the supported comparison regex.
   const relation = (token: string): RegionRelation => {
@@ -56,12 +57,12 @@ export function parseCondition(params: string, kind: 'media' | 'container', medi
         const feature=m[1]!.toLowerCase(),v=m[2]!.toLowerCase();
         if(!mediaFeatureValues[feature]?.includes(v))throw Error('Unsupported '+feature+' value: '+v);
         if(!Object.hasOwn(mediaFeatures??{},feature))throw Error('Media feature '+feature+' requires an explicit mediaFeatures profile');
-        atoms.push({feature, fixed:mediaFeatures?.[feature]===v});
+        atoms.push({feature, fixed:(mediaFeatures as Readonly<Record<string,string>>|undefined)?.[feature]===v});
       }
       else if (kind === 'media' && (m = value.match(/^(prefers-reduced-motion|prefers-color-scheme|prefers-contrast|forced-colors)\s*:\s*([a-z-]+)$/i))) {
         const feature = m[1]!.toLowerCase(), v = m[2]!.toLowerCase();
         if (!preferenceValues[feature]?.includes(v)) throw new Error(`Unsupported ${feature} value: ${v}`);
-        atoms.push(Object.hasOwn(mediaFeatures??{},feature)?{feature,fixed:mediaFeatures?.[feature]===v}:{ feature, preference: v });
+        atoms.push(Object.hasOwn(mediaFeatures??{},feature)?{feature,fixed:(mediaFeatures as Readonly<Record<string,string>>|undefined)?.[feature]===v}:{ feature, preference: v });
       }
       // Device resolution: dppx (x), dpi (÷ 96), dpcm (× 2.54 ÷ 96), and the -webkit- device-pixel-ratio forms.
       else if (kind === 'media' && (m = value.match(/^(min-|max-)?resolution\s*:\s*(\d+(?:\.\d{1,6})?)(dppx|x|dpi|dpcm)$/i))) {

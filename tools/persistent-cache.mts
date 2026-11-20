@@ -1,3 +1,4 @@
+import type {LayoutIR} from '../packages/veriss/src/layout-contract.mjs';
 // Local Node CLI only. The key is generated and retained by the same OS
 // account as the verifier. This authenticates local results, not remote proofs.
 import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
@@ -92,5 +93,12 @@ export function openLocalVerificationCache(directory:string,{revision}: {revisio
   }finally{rmSync(tmp,{force:true})}
  }
  const proofs=storage('proof:');
- return Object.freeze({geometry:storage('geometry:'),proofs:Object.freeze({get:(k:string)=>{const value=proofs.get(k);return typeof value==='number'?value:undefined},set:(k:string,v:number)=>proofs.set(k,v)}),flush});
+ const geometry=storage('geometry:');
+ // The MAC and revision fingerprint establish that these values came from
+ // this verifier's own typed writer. Reject anything outside the layout envelope.
+ const readGeometry=(k:string):LayoutIR|undefined=>{const v=geometry.get(k);
+  if(typeof v!=='object'||v===null||!('version' in v)||v.version!==1||!('kind' in v)||v.kind!=='layout'||!('geometryComplete' in v)||v.geometryComplete!==true)return undefined;
+  return v as LayoutIR;
+ };
+ return Object.freeze({geometry:Object.freeze({get:readGeometry,set:(k:string,v:LayoutIR)=>geometry.set(k,v)}),proofs:Object.freeze({get:(k:string)=>{const value=proofs.get(k);return typeof value==='number'?value:undefined},set:(k:string,v:number)=>proofs.set(k,v)}),flush});
 }

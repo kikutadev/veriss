@@ -23,7 +23,7 @@ export interface EngineOptions extends Omit<LayoutOptions, 'boxes' | 'mediaFeatu
   $devicePixelRatio?: number;
   $animationFrame?: { path: string; css: string };
   $slideVariant?: true;
-  safeArea?: { top?: number; right?: number; bottom?: number; left?: number };
+  safeArea?: LayoutOptions['safeArea'];
   images?: Readonly<Record<string, { width: number; height: number }>>;
   accessibility?: boolean | { contrast?: 'AA' | 'AAA'; targetSize?: number; targetLevel?: 'AA' | 'AAA'; profile?: 'all' | 'core' };
   selectors?: boolean;

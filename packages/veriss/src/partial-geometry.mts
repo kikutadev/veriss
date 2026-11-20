@@ -363,7 +363,7 @@ export function projectIndependentGeometry(html:string,css:string,target:string,
       // Parse all selector branches before pruning: a branch with unknown
       // syntax may invalidate its entire comma-separated rule.
       let parsed:Selector[];try{parsed=selectors(csstree.toPlainObject(csstree.parse(node.selector,{context:'selectorList'})))}catch{refuse('Unparsed CSS selector '+node.selector)}
-      if(freezeRootHas(parsed))node.selector=csstree.generate(csstree.fromPlainObject(structuredClone({type:'SelectorList',children:parsed})));
+      if(freezeRootHas(parsed))node.selector=csstree.generate(csstree.fromPlainObject(structuredClone({type:'SelectorList',children:parsed}) as csstree.CssNodePlain));
       if(parsed.every(s=>s.children.length===1&&need(s.children[0]).type==='PseudoElementSelector'&&/^view-transition(?:-group|-image-pair|-old|-new)?$/.test(name(need(s.children[0]))))){node.remove();continue}
       for(const script of inertScripts)if(geometryDecls.some(d=>!/^(?:box-sizing|(?:margin|padding)(?:-[\w-]+)?|border(?:-[\w-]+)?)$/i.test(d.prop))&&parsed.some(sel=>matchSelector(sel,script)!==false))inertScripts.delete(script);
       // Do not count pseudo rules as size guarantees; inspect their possible

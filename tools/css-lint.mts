@@ -21,6 +21,7 @@
 // --snapshots: input files are JSON manifests of complete HTML documents; --css is required.
 // --fail-on-unknown: exit 2 for incomplete checks, unless a lint error already gives exit 1.
 // Exit status 1 when any error is reported.
+import type {LintMessage,ComponentAnalysis} from '../packages/adapter-core/src/index.mjs';
 import type {TextMetrics} from '../packages/veriss/src/text-node.mjs';
 import {record,array,objectRecord} from './ui-input.mjs';
 import {readFileSync} from 'node:fs';
@@ -77,8 +78,8 @@ const adapters = {
   '.jsx': async () => (await import('../packages/react-adapter/src/index.mjs')).analyzeReact,
   '.tsx': async () => (await import('../packages/react-adapter/src/index.mjs')).analyzeReact,
 };
-type Message={file:string;severity:string;code:string;message:string;line?:number};
-type Analysis={status:string;states:{report:{status:string}}[]};
+type Message=LintMessage;
+type Analysis=ComponentAnalysis;
 const all:Message[] = [];
 let unchecked = false;
 let persistent;
@@ -93,7 +94,7 @@ for (const file of files) {
       const {checkUIManifest}=await import('./ui-manifest.mjs');
       const result=await checkUIManifest(file,{...(proofSession?{session:proofSession}:{}),...(geometrySession?{geometrySession}:{})});
       unchecked ||= result.outcome==='unknown';
-      if(result.finiteAnalysis&&result.operation!=='relational')all.push({file,severity:'info',code:'U_UI_CONTRACT',message:result.reason??result.finiteAnalysis.reason??"not checked: finite state graph unavailable"});else all.push(...lint(result,{file}));
+      if(result.operation!=='relational')all.push({file,severity:'info',code:'U_UI_CONTRACT',message:result.reason??result.finiteAnalysis?.reason??"not checked: finite state graph unavailable"});else all.push(...lint(result,{file}));
     }catch(e){unchecked=true;all.push({file,severity:'info',code:'U_UI_CONTRACT',message:'not checked: '+(e instanceof Error?e.message:String(e))});}
     continue;
   }

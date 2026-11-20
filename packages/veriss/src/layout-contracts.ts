@@ -32,7 +32,7 @@ export interface LayoutOptions {
   selectors?:boolean;
   images?:Readonly<Record<string,{width:number;height:number}>>;
   devicePixelRatios?:readonly number[];
-  safeArea?:Partial<Record<'top'|'right'|'bottom'|'left',number>>;
+  safeArea?:Partial<Record<'top'|'right'|'bottom'|'left',number>>|undefined;
 
   /** Fixed screen media inputs; unspecified capabilities are not inferred. */
   mediaFeatures?: MediaFeatures;
@@ -180,7 +180,7 @@ export interface LayoutSummary {
   generatedText?:LayoutGeneratedText[];
   layoutWarnings?:LayoutWarning[];
   accessibility?:{rules:string[];profile:'all'|'core';contrast:'AA'|'AAA';targetLevel:'AA'|'AAA';targetSize:number;warnings:LayoutWarning[];exempted:LayoutWarning[];notes:readonly unknown[]};
-  selectors?:{rows:{selector:string;file:string;line:number;matched:number}[];warnings:LayoutWarning[]};
+  selectors?:{rows:{selector:string;file:string;line:number;matched:number}[];warnings:(LayoutWarning & {selector:string})[]};
 
   /** Structural identities, including CSS-hidden boxes; never contract assumptions. */
   elements?:LayoutElement[];
