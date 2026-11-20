@@ -533,6 +533,7 @@ export interface LayoutWarning {
     fontSize?: string | undefined;
     lineHeight?: string | undefined;
     intervals?: [number, number][];
+    lines?: number;
     ancestor?: string;
     items?: string[];
     side?: 'top' | 'bottom';
