@@ -7,9 +7,9 @@ export type Specificity = [number, number, number];
 export type Boundary = { kind: string; name?: string };
 export interface SelectorBox {
   tag: string; classes: readonly string[];
-  [PARENT]?: SelectorBox;
+  [PARENT]?: SelectorBox | undefined;
   children?: readonly SelectorBox[]; inline?: readonly SelectorBox[];
-  id?: string; path?: string; label?: string; documentRoot?: boolean; anonymous?: boolean; pseudo?: string | boolean;
+  id?: string | undefined; path?: string; label?: string; documentRoot?: boolean; anonymous?: boolean; pseudo?: string | boolean;
   boundaries?: readonly Boundary[];
   inputType?: string; placeholderAttr?: boolean; value?: string; text?: boolean; whitespace?: boolean; textContent?: string;
   nativeStates?: Record<string, boolean | string | undefined>;

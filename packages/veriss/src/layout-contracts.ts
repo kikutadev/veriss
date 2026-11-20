@@ -171,9 +171,12 @@ export interface LayoutPosition {
 export interface LayoutRectangle {inlineStart:LayoutAffine;blockStart:LayoutAffine;inlineSize:LayoutAffine;blockSize:LayoutAffine}
 export interface LayoutWarning {
   code:string;severity:'warning'|'error'|'unknown';message:string;
-  box?:string;path?:string;css?:{file:string;line:number;column?:number};
+  box?:string;path?:string;
+  /** Syntax warnings can cite several author declarations. */
+  css?:{file:string;line:number;column?:number}|{file:string;line:number;property:string;selector?:string}[];
+  property?:string|undefined;min?:number;max?:number;media?:string;attributes?:string[];tag?:string;
   range?:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion;
-  rule?:string;selector?:string;file?:string;line?:number;hint?:string;
+  rule?:string;selector?:string|undefined;file?:string;line?:number;hint?:string;
   source?:SourceSpan|number|undefined;
 }
 export interface LayoutTransitionSize {box:string;path:string;properties:string[];values:Record<string,string>}

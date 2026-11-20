@@ -8,10 +8,10 @@ export type Boundary = {
 export interface SelectorBox {
     tag: string;
     classes: readonly string[];
-    [PARENT]?: SelectorBox;
+    [PARENT]?: SelectorBox | undefined;
     children?: readonly SelectorBox[];
     inline?: readonly SelectorBox[];
-    id?: string;
+    id?: string | undefined;
     path?: string;
     label?: string;
     documentRoot?: boolean;
