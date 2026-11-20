@@ -85,3 +85,21 @@ test('observations judge required axes independently and preserve exact subpixel
  assert.deepEqual(r.contracts[0].observations.map(o=>o.status),['passed','failed']);
  assert.equal(r.outcome,'failed');
 });
+
+test('block-only evidence requires consistent nonnegative complete rows and cannot certify the inline axis',async()=>{
+ const vertical=fact('empty','submit',100);
+ vertical.axes=['block'];
+ vertical.rows=[{rect:{blockStart:a('0'),blockSize:{...a('0'),heightCoefficient:'1'}}}];
+ const c=make([
+  {id:'block',kind:'predicate',states:['empty'],predicate:cmp('le',ref('submit','blockEnd'),{environment:'safeBottom'})},
+  {id:'inline',kind:'predicate',states:['empty'],predicate:cmp('le',ref('submit','inlineEnd'),{environment:'safeRight'})},
+  {id:'both',kind:'within-viewport',states:['empty'],target:'submit'}
+ ]);
+ const check=async e=>(await prove(c,createEvidenceIR([e]))).contracts.map(c=>c.status);
+ assert.deepEqual(await check(vertical),['verified','unknown','unknown']);
+ const rows=vertical.rows;
+ assert.deepEqual(await check({...vertical,rows:[{rect:{blockStart:a('0'),blockSize:a('-1')}}]}),['unknown','unknown','unknown']);
+ assert.deepEqual(await check({...vertical,rows:[...rows,{rect:{...rows[0].rect,blockStart:a('1')}}]}),['unknown','unknown','unknown']);
+ assert.deepEqual(await check({...vertical,rows:[{...rows[0],constraints:[{...a('-500','1'),strict:false}]}]}),['unknown','unknown','unknown']);
+ assert.deepEqual(await check({...vertical,axes:undefined}),['unknown','unknown','unknown']);
+});

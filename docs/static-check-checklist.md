@@ -440,3 +440,5 @@
   境界 600/601px の高さ変更で古い証拠を誤利用しない。3ブラウザーで元の実文書を測定
   (`e2e/layout-partial-geometry.spec.mjs`)、未キャッシュ時との比較は
   `packages/adapter-core/test/incremental-geometry.test.mjs`。
+
+- [x] **H6. 軸独立の幾何証拠**: 通常 block flow の高さ・兄弟内容を除外して横位置/幅を自動証明し、未証明の縦座標を補わない。html/body の単純 :has() を存在・非存在の対照で検証し、元の詳細度を保つ。幅320–1920px、高さ390/900pxの境界点と root presence の幅380/520px境界を3ブラウザーで照合 (`e2e/layout-partial-geometry.spec.mjs`)。不足軸・負寸法・被覆・重複矛盾・サブピクセル実測・float依存拒否を `relational-contract.test.mjs` と `partial-geometry.test.mjs` で確認。
