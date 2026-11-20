@@ -3,21 +3,31 @@
   "private": true,
   "type": "module",
   "description": "veriss: static verification of responsive CSS over the DOM (layout, accessibility, CSS mistakes), with component adapters.",
-  "repository": { "type": "git", "url": "git+https://github.com/mizchi/veriss.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/veriss.git"
+  },
   "packageManager": "pnpm@12.18.0",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build:text-metrics": "cd packages/veriss/text-metrics && moon build --target js --release",
     "build:oracle": "cd packages/veriss/oracle && moon build --target js --release",
     "test": "node --test tests/*.test.mjs && pnpm -r test",
     "test:e2e": "playwright test -c playwright.layout.config.mjs",
     "css-lint": "node tools/css-lint.mjs",
-    "eval:component-lint": "node tools/eval-component-lint.mjs"
+    "eval:component-lint": "node tools/eval-component-lint.mjs",
+    "build:ts": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:ts": "bash tools/check-ts-build.sh"
   },
   "devDependencies": {
     "@mizchi/vlmkit": "0.24.0",
     "@playwright/test": "1.64.1",
+    "@types/node": "^24.19.2",
     "playwright": "1.64.1",
-    "pngjs": "7.0.0"
+    "pngjs": "7.0.0",
+    "typescript": "6.0.3"
   }
 }

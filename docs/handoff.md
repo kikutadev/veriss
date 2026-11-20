@@ -92,4 +92,9 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - 数理演算 → レイアウト/IR → relational/partial geometry → adapters → CLI/テストの順で移す。判定・数値・診断の変更は移行と分離する。
 - 単体全群、既存 eval、3ブラウザー gate、依存導入・性能比較を確認してから移行完了とする。
 
-次: 数理演算の型設計とビルド手順を導入。以降 strict 対象を段階的に広げる。
+移行第1段階:
+- TypeScript 6.0.3 (既存依存の peer 解決を維持)、Node 24 型、strict の tsconfig を導入。
+- .mts を正本にして既存 .mjs と .d.mts を生成。pnpm build:ts / typecheck / check:ts を追加。gate は別ディレクトリへの再生成物とのバイト照合を行う。
+- 数理演算（linear, region, occupancy）、SMT (smt, model, layout-z3 と node adapter)、関係述語と含意、CSS の構文検査6項目と scrollbar 計算を移行。軸・座標・係数、展開済み述語、solver 入出力を明示。線形/領域テストも移行し、型契約の負例を追加。
+- 残り: layout engine/CSS、その他の core、契約 IR / partial geometry、全 adapters、CLI/実験/その他テスト。移行中の .mjs と型宣言をまだ持つモジュールは strict 検査対象外。生成された .mjs を直接編集しない。
+- 未完了: 全体移行・全 gate・Git 依存/性能の最終比較。型の回避を使って拡張範囲を偽らない。

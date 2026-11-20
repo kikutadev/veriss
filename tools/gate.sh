@@ -6,6 +6,7 @@ set -u
 set -o pipefail
 cd "$(dirname "$0")/.." || exit 1
 bad=0
+pnpm run check:ts || bad=1
 f=$(node --test --test-reporter=tap tests/*.test.mjs 2>&1 | grep -E "^# fail" | awk '{print $3}'); echo "root fail=$f"; [ "$f" = "0" ] || bad=1
 for p in veriss adapter-core react-adapter vue-adapter svelte-adapter; do
   f=$(cd packages/$p && node --test --test-reporter=tap test/*.test.mjs 2>&1 | grep -E "^# fail" | awk '{print $3}'); echo "$p fail=$f"; [ "$f" = "0" ] || bad=1
