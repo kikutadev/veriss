@@ -157,3 +157,11 @@ Chromium/Firefox/WebKit E2E 360件成功、QA supervisor 647 PID追跡・残留0
 完了条件: cold/warm の同一結果、独立要素変更/祖先変更/未知の selector/
 環境・font/box の変更、不完全 geometry/キャッシュの改変を検査する。
 複数状態の manifest と CLI から再利用可能とし、抽出を含む計測と3ブラウザーの回帰を行う。
+
+実装と API の正本は [幾何抽出セッション](../layout-contract-ir.md#幾何抽出セッション)。
+`node experiments/bench-incremental-geometry.mjs` (arm64, Node v26.12.1、各9回の中央値) の結果:
+通常 Grid 12対象で未キャッシュ239.14ms、同一入力0.33ms、変更時220.98→239.73ms。
+独立した12対象・120無関係ルールで312.64→10.50ms、1対象変更で309.68→37.89ms。
+独立矩形優先モードは全体解析の前処理も省くため、速度差は cache 単独の効果ではない。
+通常 Grid の CSS 変更時は全体解析を省けず、cache 登録のコストが加わる。
+実サイトの性能保証ではなく合成 HTML/CSS fixture の測定。

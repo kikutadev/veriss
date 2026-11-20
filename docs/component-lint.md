@@ -239,3 +239,12 @@ node tools/css-lint.mjs --contracts --fail-on-unknown ui.json
 
 manifest の documents に HTML/CSS を指定するか、独立した条件付き幾何証拠を渡す。
 React/Vue/Svelte の自動状態列挙にこの新 profile の DSL を直接組み込む機能はまだない。
+
+`--contracts` と `tools/ui-check.mjs` は同一実行内の幾何抽出と証明を再利用する。
+独立矩形に限定した検査を優先する場合は `--independent-first` を追加する。
+全体解析の保証とは別であり、依存のある対象は従来の全体解析へ戻る。
+
+```sh
+node tools/css-lint.mjs --contracts --independent-first --fail-on-unknown ui.json
+node tools/ui-check.mjs --independent-first ui.json
+```

@@ -3,7 +3,7 @@ import {dirname,resolve} from 'node:path';
 import {verifyUI,domGeometry} from '../packages/adapter-core/src/ui-contracts.mjs';
 import {loadTextMetrics} from '../packages/veriss/src/text-node.mjs';
 
-export async function checkUIManifest(file,{session}={}) {
+export async function checkUIManifest(file,{session,geometrySession}={}) {
   const path=rel=>resolve(dirname(file),rel),read=rel=>readFileSync(path(rel),'utf8');
   const manifest=JSON.parse(readFileSync(file,'utf8'));
   const {model,evidence=[],observations=[],documents=[]}=manifest;
@@ -18,7 +18,7 @@ export async function checkUIManifest(file,{session}={}) {
       const metrics=await loadTextMetrics({fonts});
       boxes=metrics.resolveBoxes(boxes??{});knownFonts=Object.keys(fonts);
     }
-    derived.push(...domGeometry({...d,profile,html:read(d.html),css:read(d.css),boxes,knownFonts}));
+    derived.push(...(geometrySession?.domGeometry??domGeometry)({...d,profile,html:read(d.html),css:read(d.css),boxes,knownFonts}));
   }
   return (session?.verifyUI??verifyUI)({model,evidence:[...evidence,...derived],observations});
 }

@@ -16,6 +16,7 @@
 //   --suggest-reset chromium,firefox,webkit   print the smallest CSS reset that makes those browsers' form controls agree
 //                            (values kept from --ua, or chromium) and exit
 // --contracts: input files are relational UI manifests.
+// --independent-first: in --contracts mode, try independently sized rectangles before full layout.
 // --snapshots: input files are JSON manifests of complete HTML documents; --css is required.
 // --fail-on-unknown: exit 2 for incomplete checks, unless a lint error already gives exit 1.
 // Exit status 1 when any error is reported.
@@ -28,12 +29,14 @@ for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '--fail-on-unknown') opt.failOnUnknown = true;
   else if (a === '--contracts') opt.contracts = true;
+  else if (a === '--independent-first') opt.independentFirst = true;
   else if (a === '--snapshots') opt.snapshots = true;
   else if (a === '--no-assume-text') opt.assumeText = false;
   else if (a === '--font') { const [family, ...file] = String(args[++i]).split('='); (opt.fonts ??= {})[family] = {file: file.join('=')}; }
   else if (a.startsWith('--')) opt[a.slice(2).replace(/-(\w)/g, (m, c) => c.toUpperCase())] = args[++i];
   else files.push(a);
 }
+if(opt.independentFirst&&!opt.contracts){console.error('--independent-first requires --contracts');process.exit(2)}
 if(opt.contracts && (opt.snapshots||opt.css||opt.pageCss||opt.fonts||opt.ua||opt.suggestReset)){console.error('--contracts takes CSS and environment from the manifest');process.exit(2)}
 if (!files.length && !opt.suggestReset) { console.error('usage: css-lint [--viewport 320-1280] [--font Family=file.ttf] [--page-css file] [--css file] [--profile recommended|all] [--format text|json] <files>'); process.exit(2); }
 if (opt.suggestReset) {
@@ -60,12 +63,13 @@ const adapters = {
 const all = [];
 let unchecked = false;
 const proofSession=opt.contracts?(await import('../packages/veriss/src/layout-contract.mjs')).createRelationalProofSession():undefined;
+const geometrySession=opt.contracts?(await import('../packages/adapter-core/src/ui-contracts.mjs')).createGeometrySession({preferIndependent:!!opt.independentFirst}):undefined;
 for (const file of files) {
   const source = readFileSync(file, 'utf8'), load = adapters[extname(file)];
   if (opt.contracts) {
     try {
       const {checkUIManifest}=await import('./ui-manifest.mjs');
-      const result=await checkUIManifest(file,{session:proofSession});
+      const result=await checkUIManifest(file,{session:proofSession,geometrySession});
       unchecked ||= result.outcome==='unknown';
       all.push(...lint(result,{file}));
     }catch(e){unchecked=true;all.push({file,severity:'info',code:'U_UI_CONTRACT',message:'not checked: '+e.message});}

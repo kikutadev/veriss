@@ -406,4 +406,4 @@ function analyzeStatesOnce({ states, css, unknowns = [], assumptions = [], scope
 }
 export { lint, formatText, recommended } from './lint.mjs';
 
-export {verifyUI, domGeometry} from './ui-contracts.mjs';
+export {verifyUI, domGeometry, createGeometrySession} from './ui-contracts.mjs';

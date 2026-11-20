@@ -434,3 +434,9 @@
   保証を再利用せず違反と判定。Chromium/Firefox/WebKit で境界幅・高さを実測する
   (`e2e/layout-partial-geometry.spec.mjs`)。キャッシュと含意の判定、被覆/状態/環境変更、
   観測失敗の扱いは `relational-composition.test.mjs`。
+
+- [x] **H5. 差分幾何の再利用**: 同一文書の状態/対象変更、独立矩形の片側の CSS
+  変更、祖先/selector/media/duplicate ID/UA/scrollbar/box の変更を比較。
+  境界 600/601px の高さ変更で古い証拠を誤利用しない。3ブラウザーで元の実文書を測定
+  (`e2e/layout-partial-geometry.spec.mjs`)、未キャッシュ時との比較は
+  `packages/adapter-core/test/incremental-geometry.test.mjs`。

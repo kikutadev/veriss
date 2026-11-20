@@ -117,3 +117,34 @@ test('nested overflow projection keeps exact rectangles and exposes failure at s
    }
  }
 });
+
+test('incremental independent extraction reuses only unchanged validated source and agrees with the browser',async({page,browserName})=>{
+ const {createGeometrySession}=await import('../packages/adapter-core/src/ui-contracts.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:400,max:900}}};
+ const html='<!doctype html><html lang="en"><head><title>Settings</title></head><body><main id="panel"><div id="left"></div><div id="right"></div><kbd>native</kbd></main></body></html>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}#panel{position:relative;overflow:hidden;height:100dvh}#left,#right{position:absolute;top:20px;width:40%;height:48px}#left{left:0}#right{right:0}';
+ const input={state:'ready',profile,html,css,targets:['left','right']};
+ const session=createGeometrySession({preferIndependent:true});
+ const initial=session.domGeometry(input);
+ expect(initial).toEqual(domGeometry(input));
+ const changed={...input,css:css+'@media(max-width:600px){#left{height:32px}}'};
+ const evidence=session.domGeometry(changed);
+ expect(evidence).toEqual(domGeometry(changed));
+ expect(session.stats().projected).toEqual({hits:1,misses:3,bypassed:0});
+ const model={version:1,initial:'ready',states:['ready'],transitions:[],profiles:[profile],contracts:[{id:'size',kind:'min-size',target:'left',width:44,height:44}]};
+ expect(verifyUI({model,evidence:initial}).status).toBe('verified');
+ expect(verifyUI({model,evidence}).status).toBe('violated');
+ for(const width of [320,600,601,1000])for(const height of [400,900]){
+  await page.setViewportSize({width,height});
+  await page.setContent(html.replace('</head>','<style>'+changed.css+'</style></head>'));
+  for(const e of evidence){
+   const actual=await page.locator('#'+e.target).evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height]});
+   const rows=e.rows.filter(r=>r.constraints.every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+   expect(rows.length).toBeGreaterThan(0);
+   for(const row of rows)for(const [i,k] of ['inlineStart','blockStart','inlineSize','blockSize'].entries())expect(actual[i]).toBeCloseTo(value(row.rect[k],width,height),1);
+  }
+ }
+ const dependency={...changed,css:changed.css+'#panel:has(kbd){height:20px}'};
+ expect(session.domGeometry(dependency)).toEqual(domGeometry(dependency));
+ expect(session.domGeometry(dependency).every(e=>!e.rows?.length)).toBe(true);
+});

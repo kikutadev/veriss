@@ -302,5 +302,37 @@ Z3 API (Context の同一性) を含むキーの Verified だけを保存する�
 これは明示的に同じ環境・幾何を共有する局所証明の合成であり、
 Troika の任意の親文脈に対する independently-true の全機能ではない。
 局所座標の平行移動や親の割当幅を子の変数へ代入する一般的な summary の輸入、
-CSS 抽出自体の差分化、source provenance の自動依存解析、永続キャッシュは対象外。
+任意の依存を横断する CSS の差分化、source provenance の完全な自動依存解析、永続キャッシュは対象外。
 既存の自動部分幾何の抽出は引き続き利用できる。
+
+### 幾何抽出セッション
+
+`@mizchi/veriss-adapter-core` の `createGeometrySession()` はプロセス内で
+HTML/CSS から独立に構築した immutable LayoutIR を再利用する。
+`session.domGeometry(input)` は通常の `domGeometry(input)` と同じ入力。
+state や target の指定が変わっても原文と全解析条件が一致すれば、全体 LayoutIR を再抽出しない。
+対象の一意性、座標、証拠の仮定、状態との束縛は呼び出しごとに構築する。
+
+独立矩形については、毎回現在の**全原文**に対して projection の依存確認を行う。
+その結果の縮約 HTML/CSS、環境 profile、解析 options (font/box/UA/viewport 等) の完全一致でのみ
+縮約文書の解析済み LayoutIR を再利用する。元の原文または依存条件が変わっても
+結果が一致すると仮定して projection 自体を省略することはない。
+未解決の selector、祖先、重複 ID、非局所の依存などで projection を拒否した場合は再利用しない。
+
+既定は従来の全体優先ルート。明示的に `createGeometrySession({preferIndependent:true})` とすると、
+32対象まで先に独立矩形を抽出し、失敗した対象は全体解析へ戻す。
+ここで得る証拠は全ページの文法・アクセシビリティ・描画を保証しない。
+全体解析可能な入力でも独立矩形由来の証拠を優先するため、出所や仮定が異なる場合がある。
+通常フロー内の Flex/Grid など依存のある要素を部分解析可能とはしない。
+
+`geometryComplete` の LayoutIR のみキャッシュする。既知の幾何的違反を含む場合も
+矩形証拠は計算済みなので再利用できるが、その違反を取り消すものではない。
+未対応の入力形式や大き過ぎる結果は保持しない。キーは plain finite JSON data の厳密な文字列。
+既定128件・キーとレイアウトの JSON 表現16MB相当 (UTF-16 code units × 2) の LRU。
+実ヒープの上限ではない。`stats()` は全体/縮約それぞれの hits / misses / bypassed と
+entries, bytes, evictions、`clear()` は全破棄。
+未知の解析結果を証明成功として保存せず、証明 session の結果判定とこの cache は独立。
+
+`checkUIManifest(file,{geometrySession,session})` に両 session を渡すと、
+複数 manifest や複数回の読み込みでも実際の現行ファイルを対象に幾何と証明の両方を再利用する。
+CLI は1実行の中で session を共有する。プロセスをまたぐキャッシュは未実装。
