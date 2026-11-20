@@ -10,6 +10,28 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - 解析が Unknown を成功に変えないこと(判定できない値は Unknown のまま)
 - lint の説明(新しいコードのとき `packages/adapter-core/src/lint.mjs`)とチェックリストの行
 
+## 現在の予定(2026-11-20 時点、次に再開するとき用)
+
+パターンの一覧(カテゴリ 1〜13)は F95 を除いて済み(88 / 89)。次は次の順で進める。
+
+1. **パターンの追加を続ける**(新しい観点を足すときはカテゴリの表と一覧の両方に足す)。まだ調べていない候補:
+   - `:focus-visible` とキーボード / マウスでの見え方の差、`:has()` の重さと無効な引数
+   - `@container` の単位(`cqw` / `cqh`)を container のない要素で使う、`container-type: size` で高さが 0 になる
+   - `writing-mode: vertical-*` と物理プロパティ(`width` / `margin-top`)の取り違え
+   - `inert` / `popover` と CSS の `display` の組み合わせ
+   - `<picture>` / `srcset` と CSS の `width` / `object-fit`
+2. **構成の作業 M6**: `solve` の中の「効かない宣言」の判定(engine.mjs の reasons の塊)を `rules/` に移す。今回の F118・F124・F129 の「レイアウトが Unknown だと届かない」問題がこれで減る
+3. **M7〜M9**: contrast を規則に、a11y を DOM と幾何に分ける、`packages/` に出す
+4. **ADR-0017 の R2**(マージンの相殺の一般化)と **R3**(web-platform-tests の部分集合を回帰試験に)。R2 が Unknown を直接減らす
+5. **保留の判断**: F95(`li` の display を変えてマーカーが消える)と F91(印刷)。どちらも利用者の判断待ち
+
+作業の進め方の約束:
+
+- ゲート `tools/gate.sh`(全パッケージの単体テスト、component-lint の eval が変わらないこと、css-mistakes の e2e を 3 ブラウザーで)を通してから commit し、main と claude ブランチへ push
+- ゲートの実行中はソースを変えない(テストが途中の変更を読む)。測るだけの使い捨てスクリプトは `tools/_m.mjs` に置いて消す
+- スクロールバーを測るときは Chromium を `ignoreDefaultArgs: ['--hide-scrollbars']` で起動する(F130)
+- 実測は Chromium・Firefox(157)・WebKit。結果が分かれるものは `browsers` を付けて報告し、レイアウトは Unknown のまま
+
 ## 進み具合(カテゴリごと)
 
 「観点」はそのカテゴリで調べる切り口。済 = 実測して実装したか、効いていると確かめて外したもの。
@@ -28,8 +50,8 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 10. ブラウザで結果が違うもの | 5 / 5 | 済 |
 | 11. 単位と計算値の落とし穴(書いた値と計算値が違う) | 4 / 4 | 済 |
 | 12. HTML 要素ごとの既定の振る舞いとリセット CSS | 4 / 4 | 済 |
-| 13. 状態のセレクタとカスケードの順 | 1 / 1 | 済 |
-| 合計 | 87 / 88(99%) | |
+| 13. 状態のセレクタとカスケードの順 | 2 / 2 | 済 |
+| 合計 | 88 / 89(99%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -159,6 +181,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 ### 13. 状態のセレクタとカスケードの順
 
 - [x] 後の規則に負けて見えない `:hover` / `:focus` / `:active`(F131。LVHA の順)
+- [x] セレクタリストの中の `-moz-` / `-ms-` の擬似で規則全体が捨てられる(F132)
 - 確かめて既存で足りていたもの: flex / grid コンテナの `text-overflow`(効かない宣言として報告済み)、中身のある `aspect-ratio`(理由付きの Unknown)
 
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
@@ -223,6 +246,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F132. セレクタリストの中の `-moz-` / `-ms-` の擬似
 - F131. 後の規則に負けて見えない `:hover` / `:focus` / `:active`
 - F130. `::-webkit-scrollbar` と標準の `scrollbar-width` / `scrollbar-color`
 - F129. リセット CSS で中央に来なくなる `<dialog>`
