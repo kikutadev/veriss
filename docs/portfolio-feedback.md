@@ -224,6 +224,7 @@ GALLERY は色・背景の transition を含む cascade の縮約未対応、HOM
 
 統合後 d135ca9 の全gate: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 381 E2E passed、supervisor exit=0、654 PID追跡・残留0。gate中の変更はこの検証記録のみ。
 
+
 ### 描画専用 transition の縮約 (2026-11-20)
 
 GALLERY の root/body にある background/color transition は、明示的に幾何へ影響しない
@@ -235,3 +236,20 @@ Chromium/Firefox/WebKit の 3 profile すべてで main-horizontal-fit が Verif
 既存4ページの証明と合わせ7契約のうち解析可能な横方向契約は5件。
 HOME の island/selected-work は別課題。全ページ・全状態・描画の完全証明ではない。
 本番変更なし。
+
+### 軸独立証拠の残り依存の精査
+実入力で残った GALLERY と selected-work を、既存の縮約により安全にモデル化する。transition は明示した非幾何 property のみ除外し、通常 block に確定している場合に限って無効な grid track 宣言を除く。動的配置や依存する grid/flex を無条件に除外しない。限られた縦軸独立モデルを検討し、対照テスト・3ブラウザー・同一 snapshot と全 gate により検証する。
+
+
+### 残り依存の精査結果 (2026-11-20)
+df34f51: paint-only transition と、全 retained chain が通常 block である場合の inactive grid tracks を区別。viewport-fixed の独立した block 軸も追加。相互依存のある軸を証明しない。単体13件、新規 E2E 6件成功。
+同じ5ページ・3ブラウザー・幅320–1920/高さ320–1080・DPR1・overlay・safe area 0・外部通信遮断・4点/環境の実ビルド再評価:
+- 7契約中成立4→6、Unknown3→1。3環境合計21ケース中18成立、3 Unknown。
+- GALLERY main と HOME selected-work が全3環境で成立。ABOUT/WORKS/ARTICLES/GALLERY exit=0、HOME exit=2。
+- 実測契約84/84、モデルの座標照合72/72、捕捉エラー0、Supervisor 残留0。
+- 縦軸は viewport-fixed、明示高・block anchor、通常 block 祖先に限定。仮の横幅を証拠に含めない。
+- 残りの island: nav に inert 属性、ancestor の fixed column-reverse Flex、対象の Grid、横幅の transition、幅の複合式 min(230px,100vw - 24px)、translate(-50%)、backdrop-filter、状態による transform/visibility がある。単純な block 縮約で解決せず、横方向の stretch 依存と固定配置、状態の時間的条件を個別に証明する必要がある。
+- 今回の作品契約は selected-work のセクション外枠の横収容。内部のカード配置全体の証明ではない。全ページ・全状態・hit-test の証明は未達。配信コード変更なし。
+
+同一の前回捕捉済み15 snapshot の再解析でも12→18/21環境ケースを確認。ゲーム3作品の25契約は成立10、違反4、Unknown11で不変。
+全gate: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 387 E2E passed、supervisor exit=0、657 PID追跡・残留0。gate起動後の変更は文書のみ。

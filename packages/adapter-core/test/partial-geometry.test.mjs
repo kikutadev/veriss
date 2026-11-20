@@ -154,3 +154,31 @@ test('paint-only transitions do not prevent independent inline geometry; unknown
  assert.ok(check(source,style+'body{transition-property:color, background-color;transition-duration:.2s}',['shell'])[0].rows?.length);
  assert.ok(!check(source,style+'body{transition-property:color, width}',['shell'])[0].rows?.length);
 });
+
+test('paint-only transitions and inactive grid tracks preserve an ordinary block inline proof',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header><kbd>native</kbd></header><main id="shell"><section id="panel"><kbd>native</kbd></section></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}body{transition:background .18s,color .18s}#shell{display:block;grid-template-columns:1fr 2fr;margin:auto;max-width:520px}#panel{width:100%}';
+ const [e]=check(source,style,['panel']);
+ assert.deepEqual(e.axes,['inline'],JSON.stringify(e));
+ for(const extra of ['body{transition:width .2s}','body{transition:all .2s}','body{transition:.2s}','body{transition-property:--size}','body{transition-property:height}','@media(max-width:500px){#shell{display:grid}}','#shell{display:flex}']){
+  assert.ok(!check(source,style+extra,['panel'])[0].rows?.length,extra);
+ }
+ assert.ok(check(source,style+'body{transition-property:background-color,opacity}',['panel'])[0].rows?.length);
+});
+
+test('fixed block-axis evidence does not require the intrinsic inline width',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><header><kbd>native</kbd></header><main id="shell"><section id="panel"><kbd>native</kbd></section></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}#panel{position:fixed;right:2rem;width:max-content;height:64px;bottom:12px}';
+ const [e]=check(source,style,['panel']);
+ assert.deepEqual(e.axes,['block'],JSON.stringify(e));
+ const model={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[
+  {id:'bottom',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'panel',field:'blockEnd'},right:{environment:'safeBottom'}}},
+  {id:'both',kind:'within-viewport',target:'panel'}
+ ]};
+ assert.deepEqual(verifyUI({model,evidence:[e]}).contracts.map(c=>c.status),['verified','unknown']);
+ const [bad]=check(source,style+'#panel{bottom:-1px}',['panel']);
+ assert.equal(verifyUI({model,evidence:[bad]}).contracts[0].status,'violated');
+ for(const extra of ['#panel{height:auto}','#panel{aspect-ratio:1/1}','#panel{position:absolute}','#panel{margin-block:auto}','#panel{transform:translateY(10px)}','#shell{transform:translateX(1px)}','#shell{filter:blur(1px)}','#shell{contain:layout}']){
+  assert.ok(!check(source,style+extra,['panel'])[0].rows?.length,extra);
+ }
+});

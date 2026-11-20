@@ -102,19 +102,19 @@ function extractGeometry({state,profile,html,css,targets,local,boxes,knownFonts,
   }
   function fallback(entry,p){
     if(p.result)return p.result;
-    let axisError;
-    if(!p.limit)try{
+    const axisErrors=[];
+    if(!p.limit)for(const axis of ['inline','block'])try{
       const target=entry.target,binding=Object.hasOwn(bindings,target)?bindings[target]:undefined;
-      const reduced=projectIndependentGeometry(html,css,target,profile,binding,true);
+      const reduced=projectIndependentGeometry(html,css,target,profile,binding,axis);
       const layout=analyze('projected',{html:reduced.html,css:reduced.css},()=>createLayoutIR(analyzeProjectedGeometry(reduced,options)));
       const [result]=layoutGeometry({state,profile,layout,targets:[target],paths:{[target]:reduced.path},local:{assumptions:reduced.assumptions}});
-      if(result.rows?.length)return {...result,axes:['inline'],rows:result.rows.map(r=>({...r,rect:{inlineStart:r.rect.inlineStart,inlineSize:r.rect.inlineSize}}))};
-      axisError=result.reason??'No projected inline geometry';
-    }catch(e){axisError=e.message}
+      if(result.rows?.length)return {...result,axes:[axis],rows:result.rows.map(r=>({...r,rect:{[axis+'Start']:r.rect[axis+'Start'],[axis+'Size']:r.rect[axis+'Size']}}))};
+      axisErrors.push(axis+' projection: '+(result.reason??'No projected geometry'));
+    }catch(e){axisErrors.push(axis+' projection: '+e.message)}
 
     if(p.limit)return {...base(entry.target),reason:'Automatic projection target budget exceeded'};
     const {rows,...rest}=entry;
-    return {...rest,reason:(entry.reason??'Geometry incomplete')+'; automatic projection: '+p.error+(axisError?'; inline projection: '+axisError:'')};
+    return {...rest,reason:(entry.reason??'Geometry incomplete')+'; automatic projection: '+p.error+(axisErrors.length?'; '+axisErrors.join('; '):'')};
   }
   if(preferIndependent){
     // Opt-in: seek a closed independent rectangle first; full-layout
