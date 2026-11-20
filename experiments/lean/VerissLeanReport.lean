@@ -184,14 +184,20 @@ structure NamedRow where
 def NamedRow.axes (r : NamedRow) : List Axis :=
   r.inline.toList ++ r.block.toList
 
-def NamedRow.field (r : NamedRow) (k : String) : Except String Scaled := do
-  let some axis := (if k.startsWith "inline" then r.inline else if k.startsWith "block" then r.block else none)
-    | throw "Required geometry axis missing"
+@[irreducible] def NamedRow.selectAxis (r : NamedRow) (k : String) : Option Axis :=
+  if k.startsWith "inline" then r.inline else if k.startsWith "block" then r.block else none
+
+def Axis.field (axis : Axis) (k : String) : Except String Scaled :=
   match k with
-  | "inlineStart" | "blockStart" => return axis.start
-  | "inlineSize" | "blockSize" => return axis.size
-  | "inlineEnd" | "blockEnd" => return axis.start.plus axis.size
-  | _ => throw "Invalid field"
+  | "inlineStart" | "blockStart" => .ok axis.start
+  | "inlineSize" | "blockSize" => .ok axis.size
+  | "inlineEnd" | "blockEnd" => .ok (axis.start.plus axis.size)
+  | _ => .error "Invalid field"
+
+def NamedRow.field (r : NamedRow) (k : String) : Except String Scaled :=
+  match r.selectAxis k with
+  | none => .error "Required geometry axis missing"
+  | some a => a.field k
 
 def Operand.compile (p : InstanceProfile) (rows : List (String × NamedRow)) :
     Operand → Except String Scaled

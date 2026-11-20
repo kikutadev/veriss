@@ -176,3 +176,71 @@ Next: [detailed design for state reachability, component proof composition,
 and CSS extraction soundness (DESIGN.md)](DESIGN.md). This is a proposed
 implementation plan, not an assertion that its theorems already hold. The
 TypeScript integration remains separate.
+
+
+## Reachability, state-wide certificates, semantic lowering and time (third milestone)
+Implemented on the separate Lean research branch; the npm/TypeScript runtime is unchanged.
+
+- `VerissLeanState`: recomputes finite reachability for each declared profile,
+  accepts only closed results, and regenerates exact static and event case keys.
+  `Graph.checkedReach_spec`, `Scope.cases_spec`, `Graph.required_spec` and
+  `Graph.checkCases_spec` prove membership equivalence, not merely absence of
+  a missing edge in a test. Invalid IDs, duplicated states/edges/contracts,
+  unknown profile selections, missing/extra/duplicate cases and empty contract
+  scope are rejected. The graph describes declared reachability, not arbitrary JS.
+- `state-cases OBLIGATION.json` checks serialized relational ObligationIR v1
+  case keys from its original state/environment/contract, never trusting the
+  producer's case list. This is coverage only, not target binding or truth.
+  `state-proofs OBLIGATION.json CERTIFICATES.json` additionally requires one
+  positive relational certificate per regenerated static key and reconstructs
+  each problem from the original evidence entries and contract. Certificates
+  are a JSON array of objects with `key: {contract,profile,from}` and
+  `certificate: VerifiedCertificate`. Event geometry, action, occupancy and
+  negative aggregate certificates remain Unknown; the existing individual
+  counterexample verifier is unchanged. The graph/selector decoder, JSON
+  binding, whole report semantics and evidence's browser/CSS provenance are
+  still trusted boundaries; this is not a state-to-browser correctness claim.
+- `VerissLeanBridge`: independent real-valued interpretation of normalized
+  coordinate fields, safe-area/environment values, rational/scaled operands,
+  and Boolean predicate AST. Theorems `Operand.compile_sound`,
+  `Predicate.compile_sound`, and `Predicate.checked_piece_sound` connect
+  compiled halfspaces with that interpretation and checked relational proofs.
+  Positive denominator and row correspondence premises are explicit. This
+  closes the normalized predicate-lowering step, not the raw CSS extraction,
+  parser, profile-key provenance or whole-report combination correctness.
+- `VerissLeanTime`: normalized shared piecewise-linear progress traces with
+  exact rational knots and integer time boundaries. Strictly increasing times,
+  full start/end coverage, progress endpoints 0/1 and values in [0,1] are
+  independently checked. `Trace.continuous_domain_safe` covers every real
+  time in the declared duration and preserves any scalar interval satisfied
+  by both interpolated endpoints. `time-domain TRACE.json` accepts
+  `{duration,knots:[{time,num,den},...]}`. It does not infer CSS duration,
+  cubic-bezier curves, independent property progress or asynchronous transitions.
+
+Reproduce (from this directory, pinned toolchain):
+
+```sh
+lake build VerissLean
+lake env lean StateTest.lean
+lake env lean TimeTest.lean
+lake env lean KernelExample.lean
+lake env lean --run Main.lean state-cases OBLIGATION.json
+lake env lean --run Main.lean state-proofs OBLIGATION.json CERTIFICATES.json
+lake env lean --run Main.lean time-domain TRACE.json
+python3 test_state.py CHECKER OUTPUT_DIR
+python3 test_relational.py CHECKER OUTPUT_DIR
+```
+
+Verified in this milestone: 20 reachability/case kernel fixtures (including
+64-state chain and 65-state rejection), 8 time kernel fixtures, 12 integration
+cases using the actual veriss ObligationIR constructor (8 required mixed-mode
+keys; 5 static model certificates), all 29 existing relational regression
+cases, and the existing KernelExample. All build; inspected axioms are only
+propext, Classical.choice and Quot.sound (some theorems use fewer); no sorry
+or native_decide. The earlier saved real-site reports and browser gate were
+not rerun in this milestone. No new production warnings or browser code.
+
+Next: cross-state before/after geometry and reachability path witnesses (S3/S4),
+negative aggregate results, proof composition and actual CSS subset extraction
+(X0–X3), and timing extraction/certificate linkage to the source. Keep source
+provenance, unknown inputs and normalized-model claims separate.
