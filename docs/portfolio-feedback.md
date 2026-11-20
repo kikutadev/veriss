@@ -256,3 +256,11 @@ df34f51: paint-only transition と、全 retained chain が通常 block であ�
 
 ### 可変 margin の厳密計算
 目標: viewport 依存の非負 margin を通常 block flow と Grid の既存区分アフィン計算へ接続する。隣接する正の block margin は大小が逆転する領域で分割する。Flex は定数の基準サイズと可変外寸を分離し、内寸に基づく shrink weight を維持して接続する。未対応の親子/空箱の相殺、負値、intrinsic contribution、可変主軸 margin と %/content basis の組合せ、positioned box は明示 Unknown とする。既存の固定 margin の挙動を変えず、対照付き単体・3ブラウザ・同一実入力・全gateを確認し fork main に統合する。
+
+### 可変 margin の検証結果 (2026-11-20)
+f538ba2: 非負の viewport 依存 margin を既存の厳密な区分アフィン計算に接続。Block は隣接非空要素の正の margin 相殺を大小の境界ごとに分割。Grid は外寸と自動行の計測、Flex は外寸の変動と内側基準寸法による shrink weight を区別する。
+- 同一公開5ページ snapshot の比較 (e874e62 → f538ba2): parser Unknown 175→163 (HOME 43→40、ABOUT/WORKS/ARTICLES 各33→30、GALLERY 33→33)。全ページの証明判定は Unknown のまま、既存 error 件数は不変。
+- 既存15実ビルド捕捉の replay: 21契約環境の証拠データがすべて一致、うち18成立。新たな実ページ測定ではなく保存入力の再解析。
+- 新規単体3件、新規3ブラウザー E2E 6件。追加差分計測34ケース・幅高さ24点・4箱・3ブラウザー、9792/9792矩形一致 (許容誤差0.15px)。Z3独立再検証34/34ケース、17526チェック成立。固定basisの縮小制御対照では成立判定と違反判定双方を確認。
+- 親子/空箱の相殺、負の可変 margin、intrinsic contribution、可変主軸 margin と %/content basis の組合せ等は Unknown を維持。HOME キャラクターの負値 clamp も未対応。配信コード変更なし。
+- 全gate (f538ba2): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 402 E2E passed、supervisor exit=0、717 PID追跡・残留0。独立プロセス検査 CLEAN。gate後のコード変更なし。
