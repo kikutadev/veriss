@@ -5,7 +5,7 @@ export async function captureSnapshot<T>(page: Page, choices: T, {headLayoutInde
   const snapshot=await page.evaluate(headLayoutIndependent=>{
     if(document.compatMode!=='CSS1Compat') throw Error('Snapshot requires standards mode');
     const root=document.documentElement.cloneNode(true);
-    if (!(root instanceof HTMLElement)) throw Error('Snapshot requires an HTML root');
+    if (!(root instanceof Element)) throw Error('Snapshot requires a document root');
     // Stylesheets are supplied separately in original cascade order. Only
     // head metadata is stripped, with an explicit caller assumption. Body
     // structure and attributes (including style and hidden) remain intact.

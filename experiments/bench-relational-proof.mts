@@ -17,7 +17,7 @@ const original=make(facts);
 const edits=Array.from({length:11},(_,i)=>make(facts.map((f,j)=>j===0?{...f,rows:f.rows.map(r=>({...r,rect:{...r.rect,blockSize:a(80+i)}}))}:f)));
 const elapsed=(fn:()=>RelationalProof)=>{const start=performance.now();assert.equal(fn().status,'verified');return performance.now()-start};
 const median=(values:number[])=>[...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
-const samples={direct:[] as number[],cold:[] as number[],warm:[] as number[],edited:[] as number[]};
+const samples:{direct:number[];cold:number[];warm:number[];edited:number[]}={direct:[],cold:[],warm:[],edited:[]};
 for(let i=0;i<3;i++)elapsed(()=>verifyRelationalObligation(original));
 const s=createRelationalProofSession({maxKeyBytes:16_000_000});
 for(let i=0;i<11;i++){

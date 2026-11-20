@@ -18,7 +18,7 @@ for(const [name,html,css,preferIndependent] of ([['grid',gridHtml,gridCss,false]
  const input={state:'ready',profile,html,css,targets};
  const session=createGeometrySession({preferIndependent});
  for(let i=0;i<3;i++)session.domGeometry(input);
- const times={uncached:[] as number[],warm:[] as number[],changedUncached:[] as number[],changedCached:[] as number[]};
+ const times:{uncached:number[];warm:number[];changedUncached:number[];changedCached:number[]}={uncached:[],warm:[],changedUncached:[],changedCached:[]};
  for(let i=0;i<9;i++){
   const measure=(label:keyof typeof times,fn:()=>GeometryEvidence[])=>{const t=performance.now(),result=fn();times[label].push(performance.now()-t);assert.ok(result.every(e=>e.rows?.length),JSON.stringify(result));return result};
   const first=measure('uncached',()=>domGeometry(input));
