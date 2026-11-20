@@ -1,3 +1,4 @@
+import { validMediaFeatures } from './conditions.mjs';
 import { q, cmp } from './linear.mjs';
 import { simpleSelector } from './css.mjs';
 import { validateFontContract, validateTextMetrics } from './text-font.mjs';
@@ -5,7 +6,7 @@ export const boxTags = new Set('canvas template noscript datalist dialog details
 // Form controls and images have UA intrinsic sizes and padding: checked only with resets and explicit sizes.
 export const controlTags = new Set(['button', 'input', 'select', 'textarea']), replacedTags = new Set(['img', 'input', 'select', 'textarea']);
 const ancestorTags=new Set([...boxTags].filter(tag=>!['button', 'img', 'input', 'select', 'textarea','noscript'].includes(tag)));
-const supportedOptions = new Set(['scripting', 'ua', 'knownFonts', 'scope', 'reportTextFonts', 'defaultFontSize', 'defaultColors', 'scrollIntent', 'name', 'css', 'cssFile', 'reset', 'ancestors', 'viewport', 'hostInset', 'hostBlockInset', 'block', 'boxes', 'scrollbars', 'integrity', 'accessibility', 'selectors', 'images', 'devicePixelRatios', '$devicePixelRatio', '$animationFrame', '$slideVariant', 'safeArea']);
+const supportedOptions = new Set(['scripting', 'mediaFeatures', 'ua', 'knownFonts', 'scope', 'reportTextFonts', 'defaultFontSize', 'defaultColors', 'scrollIntent', 'name', 'css', 'cssFile', 'reset', 'ancestors', 'viewport', 'hostInset', 'hostBlockInset', 'block', 'boxes', 'scrollbars', 'integrity', 'accessibility', 'selectors', 'images', 'devicePixelRatios', '$devicePixelRatio', '$animationFrame', '$slideVariant', 'safeArea']);
 const supportedContract = new Set(['placeholderInlineSize', 'minInlineSize', 'maxInlineSize', 'minBlockSize', 'intrinsicBlockSize', 'wrap', 'overflow', 'overflowBlock', 'font', 'textMetrics', 'textRuns']);
 function finiteSize(value, name) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error(`Invalid layout ${name}`);
@@ -13,6 +14,7 @@ function finiteSize(value, name) {
 }
 export function validateOptions(options) {
   if (!options || Object.keys(options).some(key => !supportedOptions.has(key))) throw new Error('Invalid layout options');
+  if (!validMediaFeatures(options.mediaFeatures)) throw new Error('Invalid mediaFeatures: explicit hover, pointer or prefers-reduced-motion values required');
   if (options.scripting !== undefined && options.scripting !== 'enabled') throw new Error('Invalid scripting assumption: only enabled is modeled');
   if (typeof options.css !== 'string' || options.css.length > 1_000_000) throw new Error('Invalid layout CSS input');
   if (options.knownFonts !== undefined && (!Array.isArray(options.knownFonts) || options.knownFonts.length > 256 || options.knownFonts.some(f => typeof f !== 'string' || f.length > 256))) throw new Error('Invalid layout knownFonts: a list of font family names');

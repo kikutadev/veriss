@@ -1,5 +1,6 @@
 // Relational UI contracts over a finite declared state graph and exact piecewise-affine
 // CSS-pixel geometry. Runtime observations are intentionally not proof evidence.
+import {validMediaFeatures,mediaFeatureEntries} from './layout/conditions.mjs';
 import {q,exact,cmp,sub} from './layout/linear.mjs';
 import {rational} from './layout/smt.mjs';
 import {rectangle,clip,partition,scalar,diff,sum,sample,times,affine as serializeAffine} from './layout/region.mjs';
@@ -18,7 +19,7 @@ const unique=v=>new Set(v).size===v.length;
 const finite=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1e6;
 const range=r=>r&&finite(r.min)&&finite(r.max)&&r.min>0&&r.min<=r.max;
 const cond=(r,cs)=>cs.reduce((out,[a,s])=>out&&clip(out,a,s),r);
-export const profileKey=p=>JSON.stringify([p.viewport.min,p.viewport.max,p.viewport.height.min,p.viewport.height.max,...['top','right','bottom','left'].map(k=>p.safeArea?.[k]??0),p.ua??'chromium',p.dpr??null,p.scrollbar?.name??'overlay',p.scrollbar?.inlineSize??0,p.scrollbar?.blockSize??0,p.scrollbar?.thinInlineSize??null,p.scrollbar?.thinBlockSize??null,p.input??null,p.fontProfile??null,p.assumptions??[]]);
+export const profileKey=p=>JSON.stringify([p.viewport.min,p.viewport.max,p.viewport.height.min,p.viewport.height.max,...['top','right','bottom','left'].map(k=>p.safeArea?.[k]??0),p.ua??'chromium',p.dpr??null,p.scrollbar?.name??'overlay',p.scrollbar?.inlineSize??0,p.scrollbar?.blockSize??0,p.scrollbar?.thinInlineSize??null,p.scrollbar?.thinBlockSize??null,p.input??null,p.fontProfile??null,p.assumptions??[],...(mediaFeatureEntries(p.mediaFeatures).length?[mediaFeatureEntries(p.mediaFeatures)]:[])]);
 const domainOf=p=>rectangle({min:q(p.viewport.min),max:q(p.viewport.max)},{min:q(p.viewport.height.min),max:q(p.viewport.height.max)});
 function minusRegion(region,cs) {
   let rem=region;const out=[];
@@ -253,7 +254,7 @@ function evaluateRelational({model,evidence=[],observations=[],compiledCases,cac
   for(const e of evidence) {
     ensure(e&&model.states.includes(e.state)&&model.profiles.some(p=>p.id===e.profile)&&id(e.target)&&['dom','local-dom','scene','external'].includes(e.source)&&Array.isArray(e.assumptions)&&e.assumptions.every(a=>typeof a==='string'&&a.trim())&&(e.source==='dom'||e.assumptions.length),'Invalid geometry evidence');
     const p=model.profiles.find(p=>p.id===e.profile);
-    ensure(e.profileKey===undefined||e.profileKey===profileKey(p),'Geometry evidence profile mismatch');
+    ensure((e.profileKey===undefined?!(mediaFeatureEntries(p.mediaFeatures).length&&['dom','local-dom'].includes(e.source)):e.profileKey===profileKey(p)),'Geometry evidence profile mismatch');
     const k=key(e.state,e.profile,e.target);
     ensure(!entries.has(k),'Duplicate geometry evidence');entries.set(k,e);
   }
@@ -347,8 +348,9 @@ export function createStateIR({initial,states,transitions}) {
 export function createEnvironmentIR(profiles) {
  validateProfiles(profiles);
  for(const p of profiles){
-  ensure(own(p,['id','viewport','safeArea','ua','dpr','scrollbar','assumptions','input','fontProfile']),'Unknown environment field');
+  ensure(own(p,['id','viewport','safeArea','ua','dpr','scrollbar','assumptions','input','fontProfile','mediaFeatures']),'Unknown environment field');
   ensure(own(p.viewport,['min','max','height'])&&own(p.viewport.height,['min','max']),'Invalid viewport shape');
+  ensure(validMediaFeatures(p.mediaFeatures),'Invalid profile mediaFeatures');
   ensure(p.input===undefined||['touch','mouse','keyboard','mixed'].includes(p.input),'Invalid input profile');
   ensure(p.fontProfile===undefined||id(p.fontProfile),'Invalid font profile');
   ensure(p.assumptions===undefined||Array.isArray(p.assumptions)&&p.assumptions.every(a=>typeof a==='string'&&a.trim()),'Invalid environment assumptions');
@@ -534,6 +536,7 @@ export function layoutGeometry({state,profile,layout,targets,local,paths={}}) {
  return targets.map(target=>{
   const base={state,profile:profile.id,profileKey:profileKey(profile),target,source:local?'local-dom':'dom',assumptions:[...(layout.assumptions??[]),'LayoutIR is bound by the producer to the declared UA, fonts, viewport, safe insets and platform profile.',...(local?.assumptions??[])]};
   if(layout.kind!=='layout'||layout.version!==1||!layout.geometryComplete||layout.cases.length!==1||layout.scope.hostInset||layout.scope.hostBlockInset)return {...base,reason:'CSS geometry incomplete or not a single closed layout case: '+(layout.diagnostics?.[0]?.message??'model incomplete')};
+  if(JSON.stringify(mediaFeatureEntries(layout.scope.mediaFeatures))!==JSON.stringify(mediaFeatureEntries(profile.mediaFeatures)))return {...base,reason:'layout mediaFeatures differ from environment'};
   const actual=layout.scope.scrollbarProfiles;
   const expected=profile.scrollbar??{name:'overlay',inlineSize:0,blockSize:0};
   if(actual?.length&&(actual.length!==1||['name','inlineSize','blockSize','thinInlineSize','thinBlockSize'].some(k=>actual[0][k]!==expected[k])))return {...base,reason:'layout scrollbar profile differs from environment'};

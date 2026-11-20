@@ -182,3 +182,20 @@ test('fixed block-axis evidence does not require the intrinsic inline width',()=
   assert.ok(!check(source,style+extra,['panel'])[0].rows?.length,extra);
  }
 });
+
+test('explicit media features are preserved through independent geometry and reject cross-profile reuse',()=>{
+ const base={...profile,mediaFeatures:{hover:'none',pointer:'coarse','prefers-reduced-motion':'reduce'}};
+ const source='<!doctype html><html lang="en"><head><title>Dashboard</title></head><body><main id="shell"><kbd>unmodeled</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}#shell{height:40px;width:100%;overflow:hidden}@media (hover:hover){#shell{height:var(--unknown)}}@media (pointer:coarse){#shell{height:80px}}@media (prefers-reduced-motion:reduce) and (min-width:600px){#shell{height:100px}}';
+ const input={state:'screen',profile:base,html:source,css:style,targets:['shell']};
+ const e=domGeometry(input)[0];
+ assert.ok(e.rows?.length,JSON.stringify(e));
+ assert.ok(e.assumptions.some(a=>a.includes('pointer: coarse')));
+ const model={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[base],contracts:[{id:'size',kind:'min-size',target:'shell',width:44,height:80}]};
+ assert.equal(verifyUI({model,evidence:[e]}).status,'verified');
+ const desktop={...base,mediaFeatures:{hover:'hover',pointer:'fine','prefers-reduced-motion':'no-preference'}};
+ assert.notEqual(verifyUI({model:{...model,profiles:[desktop]},evidence:domGeometry({...input,profile:desktop})}).status,'verified');
+ assert.throws(()=>verifyUI({model:{...model,profiles:[desktop]},evidence:[e]}),/profile mismatch/);
+ const {profileKey,...unbound}=e;
+ assert.throws(()=>verifyUI({model,evidence:[unbound]}),/profile mismatch/);
+});

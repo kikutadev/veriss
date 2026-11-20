@@ -3,7 +3,7 @@ import { scalar, asAffine, width, height, sum, diff, times, evaluate, affine, sa
 import { validateOptions } from './input.mjs';
 import { parseLayoutCSS, computeStyle, matches, px, setRootFontSize, setSafeArea, containsFixed, setUAProfile, setRegisteredProperties, viewportLength, animationsOf, transitionsOf, dependentProperty } from './css.mjs';
 import { resolveUAProfile } from './ua-profile.mjs';
-import { parseCondition } from './conditions.mjs';
+import { parseCondition, mediaFeatureEntries } from './conditions.mjs';
 import { tracks, tracks as gridTracks, place, parseAreas, expandTracks } from './grid.mjs';
 import { compileSelector, PARENT, dynamicAttributeTests, ignoringSiblings, placeholderField, requiredCapable, optionalDivergent, optionalDivergence, asFormField, readWriteKnown, asEditable, langMatches, directionality } from './selectors.mjs';
 import { selectorUsage } from './selector-usage.mjs';
@@ -264,7 +264,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   const { rules, layers, notes = [], keyframes: keyframeNames = new Set(), dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
-  },{scripting:options.scripting});
+  },{scripting:options.scripting,mediaFeatures:options.mediaFeatures});
+  if (options.accessibility && Object.hasOwn(options.mediaFeatures??{},'prefers-reduced-motion')) unknown('U_LAYOUT_QUERY','A fixed reduced-motion geometry profile does not check motion accessibility across preferences');
   // A selector testing the value of an attribute that is dynamic on an element (an adapter's placeholder): whether
   // the rule applies there is not known.
   // Likewise a structural pseudo-class on the root of a component: its siblings in the page are not known.
@@ -483,7 +484,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         if (facts.type !== undefined && !/^image\/(?:avif|webp|png|jpeg|gif|svg\+xml)$/i.test(facts.type.trim())) throw Object.assign(new Error(`${box.label}: a picture source of type ${facts.type} may not be decoded`), { code: 'U_LAYOUT_IMAGE' });
         let condition = null;
         if (facts.media !== undefined && facts.media.trim() && facts.media.trim().toLowerCase() !== 'all') {
-          try { condition = parseCondition(facts.media, 'media'); } catch (error) { throw Object.assign(new Error(`${box.label}: source media ${facts.media}: ${error.message}`), { code: 'U_LAYOUT_IMAGE' }); }
+          try { condition = parseCondition(facts.media, 'media',options.mediaFeatures); } catch (error) { throw Object.assign(new Error(`${box.label}: source media ${facts.media}: ${error.message}`), { code: 'U_LAYOUT_IMAGE' }); }
           if (condition.groups.flat().some(atom => atom.preference)) throw Object.assign(new Error(`${box.label}: a preference media query on a picture source is not modeled`), { code: 'U_LAYOUT_IMAGE' });
           contexts.set(condition, context(condition, ancestors));
         }
@@ -4139,7 +4140,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           let yes = [piece.region], no = [];
           if (media) {
             // Split by every atom, then classify each piece at a sample point (as the cascade does).
-            const compiled = context(parseCondition(media, 'media'), []);
+            const compiled = context(parseCondition(media, 'media',options.mediaFeatures), []);
             let parts = [piece.region];
             for (const atom of compiled.groups.flat()) parts = parts.flatMap(r => { const p = partition(r, atom.slack, atom.relation); return [...p.yes, ...p.no]; });
             const holds = r => { const p = sample(r); return compiled.groups.some(group => group.every(atom => compare(cmp(evaluate(atom.slack, p), zero), atom.relation))); };
@@ -4353,8 +4354,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   const status = diagnostics.some(d => d.severity === 'unknown') ? 'unknown' : diagnostics.length ? 'violated' : 'verified';
   return { version: 1, ok: status === 'verified', status, component,
-    scope: { axis: block ? 'both' : 'inline', viewport: { ...projection(initial, 'x'), ...(block ? { height: options.viewport.height ? projection(initial, 'y') : null } : {}) }, hostInset: options.hostInset ?? 0, ...(block ? { hostBlockInset: options.hostBlockInset ?? 0 } : {}), closedCSS: true, browserRounding: false, blockSizing: block },
-    assumptions: [...(options.scripting==='enabled' ? ['The supplied DOM is a static snapshot in a scripting-enabled browser; script-driven mutations and disabled scripting are not checked.'] : []), 'The supplied CSS is the complete author cascade and the selected root has no external query-container ancestors; host provides the declared containing sizes without unmodeled scrollbar gutters.',
+    scope: { ...(options.mediaFeatures!==undefined?{mediaFeatures:Object.fromEntries(mediaFeatureEntries(options.mediaFeatures))}:{}), axis: block ? 'both' : 'inline', viewport: { ...projection(initial, 'x'), ...(block ? { height: options.viewport.height ? projection(initial, 'y') : null } : {}) }, hostInset: options.hostInset ?? 0, ...(block ? { hostBlockInset: options.hostBlockInset ?? 0 } : {}), closedCSS: true, browserRounding: false, blockSizing: block },
+    assumptions: [...(mediaFeatureEntries(options.mediaFeatures).map(([k,v])=>'CSS media environment is explicitly fixed: '+k+': '+v+'.')), ...(options.scripting==='enabled' ? ['The supplied DOM is a static snapshot in a scripting-enabled browser; script-driven mutations and disabled scripting are not checked.'] : []), 'The supplied CSS is the complete author cascade and the selected root has no external query-container ancestors; host provides the declared containing sizes without unmodeled scrollbar gutters.',
       'Each minInlineSize/minBlockSize is a trusted sufficient content-size bound; intrinsicBlockSize is a trusted exact auto-height profile for the permitted content/fonts.',
       'Only horizontal-tb/ltr in-flow and explicitly sized local absolute geometry is checked; ink overflow and browser pixel rounding are outside the contract.',
       ...(rules.some(rule=>rule.declarations.some(d=>d.expression || d.pending)) ? ['Custom properties are unregistered; unknown external inheritance and cycles through fallback references prevent verification when used by geometry.'] : [])],

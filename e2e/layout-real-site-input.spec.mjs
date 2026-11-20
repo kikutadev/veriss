@@ -310,3 +310,35 @@ test('responsive flex margins preserve shrink, grow, wrap, and cross-axis geomet
     }
   }
 });
+
+test('screen media capabilities and motion preferences compose with responsive layout in unrelated UI',async({browser})=>{
+  const html='<!doctype html><html lang="en"><head><title>Orders</title></head><body><main class="toolbar"><div class="filter"></div><div class="command"></div></main></body></html>';
+  const css='*{box-sizing:border-box;margin:0;padding:0}.toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:10px}.filter,.command{height:48px;min-width:0;min-height:0}@media (hover:hover) and (min-width:700px),(pointer:coarse) and (min-width:1000px){.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (pointer:coarse){.filter,.command{height:64px}}@media (prefers-reduced-motion:reduce){.toolbar{gap:16px}@media (min-height:700px){.command{height:80px}}}';
+  const viewport={min:320,max:1200,height:{min:320,max:900}};
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const hasTouch of [false,true])for(const reducedMotion of ['no-preference','reduce']){
+    const context=await browser.newContext({hasTouch,reducedMotion,viewport:{width:320,height:320}});
+    try {
+      const page=await context.newPage();
+      await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
+      // Browser engines can expose different primary input capabilities.
+      // Read the actual media facts, never infer them from the viewport.
+      const media=await page.evaluate(()=>Object.fromEntries(Object.entries({hover:['none','hover'],pointer:['none','coarse','fine'],'prefers-reduced-motion':['no-preference','reduce']}).map(([k,values])=>[k,values.find(v=>matchMedia('('+k+': '+v+')').matches)])));
+      expect(media['prefers-reduced-motion']).toBe(reducedMotion);
+      expect(['none','hover']).toContain(media.hover);expect(['none','coarse','fine']).toContain(media.pointer);
+      const report=analyzeHTML(html,{css,viewport,mediaFeatures:media,integrity:true});
+      expect(report.status,JSON.stringify(report.diagnostics)).toBe('verified');
+      for(const width of [320,699,700,999,1000,1200])for(const height of [320,699,700,900]){
+        await page.setViewportSize({width,height});
+        expect(await page.evaluate(features=>Object.entries(features).every(([k,v])=>matchMedia('('+k+': '+v+')').matches),media)).toBe(true);
+        const actual=await page.locator('.toolbar,.filter,.command').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height]}));
+        const at=a=>rat(a.constant)+rat(a.coefficient)*width+rat(a.heightCoefficient)*height;
+        for(const [i,selector] of ['.toolbar','.filter','.command'].entries()){
+          const row=report.sizes.find(s=>s.box===selector&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8));
+          expect(row?.rect,JSON.stringify({media,width,height,selector})).toBeTruthy();
+          for(const [j,key] of ['inlineStart','blockStart','inlineSize','blockSize'].entries())expect(Math.abs(at(row.rect[key])-actual[i][j]),JSON.stringify({media,width,height,selector,key})).toBeLessThan(.1);
+        }
+      }
+    }finally{await context.close()}
+  }
+});

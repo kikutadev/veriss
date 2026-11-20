@@ -3,7 +3,12 @@ import { q, mul, div } from './linear.mjs';
 
 /** User preference media features, their values and the default each check assumes (the first). */
 export const preferenceValues = { 'prefers-reduced-motion': ['no-preference', 'reduce'], 'prefers-color-scheme': ['light', 'dark'], 'prefers-contrast': ['no-preference', 'more', 'less', 'custom'], 'forced-colors': ['none', 'active'] };
-export function parseCondition(params, kind) {
+// Explicit finite media assumptions, not inferred from viewport, UA or touch input.
+export const mediaFeatureValues = Object.freeze({hover:['none','hover'],pointer:['none','coarse','fine'],'prefers-reduced-motion':['no-preference','reduce']});
+export const validMediaFeatures = v => v === undefined || !!v && Object.getPrototypeOf(v) === Object.prototype &&
+  Object.entries(v).every(([k,value])=>Object.hasOwn(mediaFeatureValues,k)&&mediaFeatureValues[k].includes(value));
+export const mediaFeatureEntries = v => Object.entries(v??{}).sort(([a],[b])=>a.localeCompare(b));
+export function parseCondition(params, kind, mediaFeatures) {
   let name;
   if (kind === 'container') {
     if (params.includes(',')) throw new Error('Container query lists are outside this subset');
@@ -28,10 +33,16 @@ export function parseCondition(params, kind) {
       let m;
       // orientation: portrait is height >= width, landscape is width > height (Media Queries 4).
       // User preferences: not geometry. They become paint-only states (see parseLayoutCSS).
-      if (kind === 'media' && (m = value.match(/^(prefers-reduced-motion|prefers-color-scheme|prefers-contrast|forced-colors)\s*:\s*([a-z-]+)$/i))) {
+      if (kind === 'media' && (m = value.match(/^(hover|pointer)\s*:\s*([a-z-]+)$/i))) {
+        const feature=m[1].toLowerCase(),v=m[2].toLowerCase();
+        if(!mediaFeatureValues[feature].includes(v))throw Error('Unsupported '+feature+' value: '+v);
+        if(!Object.hasOwn(mediaFeatures??{},feature))throw Error('Media feature '+feature+' requires an explicit mediaFeatures profile');
+        atoms.push({feature, fixed:mediaFeatures[feature]===v});
+      }
+      else if (kind === 'media' && (m = value.match(/^(prefers-reduced-motion|prefers-color-scheme|prefers-contrast|forced-colors)\s*:\s*([a-z-]+)$/i))) {
         const feature = m[1].toLowerCase(), v = m[2].toLowerCase();
         if (!preferenceValues[feature].includes(v)) throw new Error(`Unsupported ${feature} value: ${v}`);
-        atoms.push({ feature, preference: v });
+        atoms.push(Object.hasOwn(mediaFeatures??{},feature)?{feature,fixed:mediaFeatures[feature]===v}:{ feature, preference: v });
       }
       // Device resolution: dppx (x), dpi (÷ 96), dpcm (× 2.54 ÷ 96), and the -webkit- device-pixel-ratio forms.
       else if (kind === 'media' && (m = value.match(/^(min-|max-)?resolution\s*:\s*(\d+(?:\.\d{1,6})?)(dppx|x|dpi|dpcm)$/i))) {
@@ -47,7 +58,7 @@ export function parseCondition(params, kind) {
       } else throw new Error(`Unsupported ${kind} condition: ${params}`);
       if (kind === 'media' && atoms.some(atom => atom.feature.includes('-size'))) throw new Error('Media queries use width/height, not logical size features');
     }
-    return atoms;
+    return atoms.some(a=>a.fixed===false)?null:atoms.filter(a=>a.fixed!==true);
   }).filter(Boolean);
   // listed: the queries of the list (a print query is dropped from groups, which are the ones that can match a screen).
   return { kind, name, groups, listed: postcss.list.comma(params).length, params };

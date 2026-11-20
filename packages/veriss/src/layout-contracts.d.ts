@@ -1,6 +1,13 @@
 export interface SourceSpan {start:number;end:number}
 export interface LayoutDeclaration {contract:import('./layout-contract.mjs').ContractIR;source:SourceSpan}
+export interface MediaFeatures {
+  hover?: 'none' | 'hover';
+  pointer?: 'none' | 'coarse' | 'fine';
+  'prefers-reduced-motion'?: 'no-preference' | 'reduce';
+}
 export interface LayoutOptions {
+  /** Fixed screen media inputs; unspecified capabilities are not inferred. */
+  mediaFeatures?: MediaFeatures;
   /** Opaque subject identifier; also used as the root path. */
   name?: string;
   /** Explicitly assume a scripting-enabled static snapshot, not script execution. */
@@ -136,7 +143,7 @@ export interface LayoutSummary {
   invalidSubstitutions?: LayoutInvalidSubstitution[];
   integrity?: { rules: string[]; targetSize: number; protrusion: 'all' | 'painted'; warnings: LayoutIntegrityRow[]; exempted: LayoutIntegrityRow[] };
   version: 1; ok: boolean; status: 'verified' | 'violated' | 'unknown'; component: string;
-  scope: { axis: 'inline' | 'both'; viewport: LayoutRange & { height?: LayoutRange | null }; hostInset: number; hostBlockInset?: number; closedCSS: true; browserRounding: false; blockSizing: boolean; scrollbarProfiles?:readonly LayoutScrollbarProfile[] };
+  scope: { mediaFeatures?: MediaFeatures; axis: 'inline' | 'both'; viewport: LayoutRange & { height?: LayoutRange | null }; hostInset: number; hostBlockInset?: number; closedCSS: true; browserRounding: false; blockSizing: boolean; scrollbarProfiles?:readonly LayoutScrollbarProfile[] };
   assumptions: string[];
   styleSources: { kind: 'reset' | 'app'; file: string }[];
   diagnostics: LayoutDiagnostic[];

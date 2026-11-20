@@ -103,3 +103,22 @@ test('block-only evidence requires consistent nonnegative complete rows and cann
  assert.deepEqual(await check({...vertical,rows:[{...rows[0],constraints:[{...a('-500','1'),strict:false}]}]}),['unknown','unknown','unknown']);
  assert.deepEqual(await check({...vertical,axes:undefined}),['unknown','unknown','unknown']);
 });
+
+test('geometry reports cannot be relabeled with a different fixed media environment',async()=>{
+ const {layoutGeometry,profileKey}=await import('../src/relational-contract.mjs');
+ const html='<div id="target"></div>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}#target{height:40px}@media (hover:hover){#target{height:80px}}';
+ const media={hover:'hover',pointer:'fine'};
+ const p={...profile,mediaFeatures:media};
+ const r=analyzeHTML(html,{css,viewport:profile.viewport,mediaFeatures:media});
+ assert.equal(r.status,'verified',JSON.stringify(r.diagnostics));
+ const layout=createLayoutIR(r);
+ const input={state:'empty',profile:p,layout,targets:['target']};
+ assert.ok(layoutGeometry(input)[0].rows?.length);
+ const other={...p,mediaFeatures:{hover:'none',pointer:'coarse'}};
+ assert.ok(!layoutGeometry({...input,profile:other})[0].rows?.length);
+ assert.ok(!layoutGeometry({...input,profile})[0].rows?.length);
+ assert.notEqual(profileKey(p),profileKey(other));
+ assert.equal(profileKey(p),profileKey({...p,mediaFeatures:{pointer:'fine',hover:'hover'}}));
+ assert.throws(()=>createEnvironmentIR([{...p,mediaFeatures:{hover:true}}]),/mediaFeatures/);
+});

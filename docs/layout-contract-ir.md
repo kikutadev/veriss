@@ -108,7 +108,7 @@ snapshot の矩形比較もこの profile に統合した。
 | ContractIR | 独立した意図。関係述語、適用状態・profile、定義と対象束縛。実装データから述語を逆算しない |
 | LayoutIR | 既存 CSS の抽出結果。先に独立して構築する |
 | StateIR | 一意の状態 ID、初期状態、from/event/to の有限遷移。環境ごとの遷移制約は任意 |
-| EnvironmentIR | 証明要求の閉じた幅・高さの範囲、ブラウザー、DPR、scrollbar、safe-area、入力/フォントの仮定 |
+| EnvironmentIR | 証明要求の閉じた幅・高さの範囲、ブラウザー、DPR、scrollbar、safe-area、明示 media 条件、入力/フォントの仮定 |
 | EvidenceIR | state/profile/target ごとの区分的 affine 矩形と出所。DOM, local-dom, scene, external |
 | ObligationIR | 契約×適用 profile×到達する状態/遷移、必要な対象と端点の有限集合 |
 | Proof/report | 被覆・整合性の判定、反例、証明の環境・状態グラフ、根拠・仮定、観測の別判定 |
@@ -149,6 +149,24 @@ range と region を保存する。host inset 0、同一 origin が必要。
 local.assumptions と必要なら origin（inlineStart,blockStart の affine 平行移動）を明記する。
 外部モデルも生成元の根拠は信頼仮定。下記の制限付き自動切り出し以外の任意の DOM、手書き矩形と実装の同値性、
 Canvas 内部の投影などを自動証明しない。LayoutIR 由来証拠は profile の署名を照合する。
+
+
+画面の primary input capability と motion preference は、viewport や
+`input` から推測せず `mediaFeatures` で固定する。例えば
+`{hover:'none',pointer:'coarse','prefers-reduced-motion':'reduce'}`。
+`hover` は none/hover、`pointer` は none/coarse/fine、
+`prefers-reduced-motion` は no-preference/reduce。
+既存の width/height 条件との AND、コンマ OR、ネストは、固定された
+atom を評価して残りのサイズ条件を連続領域で解く。未指定の capability は
+Unknown、未指定の reduced-motion は従来の paint-only 条件の制約を維持。
+`any-hover` / `any-pointer`、任意の media query 論理は今回対象外。
+LayoutOptions / LayoutIR.scope / EnvironmentProfile / profileKey に同じ条件を含め、
+異なる条件の DOM 証拠の再利用や条件を取り除いた再利用を拒否する。
+自動縮約も同一条件で処理する。ブラウザー観測を使う実ビルド評価器は
+各観測環境で matchMedia を確認し、実値と宣言が違えば成功にしない。
+固定 reduced-motion 下の幾何検査は、全 motion preference の
+accessibility 検査ではない。accessibility と同時指定された場合は Unknown。
+
 受け取った LayoutIR から分からない UA/フォント等は生産者が環境を証明範囲に束縛する信頼仮定。
 input / fontProfile は環境識別子で、未対応の pointer/hover media 分岐を勝手に成立させない。
 
