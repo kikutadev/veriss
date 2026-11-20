@@ -222,3 +222,61 @@ test('block-flow auto margins use the same exact used width as responsive width 
  assert.equal(narrow.rect.inlineStart.constant,'0');
  assert.equal(narrow.rect.inlineSize.coefficient,'1');
 });
+
+test('responsive sibling margins collapse by exact region, while grid item margins do not',()=>{
+  const html='<main><div class="a"></div><div class="b"></div></main>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}main{padding:1px}main>div{height:40px;min-width:0;min-height:0}.a{margin-bottom:clamp(12px,4vw,48px);margin-left:clamp(8px,2vw,24px)}.b{margin-top:clamp(18px,3vh,36px)}';
+  const options={viewport:{min:320,max:1600,height:{min:320,max:1000}},integrity:true};
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const grid of [false,true]){
+    const css=base+(grid?'main{display:grid;grid-template-columns:minmax(0,1fr)}':'');
+    const report=analyzeHTML(html,{...options,css});
+    assert.equal(report.status,'verified',JSON.stringify(report.diagnostics));
+    for(const w of [320,449,450,451,750,900,1200,1600])for(const h of [320,600,800,1000]){
+      const at=a=>rat(a.constant)+rat(a.coefficient)*w+rat(a.heightCoefficient)*h;
+      const rect=name=>report.sizes.find(s=>s.box===name&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8))?.rect;
+      const a=rect('.a'),b=rect('.b');
+      assert.ok(a&&b);const m=Math.max(12,Math.min(w*.04,48)),n=Math.max(18,Math.min(h*.03,36)),left=Math.max(8,Math.min(w*.02,24));
+      assert.ok(Math.abs(at(b.blockStart)-(41+(grid?m+n:Math.max(m,n))))<1e-8);
+      assert.ok(Math.abs(at(a.inlineStart)-(1+left))<1e-8);
+      assert.ok(Math.abs(at(a.inlineSize)-(w-2-left))<1e-8);
+    }
+  }
+  for(const extra of ['main{display:flex}.a{flex:0 0 50%}','main{padding:0}.a{margin-top:10vw}','.a{height:auto}','.a{position:absolute;top:0;left:0;width:100px}','.a{margin-left:5vw;margin-right:auto}']){
+    assert.equal(analyzeHTML(html,{...options,css:base+extra}).status,'unknown',extra);
+  }
+  assert.equal(analyzeHTML(html,{...options,css:base.replace('clamp(12px,4vw,48px)','clamp(-12px,4vw,48px)')}).status,'unknown');
+});
+
+test('responsive flex margins preserve inner shrink weights and outer line thresholds',()=>{
+  const html='<main><div class="a"></div><div class="b"></div></main>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}main{display:flex}main>div{height:40px;min-width:0;min-height:0}.a{flex:1 1 240px;margin-left:clamp(8px,2vw,24px);margin-top:clamp(12px,4vh,32px)}.b{flex:1 1 180px;margin-right:clamp(10px,3vw,30px)}';
+  const options={viewport:{min:320,max:1600,height:{min:320,max:1000}},integrity:true};
+  const report=analyzeHTML(html,{...options,css:base});
+  assert.equal(report.status,'verified',JSON.stringify(report.diagnostics));
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const w of [320,420,450,800,1600])for(const h of [320,600,1000]){
+    const at=a=>rat(a.constant)+rat(a.coefficient)*w+rat(a.heightCoefficient)*h;
+    const rect=name=>report.sizes.find(s=>s.box===name&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8))?.rect;
+    const a=rect('.a'),b=rect('.b');assert.ok(a&&b);
+    const left=Math.max(8,Math.min(w*.02,24)),right=Math.max(10,Math.min(w*.03,30)),free=w-420-left-right;
+    const width=240+free*(free<0?240/420:.5);
+    assert.ok(Math.abs(at(a.inlineSize)-width)<1e-8);
+    assert.ok(Math.abs(at(b.inlineStart)-width-left)<1e-8);
+  }
+  assert.equal(analyzeHTML(html,{...options,css:base+'.a{flex:0 0 50%}'}).status,'unknown');
+});
+
+test('responsive margins refuse undecided containing and through-collapse dependencies',()=>{
+  const options={viewport:{min:320,max:1600,height:{min:320,max:1000}},integrity:true};
+  const reset='*{box-sizing:border-box;margin:0;padding:0}';
+  const cases=[
+    ['<main><section><div class="a"></div></section></main>', 'main{padding:1px}.a{height:40px;margin-top:5vw}'],
+    ['<main><div class="a"></div><div class="b"></div></main>', 'main{padding:1px}.a{height:40px;margin-bottom:5vw}.b{height:40px;margin-top:-10px}'],
+    ['<main><div class="a"></div></main>', 'main{display:grid;grid-template-columns:min-content}.a{width:200px;height:40px;margin-inline:5vw}'],
+    ['<main><div class="a"></div></main>', 'main{display:flex;flex-direction:column}.a{margin-top:5vw}'],
+    ['<main><div class="a"></div></main>', 'main{display:flex}.a{height:20px;flex:1 1 80px;margin-left:5vw;margin-right:auto}'],
+  ];
+  for(const [html,css] of cases)assert.equal(analyzeHTML(html,{...options,css:reset+css}).status,'unknown',css);
+  assert.equal(analyzeHTML('<main><div class="a"></div></main>',{viewport:{min:320,max:1600},css:reset+'main{display:grid;grid-template-columns:minmax(0,1fr)}.a{margin-top:5vw}'}).status,'unknown');
+});

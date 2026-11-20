@@ -58,6 +58,10 @@
   viewport 単位と px の単純な min/max/clamp による gap と padding も、境界で領域を分割し、区分アフィン式のまま解く。
   明示 grid トラック・flex の折返し・block 内の grid の矩形を Chromium / Firefox / WebKit で比較し、overflow の対照も確認した。
   可変 subgrid / auto-repeat の gap、flex item や intrinsic / positioned box の可変 padding、% を含む式などは Unknown のまま。
+  非負 viewport 単位の margin も両軸の grid/flex item と限定した block flow で厳密に扱う。
+  隣接する非空の block sibling の正の margin は max で相殺し、Grid/Flex は相殺しない。
+  Flex の外寸と shrink の基準となる内寸を分離。3ブラウザーで幅・高さの境界、伸縮・折り返し、固定行、overflow の対照を照合した。
+  親子/空箱の可変 margin 相殺、可変主軸 margin と %/content basis の組合せ、負の可変 margin、位置指定・native box と両軸未指定は Unknown。
 - [x] **D3. inline の中の行の配置**: 文字の行と inline の箱の位置。大きい。
   最初の一歩として、測った文字の中の inline の箱(`inlineBounds`)を `text-align: center`・`right`・`end` でも出す(以前は start と
   left だけ)。行の幅の区間で外接・内接をずらし、改行が揺れる幅は除く(ADR-0013)。3 つのブラウザーで一致。

@@ -692,7 +692,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     }).flatMap(entry => {
       let pieces = [entry];
       if (entry.style.display === 'none') return pieces;
-      const keys = ['padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+      const keys = ['padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
         ...(['grid', 'flex', 'inline-grid', 'inline-flex'].includes(entry.style.display) ? ['row-gap', 'column-gap'] : [])];
       for (const key of keys) {
         const value = entry.style[key];
@@ -721,8 +721,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   const paints = style => ['left','right','top','bottom'].some(side => cmp(px(style[`border-${side}`]), zero) > 0) || style['background-image'] !== 'none' ||
     !/^(?:transparent|initial|unset|revert|rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*0\s*\)|#(?:[\da-f]{3}0|[\da-f]{6}00)|hsla\([^)]*,\s*0\s*\))$/.test(style['background-color']);
   // Flex sizes: constants compared without splitting a region.
-  const constantLess = (a, b) => cmp(evaluate(a, { x: zero, y: zero }), evaluate(b, { x: zero, y: zero })) < 0 && cmp(a.x, zero) === 0 && cmp(a.y, zero) === 0 && cmp(b.x, zero) === 0 && cmp(b.y, zero) === 0;
-  const maximumConstant = (a, b) => { if ([a, b].some(v => cmp(v.x, zero) || cmp(v.y, zero))) throw flexUnknown('A content-dependent minimum with a different base is outside the subset'); return constantLess(a, b) ? b : a; };
+  const sameSlope = (a,b) => cmp(a.x,b.x)===0 && cmp(a.y,b.y)===0;
+  const constantLess = (a,b) => sameSlope(a,b) && cmp(a.b,b.b)<0;
+  const maximumConstant = (a, b) => { if (!sameSlope(a,b)) throw flexUnknown('A content-dependent minimum with a different base is outside the subset'); return constantLess(a, b) ? b : a; };
   function intrinsic(box, content, region) {
     const value = box.contract?.intrinsicBlockSize;
     if (typeof value === 'number') return [{ region, value: scalar(value) }];
@@ -874,7 +875,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     // A grid item may also have px margins: its grid area less the margins is what it is laid out in (margins of grid
     // and flex items never collapse).
     // A negative px margin on a flex row item's main axis (an overlapping avatar stack): its outer size shrinks by it.
-    const marginOk = (key, axis) => (available.flexItem?.main === 'inline' && axis === 'inline' && /^-\d+(?:\.\d+)?px$/.test(String(style[key]))) || style[key] === '0' || (style[key] === 'auto' && available.flexItem?.main === axis) || ((available.gridItem || available.flexItem) && /^\d+(?:\.\d+)?px$/.test(String(style[key]))) || (available.gridItem && axis === 'inline' && style[key] === 'auto' && available.autoMargins);
+    const marginOk = (key, axis) => ((available.gridItem || available.flexItem) && viewportLength(style[key])) || (available.flexItem?.main === 'inline' && axis === 'inline' && /^-\d+(?:\.\d+)?px$/.test(String(style[key]))) || style[key] === '0' || (style[key] === 'auto' && available.flexItem?.main === axis) || ((available.gridItem || available.flexItem) && /^\d+(?:\.\d+)?px$/.test(String(style[key]))) || (available.gridItem && axis === 'inline' && style[key] === 'auto' && available.autoMargins);
     // px margins on items of a row flex container are modeled (layoutFlex adds them to the outer sizes); a column's not.
     // px margins on flex items are modeled (layoutFlex adds them to the outer sizes on both axes).
     if (['margin-left', 'margin-right'].some(key => !marginOk(key, 'inline'))) throw new Error(available.flexItem && ['margin-left', 'margin-right'].some(key => style[key] === 'auto') ? 'Cross-axis auto margins of a flex item are outside the subset' : 'Only known zero inline margins are supported');
@@ -945,11 +946,21 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     return true;
   }
 
+  function fromAffineFact(fact) {
+    const rat = value => { const [n,d='1'] = String(value ?? '0').split('/'); return div(q(n),q(d)); };
+    return { x: rat(fact.coefficient), y: rat(fact.heightCoefficient), b: rat(fact.constant) };
+  }
+  const hasViewportMargin = (style, sides = ['top','right','bottom','left']) => sides.some(side => viewportLength(style[`margin-${side}`]));
+  function marginValue(style, side) {
+    const key = `margin-${side}`;
+    if (side === 'top' && style.$usedMarginTop) return fromAffineFact(style.$usedMarginTop);
+    if (viewportLength(style[key])) return asAffine(resolvedViewportLength(style,key,() => { throw new Error('Unresolved responsive margin'); }));
+    return scalar(/^\d+(?:\.\d+)?px$/.test(String(style[key])) ? px(style[key]) : zero);
+  }
   function resolvedViewportLength(style, key, fallback) {
     const fact = style.$viewportLengths?.[key];
     if (!fact || fact.source !== style[key]) return fallback();
-    const rat = value => { const [n,d='1'] = String(value ?? '0').split('/'); return div(q(n),q(d)); };
-    const result = { x: rat(fact.coefficient), y: rat(fact.heightCoefficient), b: rat(fact.constant) };
+    const result = fromAffineFact(fact);
     return cmp(result.x, zero) || cmp(result.y, zero) ? result : result.b;
   }
   const resolvedGap = (style, key, parent) => resolvedViewportLength(style, key, () => gapSize(style[key], parent));
@@ -970,6 +981,37 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     throw Object.assign(new Error('Margin collapsing with padding that can reach zero is not modeled'),{code:'U_LAYOUT_CSS'});
   }
   const positiveEdge = (style, side, region) => cmp(style[`border-${side}`] === 'ua' ? zero : px(style[`border-${side}`]),zero)>0 || positivePadding(style,side,region);
+  function responsiveBlockMargins(entry, style, box, parents, available) {
+    const flow = entry.children.filter(c => c.style.position !== 'absolute');
+    if (!flow.some(c=>hasViewportMargin(c.style,['top','bottom']))) return [entry];
+    const reject = why => { throw Object.assign(new Error(`${box.label}: responsive margin collapse: ${why}`), {code:'U_LAYOUT_CSS',box,region:entry.region}); };
+    if (!block || available.collapsedTop || available.collapsedBottom || style['block-size'] !== 'auto' || style.direction !== 'ltr') reject('independent auto-height block flow required');
+    // Through-collapse, negative margins and empty boxes need a different
+    // model. A nonempty child with its own formatting context or two
+    // nonzero edges cannot propagate a grandchild margin across its boundary.
+    for(const c of flow){
+      const st=c.style, h=String(st['block-size']);
+      if(c.box.pseudo || st.position!=='static' || !['block','grid','flex'].includes(st.display) || !/^\d+(?:\.\d+)?px$/.test(h) || cmp(px(h),zero)<=0 || st['max-block-size']!=='none' ||
+        ['top','bottom'].some(side=>!viewportLength(st[`margin-${side}`])&&!/^(?:0|\d+(?:\.\d+)?px)$/.test(String(st[`margin-${side}`])))) reject('only nonempty explicitly sized siblings with nonnegative margins are modeled');
+      if((c.box.children??[]).length && st.display==='block' && !['hidden','auto','scroll'].some(v=>[st['overflow-x'],st['overflow-y']].includes(v)) &&
+        (!positiveEdge(st,'top',entry.region)||!positiveEdge(st,'bottom',entry.region))) reject('descendant margins may collapse through an item');
+    }
+    const parentStyle=parents.at(-1)?.style;
+    const formattingRoot=(!parents.length&&box.documentRoot)||(parentStyle&&['grid','flex','inline-grid','inline-flex'].includes(parentStyle.display)&&!parentStyle.$blockFlow)||['hidden','auto','scroll'].includes(String(style['overflow-x']))||['hidden','auto','scroll'].includes(String(style['overflow-y']))||style.position==='absolute';
+    if(flow.length&&!formattingRoot&&((!isZeroAffine(marginValue(flow[0].style,'top'))&&!positiveEdge(style,'top',entry.region))||(!isZeroAffine(marginValue(flow.at(-1).style,'bottom'))&&!positiveEdge(style,'bottom',entry.region)))) reject('margin may collapse through the parent');
+    let pieces=[{...entry,children:[...entry.children],$responsiveCollapse:true}];
+    for(let k=1;k<flow.length;k++){
+      // The preceding row already includes its bottom margin. Add only
+      // max(top - bottom, 0) to the next row, splitting at their crossing.
+      const index=entry.children.indexOf(flow[k]);
+      const slack=diff(marginValue(flow[k].style,'top'),marginValue(flow[k-1].style,'bottom'));
+      pieces=bounded(pieces.flatMap(p=>clamp(p.region,slack).map(m=>{
+        const children=[...p.children];children[index]={...children[index],style:{...children[index].style,$usedMarginTop:affine(m.value)}};
+        return {...p,region:m.region,children};
+      })));
+    }
+    return pieces;
+  }
   const scaleGap = (gap, count) => times(asAffine(gap), q(count));
   function flex(region, available, definitions, gap, bases, stretchAuto) {
     // Content-sized columns (Grid §12.5–12.7): each starts at its base; the free space (with fr tracks at their
@@ -1166,7 +1208,10 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     return results;
   }
   // ---- flex layout (ADR-0011) ----------------------------------------------
-  const constantItem = item => ({ ...item, base: scalar(item.base), minimum: scalar(item.minimum), maximum: item.maximum !== undefined ? scalar(item.maximum) : null, innerBase: sub(sub(item.base, item.edges), item.marginMain ?? zero) });
+  const constantItem = item => {
+    const outer = v => item.marginMainAffine ? sum(scalar(v),item.marginMainAffine) : scalar(v);
+    return { ...item, base: outer(item.base), minimum: outer(item.minimum), maximum: item.maximum !== undefined ? outer(item.maximum) : null, innerBase: sub(sub(item.base, item.edges), item.marginMain ?? zero) };
+  };
   // Greedy line breaking by outer hypothetical sizes (constants), split by width thresholds.
   function breakLines(region, available, hypothetical, gap) {
     const n = hypothetical.length, done = [];
@@ -1239,13 +1284,15 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       if (columnBasis) state.children = state.children.map(columnShares);
       const model = state.children.map(child => {
         try {
+          if (hasViewportMargin(child.style) && (!block || style.direction!=='ltr' || child.style.direction!=='ltr' || child.style.position!=='static'))
+            throw flexUnknown('Responsive flex margins need both axes and static ltr items');
           if (hasViewportPadding(child.style)) throw flexUnknown('Viewport-dependent padding on a flex item is not modeled');
           const align = crossAlignment(style['align-items'], child.style['align-self']);
           // A column item that is not stretched is as wide as its own px width.
           if (main === 'block' && align !== 'stretch' && !/^\d+(?:\.\d+)?px$/.test(child.style['inline-size'])) throw flexUnknown('A column item that is not stretched (align) shrink-wraps its content; give it a px width');
           // px margins of a row item: its outer main size (base, minimum, maximum) includes them; layoutFlex lays the
           // item out inside them on both axes.
-          const m = side => /^\d+(?:\.\d+)?px$/.test(String(child.style[`margin-${side}`])) ? px(child.style[`margin-${side}`]) : main === 'inline' && ['left', 'right'].includes(side) && /^-\d+(?:\.\d+)?px$/.test(String(child.style[`margin-${side}`])) ? q(String(child.style[`margin-${side}`]).slice(0, -2)) : zero;
+          const m = side => viewportLength(child.style[`margin-${side}`]) ? resolvedViewportLength(child.style,`margin-${side}`,()=>{throw flexUnknown('Unresolved responsive flex margin')}) : /^\d+(?:\.\d+)?px$/.test(String(child.style[`margin-${side}`])) ? px(child.style[`margin-${side}`]) : main === 'inline' && ['left', 'right'].includes(side) && /^-\d+(?:\.\d+)?px$/.test(String(child.style[`margin-${side}`])) ? q(String(child.style[`margin-${side}`]).slice(0, -2)) : zero;
           const margins = { left: m('left'), right: m('right'), top: m('top'), bottom: m('bottom') };
           // A row item sized by its content (flex-basis auto or content, auto width): its max- and min-content widths
           // are its flex base size and automatic minimum.
@@ -1255,20 +1302,31 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
             && ['auto', '0', '0px'].includes(String(child.style['min-inline-size'])) && ['visible', 'clip'].includes(child.style['overflow-x']) && !['inline-size', 'size'].includes(child.style['container-type']);
           const contentSizes = contentSized ? frAutoMinimums(child.box, child.style, state.region, [...parents, { box, style }], /%$/.test(String(child.style['flex-basis'])) || pxBasis ? 'min' : true) : null;
           let item = flexItem(child.style, { empty: !child.box.text && !child.box.children.length, axis: main, ...(contentSizes ? { contentSizes } : {}) });
-          const marginMain = main === 'inline' ? add(margins.left, margins.right) : add(margins.top, margins.bottom);
-          if (cmp(add(add(margins.left, margins.right), add(margins.top, margins.bottom)), zero) !== 0) {
-            if ((item.autoStart || item.autoEnd) && cmp(marginMain, zero) !== 0) throw flexUnknown('A flex item with both auto and px main-axis margins is outside the subset');
-            if (style.direction === 'rtl' && cmp(margins.left, margins.right) !== 0) throw flexUnknown('Unequal inline margins of a flex item in rtl are outside the subset');
-            // A content-sized column item gets its margins when it is measured.
-            item = item.base === 'content' ? { ...item, marginMain } : { ...item, base: add(item.base, marginMain), minimum: add(item.minimum, marginMain), ...(item.maximum !== undefined ? { maximum: add(item.maximum, marginMain) } : {}), marginMain };
+          const sides=main==='inline'?['left','right']:['top','bottom'];
+          const marginMainAffine=sum(asAffine(margins[sides[0]]),asAffine(margins[sides[1]]));
+          const responsiveMain=hasViewportMargin(child.style,sides);
+          if (responsiveMain) {
+            // Only the outer size varies. The inner flex base used by the
+            // scaled shrink factor remains constant. A percentage/content
+            // basis would need a separate ordering and shrink proof.
+            if (item.base==='content'||item.percentBasis!==undefined||item.autoStart||item.autoEnd)
+              throw flexUnknown('A responsive main margin needs a constant flex basis without auto main margins');
+            item={...item,marginMainAffine};
+          } else {
+            const marginMain=add(margins[sides[0]],margins[sides[1]]);
+            if (!isZeroAffine(marginMainAffine)) {
+              if (item.autoStart||item.autoEnd) throw flexUnknown('A flex item with both auto and px main-axis margins is outside the subset');
+              item = item.base === 'content' ? { ...item, marginMain } : { ...item, base: add(item.base, marginMain), minimum: add(item.minimum, marginMain), ...(item.maximum !== undefined ? { maximum: add(item.maximum, marginMain) } : {}), marginMain };
+            }
           }
+          if (style.direction==='rtl'&&!isZeroAffine(diff(asAffine(margins.left),asAffine(margins.right)))) throw flexUnknown('Unequal inline margins of a flex item in rtl are outside the subset');
           return { child, item, align, margins };
         } catch (error) { error.box ??= child.box; throw error; }
       });
       const inheritedOf = entry => entry.child.inherited ?? style;
       const itemAvailable = (entry, extra) => ({ ...extra,
-        ...(entry.margins ? { ...(extra.inline ? { inline: diff(extra.inline, scalar(add(entry.margins.left, entry.margins.right))) } : {}), ...(extra.block ? { block: diff(extra.block, scalar(add(entry.margins.top, entry.margins.bottom))) } : {}),
-          ...(extra.origin ? { origin: { inline: sum(extra.origin.inline, scalar(entry.margins.left)), block: sum(extra.origin.block, scalar(entry.margins.top)) } } : {}), marginEnd: { inline: entry.margins.right, block: entry.margins.bottom } } : {}),
+        ...(entry.margins ? { ...(extra.inline ? { inline: diff(extra.inline, sum(asAffine(entry.margins.left),asAffine(entry.margins.right))) } : {}), ...(extra.block ? { block: diff(extra.block, sum(asAffine(entry.margins.top),asAffine(entry.margins.bottom))) } : {}),
+          ...(extra.origin ? { origin: { inline: sum(extra.origin.inline, asAffine(entry.margins.left)), block: sum(extra.origin.block, asAffine(entry.margins.top)) } } : {}), marginEnd: { inline: entry.margins.right, block: entry.margins.bottom } } : {}),
         // A percentage height resolves against the container's definite height, not the area left after the item's
         // margins (measured: height: 50% with margin-top: 10px in a 100px row is 50px).
         ...(knownBlock ? { percentBlock: knownBlock } : {}),
@@ -1315,7 +1373,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         });
         // Lines break by the hypothetical main sizes: the base clamped by the maximum, then the minimum (§9.3, §9.7;
         // measured: a 180px item with max-width: 20px takes 20px of its line).
-        const hypothetical = wrap ? items.map((item, i) => item.baseBelowMinimum ? item.minimum : model[i].item.percentBasis !== undefined ? item.base : maximumConstant(item.maximum && constantLess(item.maximum, item.base) ? item.maximum : item.base, item.minimum).b) : items.map(item => item.base);
+        const hypothetical = wrap ? items.map((item, i) => item.baseBelowMinimum ? item.minimum : model[i].item.percentBasis !== undefined ? item.base : maximumConstant(item.maximum && constantLess(item.maximum, item.base) ? item.maximum : item.base, item.minimum)) : items.map(item => item.base);
         const sets = wrap ? breakLines(part.region, contentInline, hypothetical, mainGap) : [{ region: part.region, lines: model.length ? [model.map((_, i) => i)] : [] }];
         for (const set of sets) {
           let combos = [{ region: set.region, lines: [] }];
@@ -1324,7 +1382,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
               .map(m => ({ region: m.region, lines: [...c.lines, { indices, values: r.values, starts: m.starts }] })))));
           for (const combo of combos) {
             // The last item's end margin may stick out (it hides nothing; measured for grid and flex items).
-            for (const line of combo.lines) if (emit) obligation(contentInline, diff(sum(total(line.values), gaps(mainGap, line.indices.length)), scalar(line.indices.length ? model[line.indices.at(-1)].margins.right : zero)), box, combo.region, 'E_LAYOUT_TRACKS', 'inline', fitInline && !scrolls(style, 'x'), explainTracks('inline'), () => ({ layout: 'flex' }));
+            for (const line of combo.lines) if (emit) obligation(contentInline, diff(sum(total(line.values), gaps(mainGap, line.indices.length)), asAffine(line.indices.length ? model[line.indices.at(-1)].margins.right : zero)), box, combo.region, 'E_LAYOUT_TRACKS', 'inline', fitInline && !scrolls(style, 'x'), explainTracks('inline'), () => ({ layout: 'flex' }));
             if (!block) {
               let endings = [combo.region];
               for (const line of combo.lines) line.indices.forEach((i, k) => { endings = bounded(endings.flatMap(r => solve(model[i].child.box, itemAvailable(model[i], { inline: line.values[k], fitInline }), r, ancestors, inheritedOf(model[i]), emit).map(result => result.region))); });
@@ -1338,7 +1396,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
               // tallest of them, and the item is then stretched to the line (never below that minimum).
               const ms = model[i].child.style, minCross = /^\d+(?:\.\d+)?px$/.test(String(ms['min-block-size'])) ? add(px(ms['min-block-size']), ms['box-sizing'] === 'content-box' ? ['top', 'bottom'].map(side => add(px(ms[`padding-${side}`]), px(ms[`border-${side}`]))).reduce(add, zero) : zero) : null;
               measured = bounded(measured.flatMap(m => solve(model[i].child.box, itemAvailable(model[i], { inline: line.values[k], ...(minCross ? { $crossMeasure: true } : {}) }), m.region, ancestors, inheritedOf(model[i]), false)
-                .flatMap(result => (minCross ? maximum(result.region, result.block, scalar(minCross)) : [{ region: result.region, value: result.block }]).flatMap(h => maximum(h.region, m.sizes[l], sum(h.value, scalar(add(model[i].margins.top, model[i].margins.bottom)))).map(mx => ({ region: mx.region, sizes: m.sizes.map((v, j) => j === l ? mx.value : v) }))))));
+                .flatMap(result => (minCross ? maximum(result.region, result.block, scalar(minCross)) : [{ region: result.region, value: result.block }]).flatMap(h => maximum(h.region, m.sizes[l], sum(h.value, sum(asAffine(model[i].margins.top),asAffine(model[i].margins.bottom)))).map(mx => ({ region: mx.region, sizes: m.sizes.map((v, j) => j === l ? mx.value : v) }))))));
             }));
             else measured = [{ region: combo.region, sizes: [knownBlock] }];
             for (const m of measured) {
@@ -1397,7 +1455,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
           const used = sum(total(line.values), gaps(mainGap, line.values.length));
           const contentBlock = knownBlock ?? used, blockSize = sum(contentBlock, blockEdges);
           // The last item's bottom margin may stick out (it hides nothing).
-          if (emit && knownBlock) obligation(knownBlock, diff(used, scalar(model.length ? model.at(-1).margins.bottom : zero)), box, placed.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' }));
+          if (emit && knownBlock) obligation(knownBlock, diff(used, asAffine(model.length ? model.at(-1).margins.bottom : zero)), box, placed.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' }));
           let endings = [placed.region];
           model.forEach((entry, i) => {
             const origin = placed.starts ? offset(contentOrigin, scalar(0), placed.starts[i]) : null;
@@ -1625,7 +1683,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       // An end margin may stick out of the area: it creates no overflow and hides nothing (measured), so the fit check
       // is start margin + border box against the area.
       // (The end margin may stick out; a negative one does not narrow the box's room.)
-      obligation(available.marginEnd && cmp(available.marginEnd.inline, zero) > 0 ? sum(available.inline, scalar(available.marginEnd.inline)) : available.inline, inline, box, region, 'E_LAYOUT_ITEM_SIZE', 'inline', available.fitInline !== false, item('inline'));
+      obligation(available.marginEnd && (available.marginEnd.inline.x !== undefined || cmp(available.marginEnd.inline, zero) > 0) ? sum(available.inline, asAffine(available.marginEnd.inline)) : available.inline, inline, box, region, 'E_LAYOUT_ITEM_SIZE', 'inline', available.fitInline !== false, item('inline'));
       // A text domain reports how many characters still fit at the witness.
       const domain = contract.textMetrics?.kind === 'domain' ? offeredInline => ({ text: { maxLength: contract.textMetrics.maxLength, fitsUpTo: fittingLength(contract.textMetrics, offeredInline), widest: contract.textMetrics.widest } }) : undefined;
       // A one-line text cut with an ellipsis (text-overflow: ellipsis, overflow hidden or clip, nowrap) is intended
@@ -1659,7 +1717,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         // nothing by itself (clipping and page overflow are checked on their own), so there is no block-size obligation
         // against a positioned ancestor or the initial containing block. A fixed box taller than the viewport keeps it.
         const hangs = available.containingBlock && available.containingBlock.path !== 'viewport';
-        if (available.block && !hangs) obligation(available.marginEnd ? sum(available.block, scalar(available.marginEnd.block)) : available.block, blockSize, box, region, 'E_LAYOUT_ITEM_SIZE', 'block', available.fitBlock !== false && !viewportScrolls, item('block'));
+        if (available.block && !hangs) obligation(available.marginEnd ? sum(available.block, asAffine(available.marginEnd.block)) : available.block, blockSize, box, region, 'E_LAYOUT_ITEM_SIZE', 'block', available.fitBlock !== false && !viewportScrolls, item('block'));
         if (contract.minBlockSize !== undefined && !visuallyHiddenStyle(style)) (box.tableCell && (contract.overflowBlock ?? 'fit') === 'fit' ? cellGrows : obligation)(contentBlock, scalar(contract.minBlockSize), box, region, 'E_LAYOUT_CONTENT', 'block', (contract.overflowBlock ?? 'fit') === 'fit', content('block', 'minBlockSize'));
       }
       let positioned;
@@ -3004,6 +3062,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         }
         if (hasViewportPadding(style) && (available.flexItem || box.tablePart || ['table','td','th','caption','fieldset','legend','input','textarea','select','button','img','svg','canvas','iframe','video','audio'].includes(box.tag) || style.position === 'absolute' || style['grid-template-columns'] === 'subgrid' || style['grid-template-rows'] === 'subgrid'))
           throw Object.assign(new Error('Viewport-dependent padding on intrinsic/positioned/flex-item/shared-track boxes is not modeled'), {code:'U_LAYOUT_CSS',box});
+        if (hasViewportMargin(style) && (!block || !(available.gridItem || available.flexItem) || style.position !== 'static' || style.direction !== 'ltr' || box.pseudo || box.tablePart || !['block','grid','flex'].includes(style.display) || style['grid-template-columns'] === 'subgrid' || style['grid-template-rows'] === 'subgrid' || ['table','td','th','caption','fieldset','legend','input','textarea','select','button','img','svg','canvas','iframe','video','audio','html','body'].includes(box.tag)))
+          throw Object.assign(new Error('Viewport-dependent margins require a supported in-flow grid, flex or block item with both axes'), {code:'U_LAYOUT_CSS',box});
         if (!validate(style, box, state.region, emit, available, parents.at(-1)?.style ?? null)) continue;
         // A fieldset's first legend is rendered in its block-start border (HTML §15.3.13): it is not a
         // layout child, and the fieldset's effective border-top is max(border-top, legend height).
@@ -3293,7 +3353,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
               });
               for (const cs of justified) {
                 if (emit) obligation(contentInline, cs.required, box, cs.region, 'E_LAYOUT_TRACKS', 'inline', (box.contract?.overflow ?? 'fit') === 'fit' && !scrolls(style, 'x'), () => explanation(sizeChain([...parents, { box, style }], 'inline', { hostInset: options.hostInset }), trackProperties('inline').map(property => fact(box, style, property))));
-                const childStates = collect(cs.region);
+                const childStates = bounded(collect(cs.region).flatMap(c=>style.$blockFlow ? responsiveBlockMargins(c,style,box,parents,available) : [c]));
                 for (const children of childStates) {
                   if (!block && children.children.some(child=>child.style.position==='absolute')) throw new Error('Absolute boxes require both-axis analysis');
                   if (!columns.length && children.children.some(child=>child.style.position!=='absolute')) throw new Error('In-flow Grid children require explicit supported columns');
@@ -3331,6 +3391,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                     // Vertical margins collapse between adjacent siblings (the larger one wins; measured): the next
                     // sibling's top margin becomes max(previous bottom, its top) − previous bottom. Collapsing through the
                     // container (no padding or border on that side) or through an empty child is not modeled.
+                    if (!children.$responsiveCollapse) {
                     const mv = (child, side) => /^\d+(?:\.\d+)?px$/.test(String(child.style[`margin-${side}`])) ? px(child.style[`margin-${side}`]) : zero;
                     // A plain block child (not a formatting root, no padding or border on that side) lets its first
                     // (last) child's top (bottom) margin collapse through it: its own margin becomes the larger of the
@@ -3354,7 +3415,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                         }
                         return out;
                       };
-                      const gm = (st, side) => /^\d+(?:\.\d+)?px$/.test(String(st[`margin-${side}`])) ? px(st[`margin-${side}`]) : zero;
+                      const gm = (st, side) => { if (viewportLength(st[`margin-${side}`])) throw Object.assign(new Error('Responsive margin may collapse through an ancestor'),{code:'U_LAYOUT_CSS'}); return /^\d+(?:\.\d+)?px$/.test(String(st[`margin-${side}`])) ? px(st[`margin-${side}`]) : zero; };
                       // The margin that collapses out of a box on one side: its own and, through every plain block with
                       // no padding or border there (and an auto height, for the bottom), its first (last) child's
                       // (measured: several levels deep). null when that is not known.
@@ -3416,6 +3477,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                       }
                     }
                   }
+                  }
                   if (plan.fitItems !== undefined) {
                     const flow = children.children.filter(child => child.style.position !== 'absolute');
                     if (flow.length !== plan.fitItems || flow.some(child => child.style['grid-column'] !== 'auto' || child.style['grid-row'] !== 'auto'))
@@ -3437,13 +3499,21 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                   // A grid item's px margins: the item is laid out in its area less them, offset by the start margins, and
                   // its margin box (block size plus margins) sizes auto rows. rtl with unequal inline margins and margins on
                   // subgrid items are not modeled.
-                  const marginOf = (item, side) => /^\d+(?:\.\d+)?px$/.test(String(item.style[`margin-${side}`])) ? px(item.style[`margin-${side}`]) : zero;
-                  const marginInline = item => add(marginOf(item, 'left'), marginOf(item, 'right')), marginBlock = item => add(marginOf(item, 'top'), marginOf(item, 'bottom'));
-                  for (const item of placed) if (cmp(add(marginInline(item), marginBlock(item)), zero) !== 0) {
-                    if (item.style['grid-template-columns'] === 'subgrid' || item.style['grid-template-rows'] === 'subgrid') throw Object.assign(new Error(`${item.box.label}: margins on a subgrid are not modeled`), { code: 'U_LAYOUT_SUBGRID', box: item.box });
-                    if (style.direction === 'rtl' && cmp(marginOf(item, 'left'), marginOf(item, 'right')) !== 0) throw Object.assign(new Error(`${item.box.label}: unequal inline margins in rtl are not modeled`), { code: 'U_LAYOUT_CSS', box: item.box });
+                  const marginOf = (item, side) => marginValue(item.style,side);
+                  const marginInline = item => sum(marginOf(item, 'left'), marginOf(item, 'right')), marginBlock = item => sum(marginOf(item, 'top'), marginOf(item, 'bottom'));
+                  for (const item of placed) {
+                    const st=item.style;
+                    if(hasViewportMargin(st)) {
+                      if(style.direction!=='ltr'||st.direction!=='ltr'||!block||st.position!=='static'||['left','right'].some(side=>st[`margin-${side}`]==='auto')||
+                        (style.$blockFlow&&hasViewportMargin(st,['left','right'])&&(st['inline-size']!=='auto'||st['max-inline-size']!=='none'||!['auto','0','0px'].includes(String(st['min-inline-size'])))))
+                        throw Object.assign(new Error('Responsive margins with auto margins, directed/positioned boxes or an overconstrained block width are not modeled'),{code:'U_LAYOUT_CSS',box:item.box});
+                    }
+                    if (!isZeroAffine(sum(marginInline(item), marginBlock(item)))) {
+                      if (st['grid-template-columns'] === 'subgrid' || st['grid-template-rows'] === 'subgrid') throw Object.assign(new Error(`${item.box.label}: margins on a subgrid are not modeled`), { code: 'U_LAYOUT_SUBGRID', box: item.box });
+                      if (style.direction === 'rtl' && !isZeroAffine(diff(marginOf(item, 'left'), marginOf(item, 'right')))) throw Object.assign(new Error(`${item.box.label}: unequal inline margins in rtl are not modeled`), { code: 'U_LAYOUT_CSS', box: item.box });
+                    }
                   }
-                  const itemInline = item => diff(areaInline(item), scalar(marginInline(item)));
+                  const itemInline = item => diff(areaInline(item), marginInline(item));
                   // Inline auto margins of a grid item with an explicit width take the free space of its area (both: half
                   // each), and none of it when it is negative (start-aligned; measured). With an auto width the item
                   // would shrink to fit its content: Unknown.
@@ -3574,9 +3644,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                       let lower = null;
                       if (st['min-block-size'] !== 'auto') { const m = pxOf(st['min-block-size']); if (m === null || edgesOf.includes(null)) throw Object.assign(new Error(`${item.box.label}: min-height ${st['min-block-size']} in a bare fr row is not modeled`), { code: 'U_LAYOUT_GRID_FR', box: item.box }); lower = st['box-sizing'] === 'content-box' ? edgesOf.reduce(add, m) : m; }
                       else if (['hidden', 'auto', 'scroll'].includes(String(st['overflow-y']))) { if (edgesOf.includes(null)) throw Object.assign(new Error(`${item.box.label}: UA edges in a bare fr row are not modeled`), { code: 'U_LAYOUT_GRID_FR', box: item.box }); lower = edgesOf.reduce(add, zero); }
-                      if (lower !== null) { const edgesTotal = edgesOf.includes(null) ? zero : edgesOf.reduce(add, zero); if (cmp(lower, edgesTotal) < 0) lower = edgesTotal; measurements = bounded(measurements.flatMap(m => maximum(m.region, m.bases[item.row], sum(scalar(lower), scalar(marginBlock(item)))).map(mx => ({ region: mx.region, bases: m.bases.map((v, i) => i === item.row ? mx.value : v) })))); continue; }
+                      if (lower !== null) { const edgesTotal = edgesOf.includes(null) ? zero : edgesOf.reduce(add, zero); if (cmp(lower, edgesTotal) < 0) lower = edgesTotal; measurements = bounded(measurements.flatMap(m => maximum(m.region, m.bases[item.row], sum(scalar(lower), marginBlock(item))).map(mx => ({ region: mx.region, bases: m.bases.map((v, i) => i === item.row ? mx.value : v) })))); continue; }
                     }
-                    measurements = bounded(measurements.flatMap(m => (justified(item, m.region) ?? [{ region: m.region }]).flatMap(jr => solve(item.box, { inline: jr.inline ?? itemInline(item), ...(jr.inline ? { justifyHandled: true } : {}), percentInline: areaInline(item), tracks: { inline: childColumns(item) }, gridItem: true, ...(style.$blockFlow && blockFlowPercent ? { percentBlock: blockFlowPercent } : {}), ...(style.$blockFlow ? { blockFlowChild: true, ...(item.style.$collapsedTop ? { collapsedTop: true } : {}), ...(item.style.$collapsedBottom ? { collapsedBottom: true } : {}) } : {}), autoMargins: autoMargins(item) }, jr.region, ancestors, item.inherited ?? style, false).flatMap(measured => maximum(measured.region, m.bases[item.row], sum(measured.block, scalar(marginBlock(item)))).map(mx => ({ region: mx.region, bases: m.bases.map((v, i) => i === item.row ? mx.value : v) }))))));
+                    measurements = bounded(measurements.flatMap(m => (justified(item, m.region) ?? [{ region: m.region }]).flatMap(jr => solve(item.box, { inline: jr.inline ?? itemInline(item), ...(jr.inline ? { justifyHandled: true } : {}), percentInline: areaInline(item), tracks: { inline: childColumns(item) }, gridItem: true, ...(style.$blockFlow && blockFlowPercent ? { percentBlock: blockFlowPercent } : {}), ...(style.$blockFlow ? { blockFlowChild: true, ...(item.style.$collapsedTop ? { collapsedTop: true } : {}), ...(item.style.$collapsedBottom ? { collapsedBottom: true } : {}) } : {}), autoMargins: autoMargins(item) }, jr.region, ancestors, item.inherited ?? style, false).flatMap(measured => maximum(measured.region, m.bases[item.row], sum(measured.block, marginBlock(item))).map(mx => ({ region: mx.region, bases: m.bases.map((v, i) => i === item.row ? mx.value : v) }))))));
                   }
                   for (const m of measurements) {
                     let fractions = [{ region: m.region, value: scalar(0) }];
@@ -3611,8 +3681,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
                       // rows' required minimum.
                       const rowsUsed = rs.values ? sum(total(rs.values), gaps) : rs.required;
                       const blockLead = knownBlock && ['center', 'end'].includes(style['align-content']) ? times(diff(knownBlock, rowsUsed), style['align-content'] === 'center' ? div(one, q(2)) : one) : scalar(zero);
-                      for (const item of placed) endings = bounded(endings.flatMap(r0 => autoOffsets(item, r0)).flatMap(({ region: r, offset: autoLead, inline: alignedInline, justified }) => solve(item.box, { inline: alignedInline ?? itemInline(item), ...(justified ? { justifyHandled: true } : {}), block: diff(trackArea(rs.values, rowGap, item.row, item.rowSpan), scalar(marginBlock(item))), ...gridAlign(item), percentInline: areaInline(item), ...(style.$blockFlow ? (blockFlowPercent ? { percentBlock: blockFlowPercent } : {}) : { percentBlock: trackArea(rs.values, rowGap, item.row, item.rowSpan) }), gridItem: true, ...(style.$blockFlow ? { blockFlowChild: true, ...(item.style.$collapsedTop ? { collapsedTop: true } : {}), ...(item.style.$collapsedBottom ? { collapsedBottom: true } : {}) } : {}), autoMargins: autoMargins(item), marginEnd: { inline: marginOf(item, 'right'), block: marginOf(item, 'bottom') },
-                        origin:cs.shift ? offset(contentOrigin,sum(sum(sum(sum(trackStart(cs.values,columnGap,item.start),cs.shift.lead),times(cs.shift.extra,q(item.start))),scalar(marginOf(item, 'left'))),autoLead),sum(sum(trackStart(rs.values,rowGap,item.row),blockLead),scalar(marginOf(item, 'top')))) : null,
+                      for (const item of placed) endings = bounded(endings.flatMap(r0 => autoOffsets(item, r0)).flatMap(({ region: r, offset: autoLead, inline: alignedInline, justified }) => solve(item.box, { inline: alignedInline ?? itemInline(item), ...(justified ? { justifyHandled: true } : {}), block: diff(trackArea(rs.values, rowGap, item.row, item.rowSpan), marginBlock(item)), ...gridAlign(item), percentInline: areaInline(item), ...(style.$blockFlow ? (blockFlowPercent ? { percentBlock: blockFlowPercent } : {}) : { percentBlock: trackArea(rs.values, rowGap, item.row, item.rowSpan) }), gridItem: true, ...(style.$blockFlow ? { blockFlowChild: true, ...(item.style.$collapsedTop ? { collapsedTop: true } : {}), ...(item.style.$collapsedBottom ? { collapsedBottom: true } : {}) } : {}), autoMargins: autoMargins(item), marginEnd: { inline: marginOf(item, 'right'), block: marginOf(item, 'bottom') },
+                        origin:cs.shift ? offset(contentOrigin,sum(sum(sum(sum(trackStart(cs.values,columnGap,item.start),cs.shift.lead),times(cs.shift.extra,q(item.start))),marginOf(item, 'left')),autoLead),sum(sum(trackStart(rs.values,rowGap,item.row),blockLead),marginOf(item, 'top'))) : null,
                         tracks: { inline: childColumns(item), block: trackSlice(rs.values, rowGap, box, item.row, item.rowSpan) },
                         fitInline: (box.contract?.overflow ?? 'fit') === 'fit', fitBlock: (box.contract?.overflowBlock ?? 'fit') === 'fit' }, r, finalAncestors, item.inherited ?? style, emit).map(result => result.region)));
                       for (const item of children.children.filter(child=>child.style.position==='absolute')) endings = bounded(endings.flatMap(r => {
