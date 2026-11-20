@@ -146,3 +146,11 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - 最終 gate、性能比較、Git 依存導入検証は未実施。main への統合・リモート push は行っていない。
 
 第六段階の方針: 残る solve の grid/block-flow 計算の責務を分け、内部の割当・祖先・子状態の型を統一する。strict な再帰境界まで接続することを目標に、既存判定を比較して Unknown を緩めない。全体の完了条件は変更しない。
+
+### Sixth migration checkpoint
+
+- Extracted typed block-flow margin collapse, column planning, grid item allocation, child collection, out-of-flow allocation, block-size resolution, and intrinsic row measurement. Shared recursive boundaries are in engine-solver-types.mts.
+- Remaining handwritten engine.mjs: 563 lines (previous checkpoint 1,064; original 4,370). 69/70 original implementation modules have been migrated completely; the engine itself is still transitional. The strict-check trial on the unannotated remaining engine produced 440 diagnostics, and the trial file was removed rather than weakening the type checks.
+- Validation: build:ts, check:ts, and all 867 unit tests passed (no failures/skips). Compared the complete JSON reports for 129 inputs against e98f09a: all 129 matched (82 verified, 18 violated, 29 unknown). This is regression evidence, not a proof of equivalence for all inputs.
+- Next: unify SolverStyle/FinishStyle, recursive allocation and diagnostic boundaries; migrate the remaining solve/analyzeBoxTree implementation and remove the transitional declaration. Remaining test/spec and ancillary migrations, full browser gate, performance comparison, and Git-pinned consumer installation still need confirmation before declaring the migration complete.
+- Main and remote remain unchanged.
