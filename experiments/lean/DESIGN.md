@@ -452,6 +452,16 @@ X0/X1 と source binding も必要。S5 は有限 boolean machine の
 forward simulation と render variant 対応を独立に進める。
 TypeScript 作業ツリーは変更しない。
 
+今回の着手 (第五段階): X2/X3 の viewport-fixed 明示 left/top・
+width/height、padding/border、content-box/border-box の閉じた computed
+style subset から独立した実数 box 意味論を定義し、既存 EvidenceIR の
+全 row に対する等値証明と寸法・被覆を検算する。CSS の完全な cascade、
+祖先 containing block、raw parser はこの段階では信頼前提であり
+CSS source verified と呼ばない。次に C2 の exact affine 代入、有限
+state refinement の基礎を追加する。受入は kernel 定理、実 producer
+fixture、改変拒否、既存回帰。未完の X0/X1/X4、C1–C4、
+時間 source binding は完了扱いしない。
+
 | 順序 | 作業束 | 入力依存 | 完了成果 |
 |---|---|---|---|
 | 3A | S1–S4、全ケース checker | 現 M | graph + cases + cross-state + path witness の定理と実測レポート再生 |
