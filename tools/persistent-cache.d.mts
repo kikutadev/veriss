@@ -1,9 +1,10 @@
+import type { LayoutIR } from '../packages/veriss/src/layout-contract.mjs';
 export declare function openLocalVerificationCache(directory: string, { revision }?: {
     revision?: string;
 }): Readonly<{
     geometry: Readonly<{
-        get: (k: string) => unknown;
-        set: (k: string, v: unknown) => void;
+        get: (k: string) => LayoutIR | undefined;
+        set: (k: string, v: LayoutIR) => void;
     }>;
     proofs: Readonly<{
         get: (k: string) => number | undefined;

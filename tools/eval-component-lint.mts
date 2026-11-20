@@ -45,7 +45,7 @@ for (const id of cases) {
   if(ext!=='.svelte'&&ext!=='.vue'&&ext!=='.jsx')throw Error('Unsupported case: '+file);
   const adapter=adapters[ext];
   // Lint as the CLI does with --font.
-  const options = {defaultFontSize: 16, defaultColors: true, scrollIntent: 'css', sourceLines: true, eachCounts: [0, 2], pageCSS, viewport: {min: 320, max: 1280, height: {min: 480, max: 900}}, accessibility: true, integrity: true, selectors: true, scrollbars: [{name: 'overlay', inlineSize: 0, blockSize: 0}], assumeText: true, textMetrics, fonts, textResize: true};
+  const options = {defaultFontSize: 16, defaultColors: true, scrollIntent: 'css' as const, sourceLines: true, eachCounts: [0, 2], pageCSS, viewport: {min: 320, max: 1280, height: {min: 480, max: 900}}, accessibility: true, integrity: true, selectors: true, scrollbars: [{name: 'overlay', inlineSize: 0, blockSize: 0}], assumeText: true, textMetrics, fonts, textResize: true};
   const result = adapter.analyze(source, options);
   const messages:Message[] = lint(result, {file: name, source});
   // Chromium: every state the adapter expands, at each width, at 1× and 2× default font size.

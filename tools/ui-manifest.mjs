@@ -48,7 +48,7 @@ export async function checkUIManifest(file, { session, geometrySession } = {}) {
             boxes = metrics.resolveBoxes(boxes ?? {});
             knownFonts = Object.keys(fonts);
         }
-        derived.push(...(geometrySession?.domGeometry ?? domGeometry)({ ...d, profile, html: read(string(d.html, 'HTML')), css: read(string(d.css, 'CSS')), boxes, knownFonts }));
+        derived.push(...(geometrySession?.domGeometry ?? domGeometry)({ ...d, state: string(d.state, 'document state'), targets: strings(d.targets, 'document targets'), profile, html: read(string(d.html, 'HTML')), css: read(string(d.css, 'CSS')), ...(boxes ? { boxes } : {}), ...(knownFonts ? { knownFonts } : {}) }));
     }
     return (session?.verifyUI ?? verifyUI)({ model: checkedModel, evidence: [...supplied, ...derived], observations: samples });
 }

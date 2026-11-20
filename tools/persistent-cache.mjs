@@ -152,5 +152,14 @@ export function openLocalVerificationCache(directory, { revision } = {}) {
         }
     }
     const proofs = storage('proof:');
-    return Object.freeze({ geometry: storage('geometry:'), proofs: Object.freeze({ get: (k) => { const value = proofs.get(k); return typeof value === 'number' ? value : undefined; }, set: (k, v) => proofs.set(k, v) }), flush });
+    const geometry = storage('geometry:');
+    // The MAC and revision fingerprint establish that these values came from
+    // this verifier's own typed writer. Reject anything outside the layout envelope.
+    const readGeometry = (k) => {
+        const v = geometry.get(k);
+        if (typeof v !== 'object' || v === null || !('version' in v) || v.version !== 1 || !('kind' in v) || v.kind !== 'layout' || !('geometryComplete' in v) || v.geometryComplete !== true)
+            return undefined;
+        return v;
+    };
+    return Object.freeze({ geometry: Object.freeze({ get: readGeometry, set: (k, v) => geometry.set(k, v) }), proofs: Object.freeze({ get: (k) => { const value = proofs.get(k); return typeof value === 'number' ? value : undefined; }, set: (k, v) => proofs.set(k, v) }), flush });
 }

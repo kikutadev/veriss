@@ -9,9 +9,9 @@ interface ScenarioRow extends Scenario {
 }
 export interface LayoutInstance {
     path: string;
-    declaration: Readonly<LayoutDeclaration>;
+    declaration?: Readonly<LayoutDeclaration>;
     contract: ContractIR;
-    cases: Scenario[];
+    cases: readonly Scenario[];
 }
 export declare const caseKey: (row: Scenario) => string;
 export declare const boxKey: (row: ScenarioRow) => string;
@@ -21,7 +21,7 @@ export declare function layoutInstances(implementation: LayoutIR): LayoutInstanc
 export declare function directInstances(instances: readonly LayoutInstance[], path: string, cases: readonly Scenario[]): {
     cases: Scenario[];
     path: string;
-    declaration: Readonly<LayoutDeclaration>;
+    declaration?: Readonly<LayoutDeclaration>;
     contract: ContractIR;
 }[];
 /** Only the child's native root is visible to a caller's selectors/profile. */
@@ -29,6 +29,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
     boxes: {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly rect?: {
             readonly inlineStart: {
                 readonly coefficient: string;
@@ -94,7 +95,29 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly maxInclusive: boolean;
             readonly minExact: string;
             readonly maxExact: string;
-        };
+        } | undefined;
+        readonly layoutRect?: {
+            readonly inlineStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly inlineSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+        } | null;
         readonly region?: {
             readonly vertices: readonly {
                 readonly width: string;
@@ -167,11 +190,13 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
         readonly targetIdentity?: "stable" | "unknown";
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
     }[];
     version: 1;
     kind: "layout";
     component: string;
     scope: {
+        readonly devicePixelRatios?: readonly number[];
         readonly mediaFeatures?: {
             readonly hover?: "none" | "hover";
             readonly pointer?: "none" | "coarse" | "fine";
@@ -210,10 +235,12 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
     cases: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
     }[];
     presence: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly box: string;
         readonly path: string;
         readonly axis: "inline" | "block";
@@ -250,6 +277,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
     checks: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly box: string;
         readonly path: string;
         readonly code: string;
@@ -297,6 +325,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
     errors: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
         readonly severity: "error" | "unknown";
         readonly message: string;
@@ -352,7 +381,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
         readonly source?: {
             readonly start: number;
             readonly end: number;
-        };
+        } | undefined;
         readonly witness?: {
             readonly viewport: number;
             readonly viewportExact: string;
@@ -612,6 +641,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
     diagnostics: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
         readonly severity: "error" | "unknown";
         readonly message: string;
@@ -667,7 +697,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
         readonly source?: {
             readonly start: number;
             readonly end: number;
-        };
+        } | undefined;
         readonly witness?: {
             readonly viewport: number;
             readonly viewportExact: string;
@@ -930,6 +960,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
     bindings: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly path: string;
         readonly declaration: {
             readonly contract: {
@@ -995,12 +1026,12 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                     readonly block: "fit";
                 };
                 readonly profile: {
-                    readonly boxSizing: "border-box";
-                    readonly containers: "grid";
-                    readonly geometry: "piecewise-affine";
-                    readonly overflowPolicies: readonly ["fit"];
                     readonly id: "positioned-grid/1";
                     readonly positioning: "local-absolute";
+                    readonly containers: "grid";
+                    readonly boxSizing: "border-box";
+                    readonly geometry: "piecewise-affine";
+                    readonly overflowPolicies: readonly ["fit"];
                 };
                 readonly spaces: readonly {
                     readonly name: string;
@@ -1036,10 +1067,12 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
         readonly targetIdentity?: "stable" | "unknown";
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
     }[];
     boxes: {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly rect?: {
             readonly inlineStart: {
                 readonly coefficient: string;
@@ -1105,7 +1138,29 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly maxInclusive: boolean;
             readonly minExact: string;
             readonly maxExact: string;
-        };
+        } | undefined;
+        readonly layoutRect?: {
+            readonly inlineStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly inlineSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+        } | null;
         readonly region?: {
             readonly vertices: readonly {
                 readonly width: string;
@@ -1171,6 +1226,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
     presence: {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly box: string;
         readonly path: string;
         readonly axis: "inline" | "block";
@@ -1207,6 +1263,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
     checks: {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly box: string;
         readonly path: string;
         readonly code: string;
@@ -1254,6 +1311,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
     errors: {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
         readonly severity: "error" | "unknown";
         readonly message: string;
@@ -1309,7 +1367,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
         readonly source?: {
             readonly start: number;
             readonly end: number;
-        };
+        } | undefined;
         readonly witness?: {
             readonly viewport: number;
             readonly viewportExact: string;
@@ -1569,6 +1627,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
     version: 1;
     kind: "layout";
     scope: {
+        readonly devicePixelRatios?: readonly number[];
         readonly mediaFeatures?: {
             readonly hover?: "none" | "hover";
             readonly pointer?: "none" | "coarse" | "fine";
@@ -1607,6 +1666,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
     diagnostics: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
         readonly severity: "error" | "unknown";
         readonly message: string;
@@ -1662,7 +1722,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
         readonly source?: {
             readonly start: number;
             readonly end: number;
-        };
+        } | undefined;
         readonly witness?: {
             readonly viewport: number;
             readonly viewportExact: string;
@@ -1925,6 +1985,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
     bindings: readonly {
         readonly variant?: number;
         readonly scrollbarProfile?: string;
+        readonly devicePixelRatio?: number | undefined | undefined;
         readonly path: string;
         readonly declaration: {
             readonly contract: {
@@ -1990,12 +2051,12 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                     readonly block: "fit";
                 };
                 readonly profile: {
-                    readonly boxSizing: "border-box";
-                    readonly containers: "grid";
-                    readonly geometry: "piecewise-affine";
-                    readonly overflowPolicies: readonly ["fit"];
                     readonly id: "positioned-grid/1";
                     readonly positioning: "local-absolute";
+                    readonly containers: "grid";
+                    readonly boxSizing: "border-box";
+                    readonly geometry: "piecewise-affine";
+                    readonly overflowPolicies: readonly ["fit"];
                 };
                 readonly spaces: readonly {
                     readonly name: string;

@@ -77,7 +77,12 @@ const range = (text) => { const [min, max] = String(text).split('-').map(Number)
     throw Error('Invalid range'); return { min, max: max ?? min }; };
 // The default page around a component: block flow (html and body are display: block), border-box, no UA margins.
 const pageCSS = opt.pageCss ? readFileSync(opt.pageCss, 'utf8') : opt.snapshots ? '' : '*{box-sizing:border-box;margin:0}';
-const baseOptions = { ...(opt.defaultFontSize !== 'none' ? { defaultFontSize: Number(opt.defaultFontSize) } : {}), ...(opt.defaultColors !== 'none' ? { defaultColors: true } : {}), scrollIntent: 'css', ...(opt.ua ? (String(opt.ua).includes(',') ? { uas: String(opt.ua).split(',') } : { ua: opt.ua }) : {}), ...(!opt.snapshots ? { sourceLines: true, eachCounts: (opt.eachCounts ?? '0,2').split(',').map(Number) } : {}), pageCSS, viewport: { ...range(opt.viewport), height: range(opt.height) }, accessibility: true, integrity: true, selectors: true, scrollbars: [{ name: 'overlay', inlineSize: 0, blockSize: 0 }], ...(opt.assumeText && !opt.snapshots ? { assumeText: true } : {}) };
+const uaNames = (value) => value.split(',').map(name => {
+    if (name === 'chromium' || name === 'firefox' || name === 'webkit')
+        return name;
+    throw new TypeError('Unsupported browser: ' + name);
+});
+const baseOptions = { ...(opt.defaultFontSize !== 'none' ? { defaultFontSize: Number(opt.defaultFontSize) } : {}), ...(opt.defaultColors !== 'none' ? { defaultColors: true } : {}), scrollIntent: 'css', ...(opt.ua ? (String(opt.ua).includes(',') ? { uas: uaNames(opt.ua) } : { ua: uaNames(opt.ua)[0] }) : {}), ...(!opt.snapshots ? { sourceLines: true, eachCounts: (opt.eachCounts ?? '0,2').split(',').map(Number) } : {}), pageCSS, viewport: { ...range(opt.viewport), height: range(opt.height) }, accessibility: true, integrity: true, selectors: true, scrollbars: [{ name: 'overlay', inlineSize: 0, blockSize: 0 }], ...(opt.assumeText && !opt.snapshots ? { assumeText: true } : {}) };
 const options = baseOptions;
 // --font Family=file.ttf: the component's texts in that family are measured from the font file (widths, line breaks).
 if (opt.snapshots && !opt.css) {
@@ -117,8 +122,8 @@ for (const file of files) {
             const { checkUIManifest } = await import('./ui-manifest.mjs');
             const result = await checkUIManifest(file, { ...(proofSession ? { session: proofSession } : {}), ...(geometrySession ? { geometrySession } : {}) });
             unchecked ||= result.outcome === 'unknown';
-            if (result.finiteAnalysis && result.operation !== 'relational')
-                all.push({ file, severity: 'info', code: 'U_UI_CONTRACT', message: result.reason ?? result.finiteAnalysis.reason ?? "not checked: finite state graph unavailable" });
+            if (result.operation !== 'relational')
+                all.push({ file, severity: 'info', code: 'U_UI_CONTRACT', message: result.reason ?? result.finiteAnalysis?.reason ?? "not checked: finite state graph unavailable" });
             else
                 all.push(...lint(result, { file }));
         }

@@ -129,7 +129,7 @@ interface BreakInput extends MeasureInput {
 }
 interface BoxInput {
     text?: TextContract;
-    textRuns?: BoxInput[];
+    textRuns?: readonly BoxInput[];
     wrap?: string;
     minInlineSize?: unknown;
     intrinsicBlockSize?: unknown;

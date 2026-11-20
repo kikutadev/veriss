@@ -1,10 +1,9 @@
-import {analyzeInput} from './analyze.mjs';
-
+// TypeScript source. Run pnpm build:ts to regenerate the adjacent ESM and declarations.
+import { analyzeInput } from './analyze.mjs';
 /** Static box model only. This module never renders or executes UI code. */
-export function analyzeLayout(tree,options) {
-  return analyzeInput(tree,options);
+export function analyzeLayout(tree, options) {
+    return analyzeInput(tree, options);
 }
-
 // Form-control UA profiles per browser (the ua layout option) and the smallest reset that makes them agree.
 export { uaProfiles, resolveUAProfile } from './layout/ua-profile.mjs';
 export { suggestReset } from './layout/ua-reset.mjs';
