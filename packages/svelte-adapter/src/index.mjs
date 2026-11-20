@@ -12,7 +12,7 @@
 //
 // Unknown (never verified): child components, {@html}, {@render}, <slot>, dynamic class={…} that is not a literal
 // conditional, style: directives and style={…}, <svelte:element>, and more states than `maxStates`.
-import { parse } from 'svelte/compiler';
+import { parse, compile } from 'svelte/compiler';
 import { analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/veriss-adapter-core';
 
 const escapeText = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -183,4 +183,52 @@ export function analyzeSvelte(source, { maxStates, eachCounts, sourceLines, ...o
   // Svelte scopes every compound of a selector to the component (an ancestor outside it never matches: an unused
   // selector, which the Svelte compiler and W_CSS_SELECTOR_* report); :global(…) reaches past it (E_SCOPE_ESCAPE).
   return analyzeStates({ states, css: unscopeCSS(css), unknowns, assumptions, scope: { mode: 'scoped', ancestors: 'scoped', escapes: scopeEscapes(css, ['global']) } }, options);
+}
+
+import {requireFinite as need,finiteName,finiteBool,finiteString,finiteCondition,finiteUpdate,finiteTag,finiteAttribute,finiteAttempt,buildFiniteState} from '@mizchi/veriss-adapter-core';
+export function deriveSvelteState(source){
+ return finiteAttempt(()=>{
+  compile(source,{generate:'client',filename:'Component.svelte'});
+  const ast=parse(source,{modern:true}),vars=new Map(),handlers=new Map(),ids=new Set(),erase=[];
+  need(ast.instance&&!ast.module&&!ast.options,'Expected closed Svelte instance script');
+  for(const stmt of ast.instance.content.body){
+   need(stmt.type==='VariableDeclaration'&&stmt.kind==='let','Only local state declarations are supported');
+   for(const d of stmt.declarations){
+    const n=d.id.name,c=d.init;
+    need(d.id.type==='Identifier'&&finiteName(n)&&n!=='$state'&&!vars.has(n)&&c?.type==='CallExpression'&&c.callee.type==='Identifier'&&c.callee.name==='$state'&&c.arguments.length===1&&finiteBool(c.arguments[0]),'Only boolean $state declarations are supported');
+    vars.set(n,c.arguments[0].value);
+   }
+  }
+  function render(n,ancestors=[]){
+   if(['Text','Comment'].includes(n.type))return;
+   if(n.type==='IfBlock'){
+    finiteCondition(n.test,vars);n.consequent.nodes.forEach(c=>render(c,ancestors));n.alternate?.nodes.forEach(c=>render(c,ancestors));return;
+   }
+   need(n.type==='RegularElement','Unsupported Svelte template node');
+   finiteTag(n.name,ancestors);let id,event;const attrs=new Set();
+   for(const attr of n.attributes){
+    need(!attrs.has(attr.name),'Duplicate attribute');attrs.add(attr.name);
+    const parts=Array.isArray(attr.value)?attr.value:[attr.value],expr=parts.length===1&&parts[0]?.type==='ExpressionTag'?parts[0].expression:null;
+    if(attr.type==='Attribute'&&attr.name==='onclick'||attr.type==='OnDirective'&&attr.name==='click'){
+     const f=attr.type==='OnDirective'?attr.expression:expr,a=f?.body;
+     need(!event&&!attr.modifiers?.length&&f?.type==='ArrowFunctionExpression'&&!f.async&&!f.params.length&&a?.type==='AssignmentExpression'&&a.operator==='='&&a.left.type==='Identifier'&&vars.has(a.left.name),'Unsupported click assignment');
+     event={variable:a.left.name,expression:finiteUpdate(a.right,vars)};erase.push([attr.start,attr.end]);continue;
+    }
+    if(attr.type==='ClassDirective'){finiteCondition(attr.expression??{type:'Identifier',name:attr.name},vars);continue}
+    if(attr.type==='Attribute'&&attr.name==='class'&&expr?.type==='ConditionalExpression'){
+     finiteCondition(expr.test,vars);need(finiteString(expr.consequent)&&finiteString(expr.alternate),'Only literal class branches');continue;
+    }
+    need(attr.type==='Attribute'&&parts.every(p=>p?.type==='Text'),'Unsupported Svelte attribute');
+    const value=parts.map(p=>p.data).join('');finiteAttribute(attr.name,value);if(attr.name==='id')id=value;
+   }
+   if(id){need(!ids.has(id),'Duplicate id');ids.add(id)}
+   if(event){need(n.name==='button'&&id,'Click handler requires button id');handlers.set(id,event)}
+   n.fragment.nodes.forEach(c=>render(c,[...ancestors,n.name]));
+  }
+  ast.fragment.nodes.forEach(n=>render(n));
+  // The existing adapter ignores directives but does not recognize all modern
+  // event attributes. Remove validated handlers only; no other source change.
+  let template=source;for(const [start,end] of erase.sort((a,b)=>b[0]-a[0]))template=template.slice(0,start)+template.slice(end);
+  return buildFiniteState(expandSvelte(template),vars,handlers,{framework:'svelte',scopedCSS:!!ast.css});
+ });
 }

@@ -440,3 +440,14 @@
   境界 600/601px の高さ変更で古い証拠を誤利用しない。3ブラウザーで元の実文書を測定
   (`e2e/layout-partial-geometry.spec.mjs`)、未キャッシュ時との比較は
   `packages/adapter-core/test/incremental-geometry.test.mjs`。
+
+- [x] **H6. 局所保証の移植**: 独立する幅100%・高さ48pxの control を幅50vw、
+  原点(20,30)へ affine 変換。3ブラウザーで各3幅、75vwの反例も照合。
+  割当範囲外、原点違い、欠落、変換後の不一致は合成しない
+  (`e2e/layout-partial-geometry.spec.mjs`, `relational-composition.test.mjs`)。
+- [x] **H7. 有限状態由来の契約**: 実際の React/Vue/Svelte の各 compiler/runtime と
+  click 4回×3 viewport×3 browser を比較。初期状態、遷移、表示分岐、ボタンの安定性。
+  任意の更新・scoped CSS・到達不能な状態を成功扱いしない
+  (`e2e/layout-finite-ui.spec.mjs`, `tests/finite-ui.test.mjs`)。
+- [x] **H8. 永続 cache**: 別プロセス/環境版変更/改変/新CSS/Unknown/反例の
+  判定と通常経路を照合 (`tests/persistent-cache.test.mjs`)。

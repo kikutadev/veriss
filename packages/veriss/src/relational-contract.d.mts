@@ -44,7 +44,8 @@ export type EvidenceIR=Frozen<{version:1;kind:'evidence';entries:GeometryEvidenc
 export interface RelationalImplementation {state:StateIR;environment:EnvironmentIR;evidence:EvidenceIR}
 export type RelationalObligationIR=Frozen<{version:1;kind:'obligation';operation:'relational';contract:RelationalContractIR;implementation:RelationalImplementation;cases:{contract:string;profile:string;transition:{from:string;to?:string;event?:string};targets:{state:string;target:string;endpoint:string}[]}[]}>;
 export type Observation={state:string;profile:string;width:number;height:number;rects?:Readonly<Record<string,{x:number;y:number;width:number;height:number}>>;event?:string;to?:string;passed?:boolean};
-export interface CompositionDependency {component:string;contract:string;bind:Readonly<Record<string,string>>}
+export interface AllocationTransfer {profile:string;state:string;width:LayoutAffine;height:LayoutAffine;inlineStart:LayoutAffine;blockStart:LayoutAffine}
+export interface CompositionDependency {component:string;contract:string;bind:Readonly<Record<string,string>>;transfer?:AllocationTransfer}
 export interface RelationCase {method?:'composition';dependencies?:CompositionDependency[];state?:string;profile:string;to?:string;event?:string;status:Status;coverage?:{status:'verified'|'unknown'};sources?:string[];assumptions?:string[];reason?:string;witness?:{width:Exact;height:Exact}}
 export interface RelationResult {id:string;kind:Relation['kind'];status:Status;cases:RelationCase[];observations:{status:'passed'|'failed'|'unknown';sample:Observation;after?:Observation;reason?:string}[];reason?:string}
 export interface RelationalProof {
@@ -65,7 +66,7 @@ export function profileKey(profile:EnvironmentProfile):string;
 
 
 export interface RelationalCompositionImport {
-  obligation:RelationalObligationIR;contract:string;bind:Readonly<Record<string,string>>;
+  obligation:RelationalObligationIR;contract:string;bind:Readonly<Record<string,string>>;transfer?:AllocationTransfer;
 }
 export interface RelationalProofSession {
   verify(obligation:RelationalObligationIR,options?:{observations?:readonly Observation[]}):RelationalProof;
@@ -74,4 +75,5 @@ export interface RelationalProofSession {
   stats():{entries:number;keyBytes:number;hits:number;misses:number;evictions:number};
   clear():void;
 }
-export function createRelationalProofSession(options?:{maxEntries?:number;maxKeyBytes?:number}):RelationalProofSession;
+/** trustedStorage must be verifier-owned, authenticated and version-bound. Never use untrusted data. */
+export function createRelationalProofSession(options?:{maxEntries?:number;maxKeyBytes?:number;trustedStorage?:{get(key:string):number|undefined;set(key:string,cost:number):void}}):RelationalProofSession;

@@ -16,6 +16,7 @@
 //   --suggest-reset chromium,firefox,webkit   print the smallest CSS reset that makes those browsers' form controls agree
 //                            (values kept from --ua, or chromium) and exit
 // --contracts: input files are relational UI manifests.
+// --cache-dir <private-directory>: reuse authenticated local geometry and arithmetic proofs.
 // --independent-first: in --contracts mode, try independently sized rectangles before full layout.
 // --snapshots: input files are JSON manifests of complete HTML documents; --css is required.
 // --fail-on-unknown: exit 2 for incomplete checks, unless a lint error already gives exit 1.
@@ -36,6 +37,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a.startsWith('--')) opt[a.slice(2).replace(/-(\w)/g, (m, c) => c.toUpperCase())] = args[++i];
   else files.push(a);
 }
+if(opt.cacheDir&&!opt.contracts){console.error('--cache-dir requires --contracts');process.exit(2)}
 if(opt.independentFirst&&!opt.contracts){console.error('--independent-first requires --contracts');process.exit(2)}
 if(opt.contracts && (opt.snapshots||opt.css||opt.pageCss||opt.fonts||opt.ua||opt.suggestReset)){console.error('--contracts takes CSS and environment from the manifest');process.exit(2)}
 if (!files.length && !opt.suggestReset) { console.error('usage: css-lint [--viewport 320-1280] [--font Family=file.ttf] [--page-css file] [--css file] [--profile recommended|all] [--format text|json] <files>'); process.exit(2); }
@@ -62,8 +64,10 @@ const adapters = {
 };
 const all = [];
 let unchecked = false;
-const proofSession=opt.contracts?(await import('../packages/veriss/src/layout-contract.mjs')).createRelationalProofSession():undefined;
-const geometrySession=opt.contracts?(await import('../packages/adapter-core/src/ui-contracts.mjs')).createGeometrySession({preferIndependent:!!opt.independentFirst}):undefined;
+let persistent;
+if(opt.cacheDir)try{persistent=(await import('./persistent-cache.mjs')).openLocalVerificationCache(opt.cacheDir)}catch(e){console.error('cache disabled: '+e.message)}
+const proofSession=opt.contracts?(await import('../packages/veriss/src/layout-contract.mjs')).createRelationalProofSession({trustedStorage:persistent?.proofs}):undefined;
+const geometrySession=opt.contracts?(await import('../packages/adapter-core/src/ui-contracts.mjs')).createGeometrySession({preferIndependent:!!opt.independentFirst,trustedStorage:persistent?.geometry}):undefined;
 for (const file of files) {
   const source = readFileSync(file, 'utf8'), load = adapters[extname(file)];
   if (opt.contracts) {
@@ -71,7 +75,7 @@ for (const file of files) {
       const {checkUIManifest}=await import('./ui-manifest.mjs');
       const result=await checkUIManifest(file,{session:proofSession,geometrySession});
       unchecked ||= result.outcome==='unknown';
-      all.push(...lint(result,{file}));
+      if(result.finiteAnalysis&&result.operation!=='relational')all.push({file,severity:'info',code:'U_UI_CONTRACT',message:result.reason??result.finiteAnalysis.reason});else all.push(...lint(result,{file}));
     }catch(e){unchecked=true;all.push({file,severity:'info',code:'U_UI_CONTRACT',message:'not checked: '+e.message});}
     continue;
   }
@@ -98,6 +102,7 @@ for (const file of files) {
   unchecked ||= result.status === 'unknown' || result.states.some(s=>s.report.status==='unknown');
   all.push(...lint(result, {file, source, profile: opt.profile}));
 }
+try{persistent?.flush()}catch(e){console.error('cache not saved: '+e.message)}
 console.log(opt.format === 'json' ? JSON.stringify(all, null, 2) : formatText(all) || 'no findings');
 const count = s => all.filter(m => m.severity === s).length;
 if (opt.format !== 'json') console.log(`\n${count('error')} error(s), ${count('warning')} warning(s), ${count('info')} not checked or assumed`);

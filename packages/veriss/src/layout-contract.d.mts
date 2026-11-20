@@ -1,7 +1,7 @@
 import type {LayoutAffine,LayoutRange,LayoutSummary,LayoutScenarioIdentity,LayoutPosition,LayoutElement} from './layout-contracts.d.ts';
 import type {LayoutModel,LayoutProof,LayoutSolverAPI} from './layout-z3.mjs';
 import type {RelationalContractInput,RelationalContractIR,RelationalImplementation,RelationalObligationIR,RelationalProof,Observation} from './relational-contract.mjs';
-export type {StateIR,StateInput,EnvironmentIR,EnvironmentProfile,EvidenceIR,GeometryEvidence,Operand,Predicate,Relation,RelationalContractIR,RelationalContractInput,RelationalImplementation,RelationalObligationIR,RelationalProof,Observation,UIModel,RelationalProofSession,RelationalCompositionImport,CompositionDependency} from './relational-contract.mjs';
+export type {StateIR,StateInput,EnvironmentIR,EnvironmentProfile,EvidenceIR,GeometryEvidence,Operand,Predicate,Relation,RelationalContractIR,RelationalContractInput,RelationalImplementation,RelationalObligationIR,RelationalProof,Observation,UIModel,RelationalProofSession,RelationalCompositionImport,CompositionDependency,AllocationTransfer} from './relational-contract.mjs';
 export {createStateIR,createEnvironmentIR,createEvidenceIR,layoutGeometry,verifyUI,verifyRelationalObligation,createRelationalProofSession} from './relational-contract.mjs';
 type Frozen<T> = T extends object ? {readonly [K in keyof T]:Frozen<T[K]>} : T;
 export const SafeGrid: {
