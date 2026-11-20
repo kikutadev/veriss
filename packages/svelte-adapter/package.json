@@ -6,6 +6,7 @@
   "description": "Svelte 5 component adapter for @mizchi/veriss: template branches as states, scoped styles, selector usage.",
   "exports": {
     ".": {
+      "types": "./src/index.d.mts",
       "import": "./src/index.mjs"
     }
   },
@@ -22,5 +23,12 @@
   "devDependencies": {
     "@mizchi/veriss": "workspace:*",
     "@mizchi/veriss-adapter-core": "workspace:*"
-  }
+  },
+  "files": [
+    "src/**/*.mjs",
+    "src/**/*.js",
+    "src/**/*.d.mts",
+    "src/**/*.d.ts",
+    "fixtures/"
+  ]
 }

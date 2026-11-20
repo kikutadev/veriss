@@ -6,6 +6,7 @@
   "description": "React (JSX) adapter for @mizchi/veriss with StyleX and Linaria style resolution: JSX branches as states.",
   "exports": {
     ".": {
+      "types": "./src/index.d.mts",
       "import": "./src/index.mjs"
     }
   },
@@ -31,5 +32,12 @@
   },
   "peerDependencies": {
     "@mizchi/veriss-adapter-core": "*"
-  }
+  },
+  "files": [
+    "src/**/*.mjs",
+    "src/**/*.js",
+    "src/**/*.d.mts",
+    "src/**/*.d.ts",
+    "fixtures/"
+  ]
 }

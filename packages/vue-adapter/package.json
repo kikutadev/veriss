@@ -6,6 +6,7 @@
   "description": "Vue 3 SFC adapter for @mizchi/veriss: v-if/v-show/v-for/:class branches as states, scoped styles.",
   "exports": {
     ".": {
+      "types": "./src/index.d.mts",
       "import": "./src/index.mjs"
     }
   },
@@ -21,5 +22,12 @@
   },
   "devDependencies": {
     "@mizchi/veriss-adapter-core": "workspace:*"
-  }
+  },
+  "files": [
+    "src/**/*.mjs",
+    "src/**/*.js",
+    "src/**/*.d.mts",
+    "src/**/*.d.ts",
+    "fixtures/"
+  ]
 }

@@ -6,6 +6,7 @@
   "description": "Shared part of the component adapters: template states as choices, analysing every state, and the findings per state.",
   "exports": {
     ".": {
+      "types": "./src/index.d.mts",
       "import": "./src/index.mjs"
     }
   },
@@ -20,5 +21,11 @@
   },
   "devDependencies": {
     "@mizchi/veriss": "workspace:*"
-  }
+  },
+  "files": [
+    "src/**/*.mjs",
+    "src/**/*.js",
+    "src/**/*.d.mts",
+    "src/**/*.d.ts"
+  ]
 }

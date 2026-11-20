@@ -49,7 +49,10 @@
     "./text-metrics/fixtures/*": "./text-metrics/fixtures/*"
   },
   "files": [
-    "src/",
+    "src/**/*.mjs",
+    "src/**/*.js",
+    "src/**/*.d.mts",
+    "src/**/*.d.ts",
     "README.md",
     "examples/relational.mjs",
     "text-metrics/_build/js/release/build/font_ffi/font_ffi.js",
