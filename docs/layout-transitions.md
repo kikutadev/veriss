@@ -296,3 +296,26 @@ CLS > 0 かつ noshift violated で一致しました(e2e/layout-cls-facts.spec.
 
 `just noshift-oracle` は、検査器の意味論を確かめる補助として、同じDOMのCSSを切り替えて
 Chromiumの実際の矩形を三つの幅で比較します。これは静的証明を決定する手続きに含めません。
+
+## 明示した補間モデルに対する不変条件の検査
+
+`verifyInterpolatedPredicate` (`@mizchi/veriss/transitions`) は同一 viewport の前後の
+GeometryEvidence と述語を用い、全参照座標が共通の進捗 t ∈ [0,1] に対して
+前後の座標のアフィン結合になるという**呼出側の明示条件**の下で、
+途中も述語が成立するか検査する。両端の厳密な検査は既存 relational/1 を再利用する。
+比較とその conjunction のみを扱う（OR、not、ne は端点の成立から途中の成立を導けない）。
+easing は linear/標準 ease と、4制御点が [0,1] 内の有限小数の cubic-bezier に限定する。
+未知/overshoot/不足証拠は Unknown とする。端点の反例は violated。
+補間条件を CSS から自動導出すること、異なる進捗の同時アニメーション、
+viewport 変更中、未到達状態・未知の状態変化は対象外。実測フレームは別の観測であり、
+明示前提を一般に証明するものではない。
+
+```js
+const proof = verifyInterpolatedPredicate({
+  profile, from: 'closed', to: 'open', evidence,
+  predicate: {op:'compare',relation:'le',
+    left:{target:'panel',field:'inlineEnd'},right:{environment:'safeRight'}},
+  interpolation: {kind:'shared-affine',easing:'cubic-bezier(.3,.7,.2,1)',
+    assumptions:['All referenced inline coordinates share bounded progress at a fixed viewport.']}
+});
+```

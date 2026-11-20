@@ -467,3 +467,5 @@
 
 
 - [x] **H9 補足: 片軸依存の精密化**: 明示された paint-only transition と通常 block で無効な grid track 宣言のみを除外し、幅520pxの境界と他の viewport で横位置・幅を比較する。viewport-fixed の intrinsic width を除外し、明示 height と bottom 12px / -1px で縦位置・高さと違反を比較する。3ブラウザー照合は `e2e/layout-partial-geometry.spec.mjs`、all/幅 transition、Grid/Flex、auto height、transform/contain 等の拒否対照は `packages/adapter-core/test/partial-geometry.test.mjs`。
+
+- [x] **H9 補足: 有界アフィン遷移**: 端点の比較の conjunction から、明示した共通進捗の条件下で途中の不変条件を検査する。端点不足・違反、overshoot・未知 easing、非凸述語を拒否/検出し、3 UA の実際の幅 interpolation と比較する (`relational-contract.test.mjs`, `layout-partial-geometry.spec.mjs`)。DOM/CSSから共通補間を自動導出したと扱わない。

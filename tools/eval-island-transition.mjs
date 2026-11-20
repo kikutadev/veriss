@@ -9,8 +9,9 @@ import {analyzeHTML} from '../packages/veriss/src/html.mjs';
 import {createLayoutIR,layoutGeometry} from '../packages/veriss/src/layout-contract.mjs';
 import {verifyInterpolatedPredicate} from '../packages/veriss/src/transitions.mjs';
 
-const [snapshotDir,buildDir]=process.argv.slice(2);
-if(!snapshotDir||!buildDir)throw Error('usage: eval-island-transition.mjs reviewed-snapshot-directory build-directory');
+const [snapshotDir,buildDir,mode]=process.argv.slice(2);
+assert(mode===undefined||mode==='--home-only','Unknown audit option');
+if(!snapshotDir||!buildDir)throw Error('usage: eval-island-transition.mjs reviewed-snapshot-directory build-directory [--home-only]');
 const read=name=>readFileSync(resolve(snapshotDir,name),'utf8');
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const reviewed=JSON.parse(read('island-proof.json'));
@@ -59,17 +60,19 @@ for(const [ua,engine] of Object.entries({chromium,firefox,webkit})){
  const browser=await engine.launch({headless:true,timeout:15000});
  try{
   // Real local build and real event listeners, with normal (not reduced) motion.
-  // HOME is separately covered by the reviewed snapshot; this runner does not
-  // claim to exercise the full hero sequence.
-  for(const path of ['/about.html','/projects.html','/articles.html']){
+  // A direct Works hash is an actual supported route into the visible HOME
+  // island; this does not claim to exercise the full hero handoff.
+  for(const path of mode==='--home-only'?['/#selected-work']:['/about.html','/projects.html','/articles.html']){
    const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'no-preference',deviceScaleFactor:1,serviceWorkers:'block'});
    try{
     const page=await context.newPage();
     await page.route('**/*',async route=>{try{await route.fulfill({path:fileFor(route.request().url())})}catch{await route.abort()}});
     await page.goto(origin+path,{waitUntil:'domcontentloaded',timeout:15000});
     const toggle=page.locator('[data-island-toggle]');await toggle.waitFor({state:'visible'});
-    for(const width of [320,365,366,367,1024,1025,1920]){
-     const height=844;await page.setViewportSize({width,height});await page.waitForTimeout(650);
+    for(const width of mode==='--home-only'?[320,390,1024,1025,1920]:[320,365,366,367,1024,1025,1920]){
+     const height=844;await page.setViewportSize({width,height});
+     if(mode==='--home-only'){await page.goto(origin+path,{waitUntil:'domcontentloaded',timeout:15000});await toggle.waitFor({state:'visible'});}
+     await page.waitForTimeout(650);
      for(const expanded of [true,false]){
       const before=await page.evaluate(sample);
       assert.equal(before.expanded,String(!expanded));

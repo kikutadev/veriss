@@ -256,3 +256,24 @@ df34f51: paint-only transition と、全 retained chain が通常 block であ�
 
 ### 固定配置の状態と遷移の監査
 対象は既存 island panel の横収容。実際の開閉を複数 viewport/UA で測り、初期の非表示状態だけを評価していた不足を解消する。静止状態の証拠と途中フレームの観測を分ける。汎用エンジンを迂回して実測値から連続領域の証明を捏造しない。
+
+### アイランドの開閉端点と遷移の評価
+34157a9: `verifyInterpolatedPredicate` を既存 transitions API に追加。
+同じ viewport に対する端点証拠を relational/1 で検査し、共通アフィン進捗、
+有界 easing、凸な比較の conjunction を前提として途中の不変条件を導く。
+未知進捗、overshoot、OR、not、ne、端点証拠不足を成功にしない。
+新しい長さ計算器やソルバーは導入しない。
+portfolio 側が既にレビューした4ページの入力ハッシュと既存外枠の射影CSSを照合し、
+panel の横方向 stretch と共通進捗を明示条件として既存 layout engine で両端を計算。
+従来の全自動 DOM 縮約の残存 Unknown を書き換えない。
+連続領域の条件付き証明は3/3 UA、実測は実ローカルビルドの4ページ、通常 motion、
+ABOUT/WORKS/ARTICLES 各7幅、HOME (#selected-work 直接遷移) 5幅、H=844。
+本物の click / Escape、156/156 操作、10,465 rAF フレーム、横収容・端点範囲違反0。
+実測と端点モデルの照合許容差0.1 CSS px。
+外部通信遮断、safe-area 0、overlay、DPR1。HOME のフルヒーロー遷移、内部リンク全配置、
+縦方向、viewport 変更中、複数の非同期進捗、CSSからの補間/縮約自動導出は未証明。
+既存レビュー済み入力と現在のローカルビルドの実測は別の証拠。
+再実行: `node tools/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist`、
+HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラウザー supervisor 下で行う。
+新規3ブラウザー E2E 3件（各27フレーム）、関連単体13件成功。
+各実測 supervisor 残留0。サイト本体・配信コードは変更なし。
