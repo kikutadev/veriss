@@ -11,9 +11,12 @@ const out = fileURLToPath(new URL('../../docs/rule-catalog/', import.meta.url));
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const px = m => m.replace(/(\d+)\/(\d+)(?=px)/g, (_, a, c) => String(Math.round(a / c * 100) / 100));
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {});
-const page = await (await b.newContext({deviceScaleFactor: 2})).newPage();
+const context = await b.newContext({deviceScaleFactor: 2}), page = await context.newPage();
 
+// Each capture gets a page of its own, so no pointer or focus carries over from the previous capture (a hover left
+// over .card would paint the next normal capture hovered).
 async function snap(s, state) {
+  const page = await context.newPage();
   await page.setViewportSize({width: s.shot, height: 600});
   await page.setContent(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>${reset}${s.css}body{padding:10px}</style></head><body>${s.html}</body></html>`);
   if (state === 'hover') await page.hover(s.hover);
@@ -23,6 +26,7 @@ async function snap(s, state) {
   const r = await page.evaluate(sel => { const e = document.querySelector(sel).getBoundingClientRect(); return {x: e.x, y: e.y, w: e.width, h: e.height}; }, s.mark);
   const w = Math.max(s.shot, await page.evaluate(() => document.documentElement.scrollWidth));
   const png = await page.screenshot({clip: {x: 0, y: 0, width: w, height: h}, fullPage: true});
+  await page.close();
   return {png: png.toString('base64'), r, w, h, overflow: w > s.shot, state, focused};
 }
 const frame = (s, shot, ok) => `<figure><div class="frame" style="width:${shot.w}px;height:${shot.h}px"><img src="data:image/png;base64,${shot.png}" width="${shot.w}" height="${shot.h}">
