@@ -16,7 +16,9 @@
     "rootDir": "."
   },
   "include": [
-    "packages/**/*.mts"
+    "packages/**/*.mts",
+    "types/**/*.d.ts",
+    "packages/veriss/src/layout-contracts.ts"
   ],
   "exclude": [
     "**/node_modules",
