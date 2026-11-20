@@ -10,6 +10,7 @@
 // or a test double). Widths are shaped advances; the bound adds the browser
 // layout rounding allowance described in `layoutAllowance`.
 
+import type {LayoutBoxContract,LayoutOptions} from './layout-contracts.js';
 import {languageTag, breakingLanguages, breaksModeled} from './layout/text-font.mjs';
 /** Font settings a text contract was measured with; the core checks the computed CSS against them. */
 export interface TextFont { family: string; size: number; lineHeight: number; weight?: number; letterSpacing?: number }
@@ -50,19 +51,20 @@ interface PlacedBounds extends InlineBounds { line: number; lineWidth: Pair }
 type WrappedStep = {atLeastInlineSize: number; below: number | null} & ({split: true} | (PlacedBounds & {lines: number; alignBelow?: number}));
 interface Atomic { k: string; w: number; h: number; at: number; index: number }
 interface LoadedFont { family: string; entry: FontEntry; handle: number; info: FontInfo }
-interface BoxInput { text?: TextContract; textRuns?: readonly BoxInput[]; wrap?: string; minInlineSize?: unknown; intrinsicBlockSize?: unknown; minBlockSize?: unknown }
+export interface TextBoxInput extends Omit<LayoutBoxContract,'textRuns'> { text?: TextContract; textRuns?: readonly TextBoxInput[] }
+export type ResolvedTextOptions<T> = Omit<T,'boxes'> & {boxes:Record<string,LayoutBoxContract>};
 interface GeneratedText { selector?: string | null; kind: string; text: string }
 interface GeneratedResult { generatedText?: GeneratedText[] }
-type TextOptions = { boxes?: Record<string, BoxInput> };
+export type TextOptions = Omit<LayoutOptions,'boxes'> & {boxes?: Record<string,TextBoxInput>};
 export interface TextMetrics {
   measureText(input: MeasureInput): MeasuredText;
   domainBounds(input: DomainInput): TextDomainBounds;
   /** Line counts of wrapped fixed text over the content width (UAX #14 subset). */
   breakLines(input: BreakInput): DetailedLineProfile;
   /** Replace text box contracts with derived geometry and font provenance. */
-  resolveBoxes<T extends Record<string, object>>(boxes?: T): Record<string, object>;
-  resolveOptions<T extends TextOptions>(options: T): T;
-  withGeneratedText<T extends TextOptions, R extends GeneratedResult>(analyze: (options: T) => R, options: T): R;
+  resolveBoxes(boxes?: Readonly<Record<string,TextBoxInput>>): Record<string,LayoutBoxContract>;
+  resolveOptions<T extends TextOptions>(options: T): ResolvedTextOptions<T>;
+  withGeneratedText<T extends TextOptions, R extends GeneratedResult>(analyze: (options: ResolvedTextOptions<T>) => R, options: T): R;
 }
 
 const UNIT = 64; // Chromium LayoutUnit: 1/64 CSS px
@@ -588,11 +590,11 @@ export function createTextMetrics({fonts, shaper, limits = {}}: {fonts: Record<s
   }
 
   /** Replace `text` box contracts with the core's derived size contracts. */
-  function resolveBoxes(boxes: Record<string, BoxInput> = {}): Record<string, object> {
-    const out: Record<string, object> = {};
+  function resolveBoxes(boxes: Readonly<Record<string,TextBoxInput>> = {}): Record<string,LayoutBoxContract> {
+    const out: Record<string,LayoutBoxContract> = {};
     for (const [selector, contract] of Object.entries(boxes)) {
       // textRuns: one text contract per anonymous text block of a table cell.
-      if (contract?.textRuns) { out[selector] = {...contract, textRuns: contract.textRuns.map((run, k) => resolveBoxes({[`${selector} text ${k}`]: run})[`${selector} text ${k}`])}; continue; }
+      if (contract?.textRuns) { out[selector] = {...contract, textRuns: contract.textRuns.map((run, k) => required(resolveBoxes({[`${selector} text ${k}`]: run})[`${selector} text ${k}`]))}; continue; }
       if (!contract?.text) { out[selector] = contract; continue; }
       const {text, ...rest} = contract;
       if (rest.minInlineSize !== undefined || rest.intrinsicBlockSize !== undefined || rest.minBlockSize !== undefined) fail(`${selector}: a text contract derives its own sizes`);
@@ -652,7 +654,7 @@ export function createTextMetrics({fonts, shaper, limits = {}}: {fonts: Record<s
         const oneLine = lines.profile.find(entry => entry.lines === 1)?.atLeastInlineSize;
         out[selector] = {...rest, minInlineSize: lines.minContent, ...(oneLine !== undefined ? {maxInlineSize: Math.max(oneLine, lines.minContent)} : {}), intrinsicBlockSize: lines.profile.map(entry => ({atLeastInlineSize: entry.atLeastInlineSize, blockSize: entry.lines === null ? null : entry.lines * font.lineHeight})),
           font: fontContract, textMetrics: {kind: 'lines', text: lines.text, width: lines.width, minContent: lines.minContent, overflowWrap, profile: lines.profile, ...(text.lang !== undefined ? {lang: text.lang} : {}),
-            ...(text.inline ? {inline: wrappedInlineBounds({font, text: wrapContent, lang: text.lang, inline: Object.fromEntries(Object.entries(text.inline ?? {}).filter(nonAtomicEntry).map(([k, v]): [string, string] => [k, pieceOf(v)])), lines, extraAt, edges: wrapEdges, weights: wrapWeights, atomics: wrapAtomics}), ...(extraAt ? {inlineEdges: wrapEdges} : {}), ...(weightAt ? {inlineWeights: wrapWeights} : {}), ...(wrapAtomics.length ? {inlineAtomics: Object.fromEntries(wrapAtomics.map(a => [a.k, [a.w, a.h]]))} : {})} : {}), baseline: baselineMetrics(font),
+            ...(text.inline ? {inline: wrappedInlineBounds({font, text: wrapContent, lang: text.lang, inline: Object.fromEntries(Object.entries(text.inline ?? {}).filter(nonAtomicEntry).map(([k, v]): [string, string] => [k, pieceOf(v)])), lines, extraAt, edges: wrapEdges, weights: wrapWeights, atomics: wrapAtomics}), ...(extraAt ? {inlineEdges: wrapEdges} : {}), ...(weightAt ? {inlineWeights: wrapWeights} : {}), ...(wrapAtomics.length ? {inlineAtomics: Object.fromEntries(wrapAtomics.map(a => [a.k, [a.w, a.h] satisfies Pair]))} : {})} : {}), baseline: baselineMetrics(font),
             // WCAG 1.4.12 text spacing: the same text with letter-spacing 0.12em and word-spacing 0.16em.
             spacedProfile: breakLines({font, text: wrapContent, overflowWrap, lang: text.lang, spacing: {letter: 0.12 * font.size, word: 0.16 * font.size}, extra: extraAt, weightAt}).profile,
             font: provenance(font), allowance: layoutAllowance.rule}};
@@ -660,7 +662,7 @@ export function createTextMetrics({fonts, shaper, limits = {}}: {fonts: Record<s
       }
       let metrics: ({kind: "domain"} & TextDomainBounds) | {
         kind: "content"; text: string; width: number; baseline: {ascent: number; descent: number};
-        inline?: Record<string, InlineBounds>; lineWidth?: number[]; inlineEdges?: Record<string, Edges>;
+        inline?: Record<string, InlineBounds>; lineWidth?: Pair; inlineEdges?: Record<string, Edges>;
         inlineWeights?: Record<string, number>; inlineAtomics?: Record<string, Pair>;
       }, width: number;
       if (text.inline !== undefined && text.content === undefined) fail(`${selector}: inline bounds need fixed content`);
@@ -726,7 +728,7 @@ export function createTextMetrics({fonts, shaper, limits = {}}: {fonts: Record<s
             return [k, {...b, start: pair(b.start, v => v + shift), end: pair(b.end, v => v + shift + bl + br)}] satisfies [string, InlineBounds];
           }));
         }
-        metrics = {kind: 'content', text: measured.text, width: measured.width + extra, baseline: baselineMetrics(font), ...(inline ? {inline, lineWidth: required(measured.range).map(v => v + extra), ...(Object.keys(edges).length ? {inlineEdges: edges} : {}), ...(runs ? {inlineWeights: weights} : {}), ...(Object.keys(atomics).length ? {inlineAtomics: Object.fromEntries(Object.entries(atomics).map(([k, v]) => [k, v.atomic]))} : {})} : {})};
+        metrics = {kind: 'content', text: measured.text, width: measured.width + extra, baseline: baselineMetrics(font), ...(inline ? {inline, lineWidth: pair(required(measured.range),v=>v+extra), ...(Object.keys(edges).length ? {inlineEdges: edges} : {}), ...(runs ? {inlineWeights: weights} : {}), ...(Object.keys(atomics).length ? {inlineAtomics: Object.fromEntries(Object.entries(atomics).map(([k, v]) => [k, v.atomic]))} : {})} : {})};
       } else {
         const domain = domainBounds({font, characters: text.characters, maxLength: text.maxLength, lang: text.lang});
         width = required(domain.bounds.at(-1));
@@ -739,7 +741,7 @@ export function createTextMetrics({fonts, shaper, limits = {}}: {fonts: Record<s
     return out;
   }
 
-  const resolveOptions = <T extends TextOptions>(options: T): T => ({...options, boxes: resolveBoxes(options.boxes)});
+  const resolveOptions = <T extends TextOptions>(options: T): ResolvedTextOptions<T> => ({...options, boxes: resolveBoxes(options.boxes)});
   /**
    * Analyse with ::before/::after text included in the measured content: `analyze(options)` runs the layout analysis
    * (e.g. options => analyzeHTML(html, options)). A first pass reports the generated text of each leaf (generatedText);
@@ -747,7 +749,7 @@ export function createTextMetrics({fonts, shaper, limits = {}}: {fonts: Record<s
    * after) and the page is analysed again. Generated text that differs between the boxes or conditions of a contract
    * is left out, so those leaves stay Unknown.
    */
-  function withGeneratedText<T extends TextOptions, R extends GeneratedResult>(analyze: (options: T) => R, options: T): R {
+  function withGeneratedText<T extends TextOptions, R extends GeneratedResult>(analyze: (options: ResolvedTextOptions<T>) => R, options: T): R {
     const first = analyze(resolveOptions(options));
     const generated = first.generatedText ?? [];
     if (!generated.length) return first;

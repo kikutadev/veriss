@@ -4,7 +4,7 @@
 import { analyzeHTML, phrasingTags } from '@mizchi/veriss/html';
 import { parseFragment, serialize, type DefaultTreeAdapterTypes as Tree } from 'parse5';
 import type {LayoutOptions,LayoutBoxContract,LayoutSummary,LayoutTextFont} from '@mizchi/veriss/src/layout-contracts.d.ts';
-import type {TextMetrics} from '@mizchi/veriss/text';
+import type {TextMetrics,TextBoxInput} from '@mizchi/veriss/text';
 import type {EnvironmentProfile,Status} from '@mizchi/veriss/src/relational-contract.mjs';
 import type {Finding,SelectorWarning,LintResult} from './lint.mjs';
 import type {Choice,Choices,AnalysisFailure,ContractUnknown} from './noshift.mjs';
@@ -226,7 +226,11 @@ function measuredContract(facts:FontFacts, textMetrics:Pick<TextMetrics,'resolve
   const nowrap = ['nowrap', 'pre'].includes(facts.whiteSpace??'');
   const wrap = nowrap ? 'nowrap' : facts.oneLine ? 'one-line' : domain ? null : ['normal', 'pre-line', 'pre-wrap'].includes(facts.whiteSpace??'') ? (facts.overflowWrap === 'anywhere' ? 'anywhere' : 'normal') : null;
   if (!wrap) return null;
-  const contract = { text: { font: { family, size, lineHeight, weight }, ...(domain ?? { content: facts.text }), ...(facts.lang ? { lang: facts.lang } : {}), ...(wrap === 'normal' && facts.overflowWrap !== 'normal' ? { overflowWrap: facts.overflowWrap } : {}) }, wrap };
+  const font = {family,size,lineHeight,weight};
+  const lang = facts.lang ? {lang:facts.lang} : {};
+  const overflowWrap = facts.overflowWrap;
+  if(wrap==='normal' && overflowWrap!==undefined && !['normal','anywhere','break-word'].includes(overflowWrap)) return {unmeasurable:'Unsupported overflow-wrap: '+overflowWrap};
+  const contract:TextBoxInput = {wrap,text:domain ? {font,...domain,...lang} : {font,content:facts.text ?? '',...lang,...(wrap==='normal' && (overflowWrap==='anywhere'||overflowWrap==='break-word') ? {overflowWrap} : {})}};
   // A text the font file cannot measure (a character it lacks, a feature not modeled): not a size, but a reason the
   // caller reports as Unknown (its text is then only assumed to fit).
   try { const measured:Measurement|undefined=textMetrics.resolveBoxes({ x: contract }).x; return measured??null; } catch (error) { return { unmeasurable: errorMessage(error) }; }

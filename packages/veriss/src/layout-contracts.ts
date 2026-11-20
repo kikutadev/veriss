@@ -69,6 +69,11 @@ interface TextInlineMetrics {
   inlineAtomics?:Readonly<Record<string,TextMetricPair>>;
   baseline?:{ascent:number;descent:number};
 }
+/** Optional provenance on manually supplied bounds; measured bounds also record the shaper. */
+export interface TextFontProvenance {
+  family?:string;size?:number;weight?:number;unitsPerEm?:number;
+  file?:string;sha256?:string;shaper?:string;lineHeight?:number;letterSpacing?:number;
+}
 export interface LayoutBoxContract {
   /** Trusted sufficient content-width bound for every allowed input/font. */
   minInlineSize?: number;
@@ -84,9 +89,9 @@ export interface LayoutBoxContract {
   /** Font the size bounds were measured with (`/text`); the computed CSS font must match or the box is Unknown. */
   font?: { family: string; size: number; lineHeight: number; weight?: number; style?: 'normal'; letterSpacing?:number };
   /** Provenance of font-derived bounds. A domain bound table indexed by character count. */
-  textMetrics?: (TextInlineMetrics & { kind: 'content'; text: string; width: number; lang?:string; font?: object; allowance?: string;inline?:Readonly<Record<string,TextInlineBounds>>;lineWidth?:TextMetricPair })
-    | { kind: 'domain'; lang?:string; characters: string; maxLength: number; perCharacter: number; pairAdjustment: number; widest: string; bounds: number[]; font?: object; allowance?: string }
-    | (TextInlineMetrics & { kind: 'lines'; text: string; width: number; minContent: number; overflowWrap: 'normal' | 'anywhere' | 'break-word'; profile: { atLeastInlineSize: number; lines: number | null }[]; lang?: string; font?: object; allowance?: string;inline?:Readonly<Record<string,readonly TextWrappedBound[]>>;spacedProfile?:{atLeastInlineSize:number;lines:number|null}[] });
+  textMetrics?: (TextInlineMetrics & { kind: 'content'; text: string; width: number; lang?:string; font?: TextFontProvenance; allowance?: string;inline?:Readonly<Record<string,TextInlineBounds>>;lineWidth?:TextMetricPair })
+    | { kind: 'domain'; lang?:string; characters: string; maxLength: number; perCharacter: number; pairAdjustment: number; widest: string; bounds: number[]; font?: TextFontProvenance; allowance?: string }
+    | (TextInlineMetrics & { kind: 'lines'; text: string; width: number; minContent: number; overflowWrap: 'normal' | 'anywhere' | 'break-word'; profile: { atLeastInlineSize: number; lines: number | null }[]; lang?: string; font?: TextFontProvenance; allowance?: string;inline?:Readonly<Record<string,readonly TextWrappedBound[]>>;spacedProfile?:{atLeastInlineSize:number;lines:number|null}[] });
 }
 export interface CheckedLayoutBoxContract extends Omit<LayoutBoxContract, 'overflow' | 'overflowBlock'> {
   overflow?: 'fit' | 'clip' | 'scroll';

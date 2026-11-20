@@ -147,6 +147,18 @@ interface TextInlineMetrics {
         descent: number;
     };
 }
+/** Optional provenance on manually supplied bounds; measured bounds also record the shaper. */
+export interface TextFontProvenance {
+    family?: string;
+    size?: number;
+    weight?: number;
+    unitsPerEm?: number;
+    file?: string;
+    sha256?: string;
+    shaper?: string;
+    lineHeight?: number;
+    letterSpacing?: number;
+}
 export interface LayoutBoxContract {
     /** Trusted sufficient content-width bound for every allowed input/font. */
     minInlineSize?: number;
@@ -177,7 +189,7 @@ export interface LayoutBoxContract {
         text: string;
         width: number;
         lang?: string;
-        font?: object;
+        font?: TextFontProvenance;
         allowance?: string;
         inline?: Readonly<Record<string, TextInlineBounds>>;
         lineWidth?: TextMetricPair;
@@ -190,7 +202,7 @@ export interface LayoutBoxContract {
         pairAdjustment: number;
         widest: string;
         bounds: number[];
-        font?: object;
+        font?: TextFontProvenance;
         allowance?: string;
     } | (TextInlineMetrics & {
         kind: 'lines';
@@ -203,7 +215,7 @@ export interface LayoutBoxContract {
             lines: number | null;
         }[];
         lang?: string;
-        font?: object;
+        font?: TextFontProvenance;
         allowance?: string;
         inline?: Readonly<Record<string, readonly TextWrappedBound[]>>;
         spacedProfile?: {

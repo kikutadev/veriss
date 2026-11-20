@@ -241,7 +241,12 @@ function measuredContract(facts, textMetrics, fonts, defaultFontSize) {
     const wrap = nowrap ? 'nowrap' : facts.oneLine ? 'one-line' : domain ? null : ['normal', 'pre-line', 'pre-wrap'].includes(facts.whiteSpace ?? '') ? (facts.overflowWrap === 'anywhere' ? 'anywhere' : 'normal') : null;
     if (!wrap)
         return null;
-    const contract = { text: { font: { family, size, lineHeight, weight }, ...(domain ?? { content: facts.text }), ...(facts.lang ? { lang: facts.lang } : {}), ...(wrap === 'normal' && facts.overflowWrap !== 'normal' ? { overflowWrap: facts.overflowWrap } : {}) }, wrap };
+    const font = { family, size, lineHeight, weight };
+    const lang = facts.lang ? { lang: facts.lang } : {};
+    const overflowWrap = facts.overflowWrap;
+    if (wrap === 'normal' && overflowWrap !== undefined && !['normal', 'anywhere', 'break-word'].includes(overflowWrap))
+        return { unmeasurable: 'Unsupported overflow-wrap: ' + overflowWrap };
+    const contract = { wrap, text: domain ? { font, ...domain, ...lang } : { font, content: facts.text ?? '', ...lang, ...(wrap === 'normal' && (overflowWrap === 'anywhere' || overflowWrap === 'break-word') ? { overflowWrap } : {}) } };
     // A text the font file cannot measure (a character it lacks, a feature not modeled): not a size, but a reason the
     // caller reports as Unknown (its text is then only assumed to fit).
     try {

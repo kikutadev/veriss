@@ -673,7 +673,7 @@ export function createTextMetrics({ fonts, shaper, limits = {} }) {
         for (const [selector, contract] of Object.entries(boxes)) {
             // textRuns: one text contract per anonymous text block of a table cell.
             if (contract?.textRuns) {
-                out[selector] = { ...contract, textRuns: contract.textRuns.map((run, k) => resolveBoxes({ [`${selector} text ${k}`]: run })[`${selector} text ${k}`]) };
+                out[selector] = { ...contract, textRuns: contract.textRuns.map((run, k) => required(resolveBoxes({ [`${selector} text ${k}`]: run })[`${selector} text ${k}`])) };
                 continue;
             }
             if (!contract?.text) {
@@ -856,7 +856,7 @@ export function createTextMetrics({ fonts, shaper, limits = {} }) {
                         return [k, { ...b, start: pair(b.start, v => v + shift), end: pair(b.end, v => v + shift + bl + br) }];
                     }));
                 }
-                metrics = { kind: 'content', text: measured.text, width: measured.width + extra, baseline: baselineMetrics(font), ...(inline ? { inline, lineWidth: required(measured.range).map(v => v + extra), ...(Object.keys(edges).length ? { inlineEdges: edges } : {}), ...(runs ? { inlineWeights: weights } : {}), ...(Object.keys(atomics).length ? { inlineAtomics: Object.fromEntries(Object.entries(atomics).map(([k, v]) => [k, v.atomic])) } : {}) } : {}) };
+                metrics = { kind: 'content', text: measured.text, width: measured.width + extra, baseline: baselineMetrics(font), ...(inline ? { inline, lineWidth: pair(required(measured.range), v => v + extra), ...(Object.keys(edges).length ? { inlineEdges: edges } : {}), ...(runs ? { inlineWeights: weights } : {}), ...(Object.keys(atomics).length ? { inlineAtomics: Object.fromEntries(Object.entries(atomics).map(([k, v]) => [k, v.atomic])) } : {}) } : {}) };
             }
             else {
                 const domain = domainBounds({ font, characters: text.characters, maxLength: text.maxLength, lang: text.lang });

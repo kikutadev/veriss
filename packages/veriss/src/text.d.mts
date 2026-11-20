@@ -1,3 +1,4 @@
+import type { LayoutBoxContract, LayoutOptions } from './layout-contracts.js';
 /** Font settings a text contract was measured with; the core checks the computed CSS against them. */
 export interface TextFont {
     family: string;
@@ -127,14 +128,13 @@ interface BreakInput extends MeasureInput {
     extra?: number[] | undefined;
     weightAt?: (number | undefined)[] | undefined;
 }
-interface BoxInput {
+export interface TextBoxInput extends Omit<LayoutBoxContract, 'textRuns'> {
     text?: TextContract;
-    textRuns?: readonly BoxInput[];
-    wrap?: string;
-    minInlineSize?: unknown;
-    intrinsicBlockSize?: unknown;
-    minBlockSize?: unknown;
+    textRuns?: readonly TextBoxInput[];
 }
+export type ResolvedTextOptions<T> = Omit<T, 'boxes'> & {
+    boxes: Record<string, LayoutBoxContract>;
+};
 interface GeneratedText {
     selector?: string | null;
     kind: string;
@@ -143,8 +143,8 @@ interface GeneratedText {
 interface GeneratedResult {
     generatedText?: GeneratedText[];
 }
-type TextOptions = {
-    boxes?: Record<string, BoxInput>;
+export type TextOptions = Omit<LayoutOptions, 'boxes'> & {
+    boxes?: Record<string, TextBoxInput>;
 };
 export interface TextMetrics {
     measureText(input: MeasureInput): MeasuredText;
@@ -152,9 +152,9 @@ export interface TextMetrics {
     /** Line counts of wrapped fixed text over the content width (UAX #14 subset). */
     breakLines(input: BreakInput): DetailedLineProfile;
     /** Replace text box contracts with derived geometry and font provenance. */
-    resolveBoxes<T extends Record<string, object>>(boxes?: T): Record<string, object>;
-    resolveOptions<T extends TextOptions>(options: T): T;
-    withGeneratedText<T extends TextOptions, R extends GeneratedResult>(analyze: (options: T) => R, options: T): R;
+    resolveBoxes(boxes?: Readonly<Record<string, TextBoxInput>>): Record<string, LayoutBoxContract>;
+    resolveOptions<T extends TextOptions>(options: T): ResolvedTextOptions<T>;
+    withGeneratedText<T extends TextOptions, R extends GeneratedResult>(analyze: (options: ResolvedTextOptions<T>) => R, options: T): R;
 }
 export declare const layoutAllowance: {
     unit: number;
