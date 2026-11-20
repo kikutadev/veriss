@@ -253,3 +253,6 @@ df34f51: paint-only transition と、全 retained chain が通常 block であ�
 
 同一の前回捕捉済み15 snapshot の再解析でも12→18/21環境ケースを確認。ゲーム3作品の25契約は成立10、違反4、Unknown11で不変。
 全gate: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 387 E2E passed、supervisor exit=0、657 PID追跡・残留0。gate起動後の変更は文書のみ。
+
+### 可変 margin の厳密計算
+目標: viewport 依存の非負 margin を通常 block flow と Grid の既存区分アフィン計算へ接続する。隣接する正の block margin は大小が逆転する領域で分割する。未対応の親子/空箱の相殺、負値、intrinsic contribution、flex item、positioned box は明示 Unknown とする。既存の固定 margin の挙動を変えず、対照付き単体・3ブラウザ・同一実入力・全gateを確認し fork main に統合する。
