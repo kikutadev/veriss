@@ -95,6 +95,8 @@ tools/gate.sh                                     # push の前に毎回。20〜
 移行第1段階:
 - TypeScript 6.0.3 (既存依存の peer 解決を維持)、Node 24 型、strict の tsconfig を導入。
 - .mts を正本にして既存 .mjs と .d.mts を生成。pnpm build:ts / typecheck / check:ts を追加。gate は別ディレクトリへの再生成物とのバイト照合を行う。
-- 数理演算（linear, region, occupancy）、SMT (smt, model, layout-z3 と node adapter)、関係述語と含意、CSS の構文検査6項目と scrollbar 計算を移行。軸・座標・係数、展開済み述語、solver 入出力を明示。線形/領域テストも移行し、型契約の負例を追加。
+- 数理演算（linear, region, occupancy）、SMT (smt, model, layout-z3 と node adapter)、関係述語と含意、CSS の構文検査6項目と scrollbar 計算（実装16ファイル）を移行。軸・座標・係数、展開済み述語、solver 入出力を明示。線形/領域テストも移行し、型契約の負例を追加。
 - 残り: layout engine/CSS、その他の core、契約 IR / partial geometry、全 adapters、CLI/実験/その他テスト。移行中の .mjs と型宣言をまだ持つモジュールは strict 検査対象外。生成された .mjs を直接編集しない。
 - 未完了: 全体移行・全 gate・Git 依存/性能の最終比較。型の回避を使って拡張範囲を偽らない。
+
+第1段階の検証: a4935e4。pnpm install --frozen-lockfile、check:ts、関連単体64件、git diff --check は成功。最終 gate はツール切断で完了結果を取得できず、fork main への統合とリモート push は行っていない。途中切断で生じた当 worktree の gate プロセス2系統を cwd/親PID で照合して回収し、Chrome プロセス残留0を確認した。sandbox 内単体実行では pnpm 署名のネットワーク確認が失敗するため、次回の gate はホスト上の監督ランナーで結果を保存して検証する。次は残りの core の型付けと既存 API 型宣言の統合、特に layout/engine と CSS 依存境界を進める。
