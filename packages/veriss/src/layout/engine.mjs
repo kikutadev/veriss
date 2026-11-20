@@ -1,3 +1,4 @@
+import {hasCarousel,checkCarouselShifts} from './engine-carousel.mjs';
 import {preflight} from './engine-preflight.mjs';
 import {createObligationCollector} from './engine-obligations.mjs';
 import {createPositionSolver, subgridError, isDescendant, intersectRegions} from './engine-positioning.mjs';
@@ -40,15 +41,14 @@ import { createIntrinsicSolver, intrinsicBlock, measureLegend } from './engine-i
 import { tableAsGrid as tableAsGridImpl, tablePlacement } from './engine-table.mjs';
 import { affineOf, linearOf, mapper, scaled, translated as translatedWithRoot, relativelyOffset, offset } from './engine-transforms.mjs';
 import { createTrackSolver, scaleGap, constantLess, maximumConstant } from './engine-tracks.mjs';
-import { unitContext, lengthPieces, length, layoutStartMoves, shiftScoreBound, sweptBound, layoutRectangle, firstStartMove, matchLayoutRectangles } from './engine-geometry.mjs';
+import { unitContext, lengthPieces, length, shiftScoreBound, sweptBound, layoutRectangle, firstStartMove, matchLayoutRectangles } from './engine-geometry.mjs';
 let uaEngine; // the engine of the ua option's profile (set per analysis, like the UA profile in css.mjs)
 
 // `preferences` (internal) names non-default user preferences, e.g. 'prefers-color-scheme:dark'.
 export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSheets=[], inputDiagnostics=[], preferences=[]) {
   // A hovered re-layout (hover-at:<path>) still needs its own untransformed re-layout, so it keeps a pristine copy.
   const hovered = preferences.find(p => p.startsWith('hover-at:'))?.slice(9);
-  const carouselIn = box => /^carousel$/i.test(String(box.aria?.['aria-roledescription'] ?? '').trim()) || (box.children ?? []).some(carouselIn);
-  const pristine = (options.accessibility || options.integrity || /:hover|@(?:-webkit-)?keyframes|@starting-style/i.test(String(options.css ?? '')) || inlineSheets.length || carouselIn(root)) && preferences.every(p => p.startsWith('hover-at:')) ? structuredClone(root) : null;
+  const pristine = (options.accessibility || options.integrity || /:hover|@(?:-webkit-)?keyframes|@starting-style/i.test(String(options.css ?? '')) || inlineSheets.length || hasCarousel(root)) && preferences.every(p => p.startsWith('hover-at:')) ? structuredClone(root) : null;
   // The untransformed re-layout (CSS transforms removed): the layout boxes, which is what a layout shift compares.
   const untransformed = preferences.includes('untransformed');
   let sawTransform = false;
@@ -2663,50 +2663,9 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     layoutWarnings.push({ code: 'W_LAYOUT_LAZY_IN_VIEWPORT', severity: 'warning', box: row.box, path: row.path,
       message: `${row.box} has loading="lazy" but is in the initial viewport (top ${number(evaluate(top, p))}px at viewport ${number(p.x)}px × ${number(p.y)}px): it loads later than an eager image; drop loading="lazy" for images above the fold (and consider fetchpriority="high" for the largest one)`, ...ranges(visible) });
   }
-  // Carousels (the WAI-ARIA pattern: aria-roledescription="carousel" with "slide" descendants): with each slide shown
-  // in turn, nothing outside the slides may move, or switching slides is a layout shift (slides of different heights
-  // move the content below; measured). The shown slide is the one without the hidden attribute, or the one carrying
-  // a class no other slide has; each variant moves that marker to another slide.
   if (pristine && hovered === undefined && !options.$animationFrame && !options.$slideVariant && !diagnostics.some(d => d.severity === 'unknown')) {
-    const role = (box, name) => String(box.aria?.['aria-roledescription'] ?? '').trim().toLowerCase() === name;
-    const carousels = []; (function walk(box) { if (role(box, 'carousel')) carousels.push(box); for (const child of box.children ?? []) walk(child); })(root);
-    for (const carousel of carousels.slice(0, 8)) {
-      const slides = []; (function walk(box) { for (const child of box.children ?? []) { if (role(child, 'slide')) slides.push(child); else if (!role(child, 'carousel')) walk(child); } })(carousel);
-      if (slides.length < 2) continue;
-      const fail = message => diagnostics.push({ code: 'U_LAYOUT_CAROUSEL_SHIFT', severity: 'unknown', message: `${carousel.label}: ${message}`, box: carousel.label, path: carousel.path });
-      const shownByHidden = slides.filter(slide => slide.hiddenAttr !== true);
-      // A state class (active, is-current, selected, show, …) that exactly one slide carries marks the shown slide.
-      const stateClass = /(?:^|[-_])(?:active|current|selected|show|shown|visible|open)$/i;
-      const unique = slides.map(slide => slide.classes.filter(c => stateClass.test(c) && !slides.some(other => other !== slide && other.classes.includes(c))));
-      let marker;
-      if (slides.some(slide => slide.hiddenAttr === 'dynamic' || slide.hiddenAttr === 'until-found' || [...slide.classes].some(c => c === 'dynamic'))) { fail('a slide with a dynamic hidden attribute or class is not enumerated'); continue; }
-      if (shownByHidden.length === 1) marker = { kind: 'hidden' };
-      else if (unique.filter(list => list.length).length === 1) marker = { kind: 'class', name: unique.find(list => list.length)[0], from: slides[unique.findIndex(list => list.length)].path };
-      else if (shownByHidden.length !== slides.length) { fail('the shown slide is not identified (one slide without hidden, or one with a state class such as active that no other slide has)'); continue; }
-      else marker = null; // every slide shown at once (a scrolling track): switching does not change the layout
-      if (!marker) continue;
-      const inSlide = path => slides.some(slide => path === slide.path || path.startsWith(slide.path + '/'));
-      const variants = [];
-      for (const target of slides.slice(0, 16)) {
-        const copy = structuredClone(pristine);
-        const find = (box, path) => box.path === path ? box : (box.children ?? []).map(child => find(child, path)).find(Boolean);
-        const list = slides.map(slide => find(copy, slide.path));
-        if (marker.kind === 'hidden') list.forEach(slide => { if (slide.path === target.path) delete slide.hiddenAttr; else slide.hiddenAttr = true; });
-        else list.forEach(slide => { slide.classes = slide.classes.filter(c => c !== marker.name); if (slide.path === target.path) slide.classes.push(marker.name); });
-        variants.push({ target, report: analyzeBoxTree(copy, { ...options, $slideVariant: true }, scrollbarProfile, budget, inlineSheets, [], preferences) });
-      }
-      const failed = variants.find(v => v.report.status === 'unknown');
-      if (failed) { fail(`its layout with ${failed.target.label} shown is not decided (${failed.report.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`); continue; }
-      const first = variants[0];
-      for (const variant of variants.slice(1)) {
-        const result = layoutStartMoves(first.report.sizes, variant.report.sizes, row => !inSlide(row.path));
-        if (result.undecided) { fail(`${result.undecided.box} has no layout rectangle to compare across slides`); break; }
-        for (const move of result.moves) diagnostics.push({ code: 'E_LAYOUT_CAROUSEL_SHIFT', severity: 'error', box: move.row.box, path: move.row.path, carousel: carousel.label, carouselPath: carousel.path, from: first.target.label, to: variant.target.label, field: move.field, delta: exact(move.delta),
-          ...(() => { const bound = block ? shiftScoreBound(first.report.sizes, variant.report.sizes, row => !inSlide(row.path), move.v) : null; return bound !== null ? { scoreBound: bound } : {}; })(),
-          message: `Switching ${carousel.label} from ${first.target.label} to ${variant.target.label} moves ${move.row.box} (${move.field} by ${number(move.delta)}px at viewport ${number(move.v.x)}px${block ? ` × ${number(move.v.y)}px` : ''}): slides of different sizes shift the page. Give the slide area a fixed height or aspect-ratio, or stack the slides in one grid cell`, ...ranges(move.shared) });
-        if (result.moves.length) break;
-      }
-    }
+    checkCarouselShifts({root,pristine,block,diagnostics,ranges,
+      analyze:copy=>analyzeBoxTree(copy, { ...options, $slideVariant: true }, scrollbarProfile, budget, inlineSheets, [], preferences)});
   }
   // A picture source that is never the selected one in the checked range: an earlier source's media covers every
   // width where its own matches (the first matching source wins), or its media never matches. Its files are dead.
