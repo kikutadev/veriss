@@ -219,3 +219,5 @@ ABOUT・WORKS・ARTICLES は exit=0、HOME と GALLERY は未証明があるた�
 GALLERY は色・背景の transition を含む cascade の縮約未対応、HOME island は祖先/対象 markup、selected-work は grid 依存。縦軸の独立外部証拠は直接検証できるが、縦軸の自動縮約、全ページの全要素・全状態の証明は未達。既知の未証明座標に0を与えない。
 関連単体22件、新規3ブラウザー6 E2E 成功。片軸の外部 block 証拠についても、欠落軸・負寸法・矛盾・被覆不足を拒否する対照を別途確認。4ページ/WebKit の単回計測では非キャッシュ2.20s、セッション初回1.77s、再実行1.55s（並行QA負荷あり、一般性能保証ではない）。証拠行一致、4 projected cache hits。
 ゲーム・サイト配信コード変更なし。
+
+軸独立版の全gate: 6単体群 fail=0、component-lint 4評価不変、3ブラウザー369 E2E passed、supervisor exit=0（660 PID追跡、残留0）。並行開発の有限状態解析・永続キャッシュ・割当写像による合成を保持するため fork main f99ab46 を取り込み d135ca9 に統合した。統合後の関連単体32件成功、実ビルド保存済み15 snapshotから再抽出した21証拠はすべて統合前と完全一致。
