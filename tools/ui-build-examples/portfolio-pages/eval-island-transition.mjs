@@ -3,15 +3,16 @@
 import {readFileSync,realpathSync,statSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
 import {strict as assert} from 'node:assert';
 import {chromium,firefox,webkit} from 'playwright';
 import {analyzeHTML} from '../../../packages/veriss/src/html.mjs';
 import {createLayoutIR,layoutGeometry} from '../../../packages/veriss/src/layout-contract.mjs';
-import {verifyInterpolatedPredicate} from '../../../packages/veriss/src/transitions.mjs';
+import {verifyInterpolatedPredicate,verifyCSSWidthTransition} from '../../../packages/veriss/src/transitions.mjs';
 
 const [snapshotDir,buildDir,mode]=process.argv.slice(2);
-assert(mode===undefined||mode==='--home-only','Unknown audit option');
-if(!snapshotDir||!buildDir)throw Error('usage: eval-island-transition.mjs reviewed-snapshot-directory build-directory [--home-only]');
+assert(mode===undefined||mode==='--home-only'||mode==='--proof-only','Unknown audit option');
+if(!snapshotDir||!buildDir)throw Error('usage: eval-island-transition.mjs reviewed-snapshot-directory build-directory [--home-only|--proof-only]');
 const read=name=>readFileSync(resolve(snapshotDir,name),'utf8');
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const reviewed=JSON.parse(read('island-proof.json'));
@@ -23,6 +24,22 @@ for(const name of pages){
  assert.equal(result.inputHash,hashes[name]);
  assert.equal(sha(result.projectedCSS),'9d30a04838d63d89a591bebd8dc6776f27e9142a2950d0685b85c2656066a5f8');
 }
+// The closed-component validator derives interpolation from actual authored
+// width/transition declarations. The mapping from this already reviewed
+// synthetic component to the original full-page cascade is still conditional.
+const require=createRequire(new URL('../../../packages/veriss/package.json',import.meta.url));
+const postcss=require('postcss');
+const transitions=pages.map(name=>{
+ const ast=postcss.parse(JSON.parse(read(name+'.css.json')).map(s=>s.css).join('\n'));
+ const values=[];
+ ast.walkRules(r=>{if(r.parent.type==='root'&&r.selector==='.mobile-island')r.walkDecls('transition',d=>values.push(d.value))});
+ assert.equal(values.length,1,'Unreviewed base transition '+name);
+ return values[0];
+});
+assert.equal(new Set(transitions).size,1);
+const closedCSS=reviewed.results[0].projectedCSS.replaceAll('.mobile-island','#outer').replace('html,body{font-size:16px}','html{font-size:16px}body{font-size:16px}')+
+ '\n#outer{display:flex;flex-direction:column-reverse;transition:'+transitions[0]+'}#panel{height:0;min-width:0;flex:none}';
+const closedHTML='<!doctype html><html lang="ja"><head><title>QA</title></head><body><div id="outer" data-expanded="false"><nav id="panel"></nav></div></body></html>';
 const css=reviewed.results[0].projectedCSS+'\n.mobile-island{display:block}#panel{display:block;height:0;width:auto}';
 const assumptions=['For the reviewed, hash-bound DOM/CSS: the fixed island is viewport-anchored and centered by a -50% horizontal translation; its border is constant and no horizontal padding is applied. The column-reverse nowrap flex panel has auto inline size, stretch alignment and no inline margins, so its inline border rectangle equals the outer content box. The synthetic block child expresses only this boundary relation; its height and vertical position are not evidence.',
  'At a fixed viewport, the collapsed and expanded used widths bound the intermediate width. The min() operands are componentwise ordered, the width easing does not overshoot, and the horizontal translation and border are constant. Thus panel and outer inline positions/sizes share an affine progress. Home rules may disable width interpolation (endpoint jumps still lie within the envelope). No viewport resizing, unrelated mutation, or other animation is covered. This implementation correspondence is reviewed, not automatically proved.'];
@@ -56,7 +73,11 @@ for(const [ua,engine] of Object.entries({chromium,firefox,webkit})){
   });
  });
  const proof=verifyInterpolatedPredicate({profile,from:'collapsed',to:'expanded',evidence,predicate:fit,interpolation:{kind:'shared-affine',easing:'cubic-bezier(.3,.7,.2,1)',assumptions}});
- assert.equal(proof.status,'verified');proofs.push({ua,proof});
+ assert.equal(proof.status,'verified');
+ const derived=verifyCSSWidthTransition({profile,html:closedHTML,css:closedCSS,target:'outer',stateAttribute:'data-expanded',from:'false',to:'true',predicate:fit});
+ assert.equal(derived.status,'verified',JSON.stringify(derived));
+ proofs.push({ua,proof,derived});
+ if(mode==='--proof-only')continue;
  const browser=await engine.launch({headless:true,timeout:15000});
  try{
   // Real local build and real event listeners, with normal (not reduced) motion.

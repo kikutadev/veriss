@@ -100,6 +100,16 @@ export function deriveWidthTransition({html,css,profile,target,stateAttribute,fr
   staticProperties.set(key,v);
  };
  const sheet=postcss.parse(css);
+ // Minifiers can emit a separate @media block for each selector.
+ // Coalesce only adjacent, textually identical conditions; never move a
+ // declaration past another condition or intervening non-comment rule.
+ let previous=null;
+ for(const rule of [...sheet.nodes]){
+  if(rule.type==='comment')continue;
+  if(previous?.type==='atrule'&&rule.type==='atrule'&&previous.name==='media'&&rule.name==='media'&&previous.params===rule.params&&previous.nodes&&rule.nodes){
+   previous.append([...rule.nodes]);rule.remove();
+  }else previous=rule;
+ }
  function inspect(container,context=''){
   let pair=null;
   for(const rule of container.nodes){

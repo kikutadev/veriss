@@ -36,3 +36,10 @@ test('the same proof handles a different fixed notification pane and detects ins
  assert.equal(verifyCSSWidthTransition(input).status,'verified');
  assert.equal(verifyCSSWidthTransition({...input,css:css.replace('280px','330px')}).status,'violated');
 });
+
+test('adjacent identical responsive conditions can be emitted as separate rules',()=>{
+ const split=css.replace('@media(width>=1025px){#dock{width:258px}#dock[data-expanded=true]{width:358px}}','@media(width>=1025px){#dock{width:258px}}/* compiled stylesheet */@media (width>=1025px){#dock[data-expanded=true]{width:358px}}');
+ assert.equal(verifyCSSWidthTransition({...input,css:split}).status,'verified');
+ const interrupted=split.replace('/* compiled stylesheet */','#dock{width:500px}');
+ assert.equal(verifyCSSWidthTransition({...input,css:interrupted}).status,'unknown');
+});
