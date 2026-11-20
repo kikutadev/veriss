@@ -242,6 +242,18 @@ test('F26: table > tr never matches: the parser inserts a tbody', () => {
   assert.equal(w('.t > tbody > .r{color:red}').length, 0);
   // A tbody written in the source is not implied.
   assert.equal(codes(run('.t > .r{color:red}', '<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>'), 'W_CSS_SELECTOR_IMPLIED_PARENT').length, 0);
+  // The skipped tbody in the middle of the selector: the subject is a cell (or something inside it), not the row.
+  const deep = '<table class="t"><tr class="r"><td class="c"><span class="s">x</span></td></tr></table>';
+  for (const sel of ['.t > .r > td', '.t > tr > .c', 'table > tr td', '.t > .r > .c > .s', '.t > .r .s']) {
+    const found = codes(run(`${sel}{color:red}`, deep), 'W_CSS_SELECTOR_IMPLIED_PARENT');
+    assert.equal(found.length, 1, sel);
+    assert.match(found[0].message, /tbody/, sel);
+  }
+  // Controls: these match as written (no child combinator across the implied tbody), or never match either way.
+  for (const sel of ['.t .r > td', '.t td', '.t > tbody > .r > td', '.r > .c > .s', '.t > .c', '.t > .r > th'])
+    assert.equal(codes(run(`${sel}{color:red}`, deep), 'W_CSS_SELECTOR_IMPLIED_PARENT').length, 0, sel);
+  // A written tbody is not implied, however deep the subject.
+  assert.equal(codes(run('.t > .r > td{color:red}', '<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>'), 'W_CSS_SELECTOR_IMPLIED_PARENT').length, 0);
 });
 
 test('F27: the HTML parser changed the structure written in the source', () => {

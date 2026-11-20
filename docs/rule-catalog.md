@@ -117,7 +117,7 @@ verified で指摘なしになる。Web 版: https://mizchi.github.io/veriss/
 | コード | 検出すること | 判定 |
 |---|---|---|
 | `W_CSS_STATE_UNREACHABLE` | 当たらない状態のセレクタ: フォーカスできない要素の `:focus`(F17)・`:focus-within`(F35)、`pointer-events: none` の `:hover`(F18)、`:checked`・`::placeholder`(F19)、`:link`(F48)、`:placeholder-shown`(F49)、`:required`(F50)、`:read-write`(F61)、`:dir()`(F63)、ブロック容器でない `::first-letter`(F37)、リスト項目でない `::marker` | 一部(動的な tabindex・value・dir、外から渡される子は報告しない) |
-| `W_CSS_SELECTOR_IMPLIED_PARENT` | HTML の解析が補う tbody を飛ばす `table > tr`(F26) | 検査可(HTML の解析を通るときだけ) |
+| `W_CSS_SELECTOR_IMPLIED_PARENT` | HTML の解析が補う tbody を飛ばす `table > tr`、`table > tr > td`(F26) | 検査可(HTML の解析を通るときだけ) |
 | `W_CSS_CHILD_INDEX_HIDDEN_SIBLING` | template・script が数に入る `:last-child`(F33) | 検査可 |
 | `W_CSS_EMPTY_WHITESPACE` | 空白だけの要素の `:empty`(F29) | 検査可 |
 | `W_CSS_LANG_CODE` | `:lang(jp)` など国の符号(F62) | 検査可 |
