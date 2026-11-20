@@ -455,7 +455,10 @@ inputs are retained as scripts, not just result logs.
 
 2026-11-21 fifth-milestone validation: 58 new integration fixtures passed
 (20 CSS including 7 canonical-source, 14 composition, 13 finite dispatch,
-11 motion). Four representative concrete certificates were checked by
+11 motion). The 94 earlier fixtures also passed (29 state and 8 time
+Lean examples, 28 state and 29 relational integration tests), with Lake
+build and KernelExample successful. All 32 earlier representative concrete
+certificates passed kernel reduction again. Four new representative concrete certificates were checked by
 Lean kernel reduction (`by decide`), and the new audited semantic theorems
 depend only on standard Lean axioms (`propext`, `Classical.choice`,
 `Quot.sound`, or subsets). The full browser/production gate and the
