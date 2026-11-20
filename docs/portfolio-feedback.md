@@ -264,3 +264,6 @@ f538ba2: 非負の viewport 依存 margin を既存の厳密な区分アフィ�
 - 新規単体3件、新規3ブラウザー E2E 6件。追加差分計測34ケース・幅高さ24点・4箱・3ブラウザー、9792/9792矩形一致 (許容誤差0.15px)。Z3独立再検証34/34ケース、17526チェック成立。固定basisの縮小制御対照では成立判定と違反判定双方を確認。
 - 親子/空箱の相殺、負の可変 margin、intrinsic contribution、可変主軸 margin と %/content basis の組合せ等は Unknown を維持。HOME キャラクターの負値 clamp も未対応。配信コード変更なし。
 - 全gate (f538ba2): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 402 E2E passed、supervisor exit=0、717 PID追跡・残留0。独立プロセス検査 CLEAN。gate後のコード変更なし。
+
+### 汎用性レビューと明示 media 環境
+ポートフォリオ等の URL・固有セレクター・ブレークポイントをコアへ持ち込まず、実問題は CSS 意味論から定義した再現可能な対照入力へ一般化する。既存コアのサイト固有依存を監査し、次に primary hover/pointer と reduced-motion の明示環境を既存の media query の領域分割へ接続する。未指定は推測せず、サイズとの AND/コンマ OR・ネスト・非成立枝・証拠の環境不一致をテストする。全アクセシビリティ状態の検査と固定 reduced-motion の幾何検査は混同しない。外部サイトと無関係なフォーム/ツールバー等の3ブラウザー対照を通し、全 gate 後に統合する。
