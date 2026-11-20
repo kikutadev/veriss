@@ -41,7 +41,7 @@ export interface FlexItemOptions {
     axis?: Axis;
     contentSizes?: {
         min: Rational;
-        max: Rational;
+        max?: Rational;
     } | undefined;
 }
 interface ItemCommon {
