@@ -31,13 +31,13 @@ export interface ImageSize {
     loading?: string;
 }
 interface DOMFacts {
-    named?: DynamicBoolean;
-    ariaHidden?: DynamicBoolean;
+    named?: DynamicBoolean | undefined;
+    ariaHidden?: DynamicBoolean | undefined;
     focusable?: DynamicBoolean;
     references?: ReferenceList;
     labelledBy?: ReferenceList;
     headers?: ReferenceList;
-    tabIndex?: number;
+    tabIndex?: number | undefined;
     equivalent?: string;
     essential?: string;
     alt?: string;
@@ -45,10 +45,10 @@ interface DOMFacts {
     labelFor?: string;
     placeholder?: boolean;
     placeholderAttr?: boolean;
-    role?: string;
+    role?: string | undefined;
     inputName?: string;
     ariaLabel?: string;
-    href?: string;
+    href?: string | undefined;
     textContent?: string;
     aria?: Record<string, string>;
     nameSource?: string;
@@ -134,7 +134,7 @@ export interface NormalizedBox extends DOMFacts {
     restructured?: BoxTree['restructured'];
     inertAttributes?: string[];
     notAttributes?: string[];
-    inline?: NormalizedBox[];
+    inline?: NormalizedBox[] | undefined;
     anonymous?: boolean;
     anonymousRuns?: number;
     disabled?: DynamicBoolean;

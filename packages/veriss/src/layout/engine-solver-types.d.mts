@@ -6,7 +6,7 @@ import type { Region, Affine2 } from './region.mjs';
 import type { Dimensions } from './engine-types.mjs';
 export interface SolverBox extends InlineBox, Omit<TableBox, 'children' | 'inline' | 'contract' | 'tag' | 'label' | 'path' | 'text' | 'colSpan' | 'rowSpan' | 'tableCell'> {
     children: SolverBox[];
-    inline?: SolverBox[];
+    inline?: SolverBox[] | undefined;
     $foldedInline?: boolean;
     $starts?: {
         geometry: number;

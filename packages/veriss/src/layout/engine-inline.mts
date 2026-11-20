@@ -14,7 +14,7 @@ import type {Dimensions,DimensionValue} from './engine-types.mjs';
 import type {LayoutRange,LayoutRegion,LayoutWarning,LayoutGeneratedText,TextInlineBounds,TextMetricPair} from '../layout-contracts.d.ts';
 type Generated=Partial<Record<'before'|'after',string>>;
 export interface InlineBox extends Omit<NormalizedBox,'children'|'inline'> {
-  children:InlineBox[];inline?:InlineBox[];pseudo?:string;contract?:EngineBoxContract;
+  children:InlineBox[];inline?:InlineBox[]|undefined;pseudo?:string;contract?:EngineBoxContract|undefined;
   generated?:Generated;absolutePseudo?:('before'|'after')[];contractSelector?:string;tableCell?:boolean;
 }
 interface InlineAncestor {box:InlineBox;style:EngineStyle;names?:readonly string[]}

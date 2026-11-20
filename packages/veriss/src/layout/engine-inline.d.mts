@@ -8,9 +8,9 @@ import type { LayoutRange, LayoutRegion, LayoutWarning, LayoutGeneratedText } fr
 type Generated = Partial<Record<'before' | 'after', string>>;
 export interface InlineBox extends Omit<NormalizedBox, 'children' | 'inline'> {
     children: InlineBox[];
-    inline?: InlineBox[];
+    inline?: InlineBox[] | undefined;
     pseudo?: string;
-    contract?: EngineBoxContract;
+    contract?: EngineBoxContract | undefined;
     generated?: Generated;
     absolutePseudo?: ('before' | 'after')[];
     contractSelector?: string;

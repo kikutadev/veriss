@@ -19,11 +19,11 @@ export interface ImageSize {
   media?: string; type?: string; sizes?: string; loading?: string;
 }
 interface DOMFacts {
-  named?: DynamicBoolean; ariaHidden?: DynamicBoolean; focusable?: DynamicBoolean;
+  named?: DynamicBoolean|undefined; ariaHidden?: DynamicBoolean|undefined; focusable?: DynamicBoolean;
   references?: ReferenceList; labelledBy?: ReferenceList; headers?: ReferenceList;
-  tabIndex?: number; equivalent?: string; essential?: string;
+  tabIndex?: number|undefined; equivalent?: string; essential?: string;
   alt?: string; inputType?: string; labelFor?: string; placeholder?: boolean; placeholderAttr?: boolean;
-  role?: string; inputName?: string; ariaLabel?: string; href?: string; textContent?: string;
+  role?: string|undefined; inputName?: string; ariaLabel?: string; href?: string|undefined; textContent?: string;
   aria?: Record<string,string>; nameSource?: string; value?: string; autocomplete?: string; scope?: string;
   controls?: boolean; autoplay?: boolean; muted?: boolean; trackKind?: string; accessKey?: string; ismap?: boolean;
   colSpan?: number|'dynamic'; rowSpan?: number|'dynamic'; hiddenAttr?: true|'dynamic'|'until-found';
@@ -53,7 +53,7 @@ export interface NormalizedBox extends DOMFacts {
   targets?:string[]; targetIdentity?:'stable'|'unknown'; boundaries?:BoxBoundary[];
   attributes?:Attributes; metaViewport?:string; implied?:boolean; restructured?:BoxTree['restructured'];
   inertAttributes?:string[]; notAttributes?:string[];
-  inline?:NormalizedBox[]; anonymous?:boolean; anonymousRuns?:number; disabled?:DynamicBoolean; inertSubtree?:boolean;
+  inline?:NormalizedBox[]|undefined; anonymous?:boolean; anonymousRuns?:number; disabled?:DynamicBoolean; inertSubtree?:boolean;
 }
 export type TreeDiagnostic = Omit<LayoutDiagnostic,'source'> & {source?: SourceSpan|undefined};
 

@@ -10,7 +10,7 @@ export interface SelectorBox {
     classes: readonly string[];
     [PARENT]?: SelectorBox | undefined;
     children?: readonly SelectorBox[];
-    inline?: readonly SelectorBox[];
+    inline?: readonly SelectorBox[] | undefined;
     id?: string | undefined;
     path?: string;
     label?: string;
@@ -30,7 +30,7 @@ export interface SelectorBox {
     disabled?: boolean | string;
     lang?: string;
     dirAttr?: string;
-    href?: string;
+    href?: string | undefined;
 }
 type AttributePart = {
     kind: 'attribute';

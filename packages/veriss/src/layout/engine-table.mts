@@ -29,8 +29,8 @@ type TableContract = Omit<EngineBoxContract, 'textMetrics'> & {
 };
 interface CellArea {column: number; row: number; span: number; down: number}
 export interface TableBox {
-  tag: string; label: string; path: string; text: boolean; children: TableBox[]; inline?: readonly TableBox[];
-  colSpan?: number | 'dynamic'; rowSpan?: number | 'dynamic'; contract?: TableContract;
+  tag: string; label: string; path: string; text: boolean; children: TableBox[]; inline?: readonly TableBox[]|undefined;
+  colSpan?: number | 'dynamic'; rowSpan?: number | 'dynamic'; contract?: TableContract|undefined;
   tableAt?: CellArea; tableArea?: CellArea; tablePart?: boolean; tableCell?: boolean; tableFlow?: boolean;
   tableRowSpan?: number; tableBaselineTop?: boolean; tableBaselineShift?: Rational;
   tableBaselineGroup?: {row: number; style: TableStyle; text?: Rational};

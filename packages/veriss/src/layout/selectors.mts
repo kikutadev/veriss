@@ -8,13 +8,13 @@ export type Boundary = { kind: string; name?: string };
 export interface SelectorBox {
   tag: string; classes: readonly string[];
   [PARENT]?: SelectorBox | undefined;
-  children?: readonly SelectorBox[]; inline?: readonly SelectorBox[];
+  children?: readonly SelectorBox[]; inline?: readonly SelectorBox[]|undefined;
   id?: string | undefined; path?: string; label?: string; documentRoot?: boolean; anonymous?: boolean; pseudo?: string | boolean;
   boundaries?: readonly Boundary[];
   inputType?: string; placeholderAttr?: boolean; value?: string; text?: boolean; whitespace?: boolean; textContent?: string;
   nativeStates?: Record<string, boolean | string | undefined>;
   contentEditable?: unknown; attributes?: Record<string, string | boolean | number | undefined>;
-  disabled?: boolean | string; lang?: string; dirAttr?: string; href?: string;
+  disabled?: boolean | string; lang?: string; dirAttr?: string; href?: string|undefined;
 }
 type Nth = { a: number; b: number };
 type AttributePart = {kind: 'attribute'; name: string; operator?: string; value?: string; insensitive?: boolean};

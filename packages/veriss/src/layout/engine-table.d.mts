@@ -36,10 +36,10 @@ export interface TableBox {
     path: string;
     text: boolean;
     children: TableBox[];
-    inline?: readonly TableBox[];
+    inline?: readonly TableBox[] | undefined;
     colSpan?: number | 'dynamic';
     rowSpan?: number | 'dynamic';
-    contract?: TableContract;
+    contract?: TableContract | undefined;
     tableAt?: CellArea;
     tableArea?: CellArea;
     tablePart?: boolean;
