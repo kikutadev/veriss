@@ -279,3 +279,10 @@ baf9eb0: primary hover/pointer と prefers-reduced-motion の明示値を一般�
 
 ### 状態依存 custom property の健全性
 目標: state/preference による custom property の代入が var() の連鎖や fallback を通じて幾何・表示・アニメーション等へ伝播する場合、静止時の結果を全状態成立として返さない。既存の token 化済み依存を使い、まず安全側の依存閉包を求める。単純 hover は既存 re-layout を利用できる範囲で比較し、他の状態・混在・間接アニメーション等は Unknown。純色のみ・未使用変数は影響を分離する。サイト非依存の対照入力、3ブラウザー、Z3、既存 gate で確認する。
+
+### 状態依存 custom property の検証結果 (2026-11-20)
+ed81485 / d00e811: token 化済み var() の参照・fallback・代入から保守的な依存閉包を計算し、幾何へ伝播する単純 hover の長さ依存を既存 re-layout へ接続。純色・未使用変数は分離、未対応の複合状態・間接アニメーション等は Unknown とする。hover の fit 制約を solver へ渡し、位置不変の幅超過も違反として検出。各再解析は独立した DOM で行い、寸法契約の二重登録を防ぐ。
+- 新規単体10件・3ブラウザー E2E 3件。独立対照16 cascade ケース384/384操作、viewport/gap/長さ条件6ケース576/576操作、未対応状態6ケース36/36操作一致。Z3の判定は22/22期待値一致（成立7、違反13、Unknown2）。最初の layer 対照の期待値は非 layer 宣言の優先順位を反映して修正し、全対照を再実行。
+- 保存済み非ポートフォリオ6製品15入力の3環境再解析、および公開5ページの同一入力再解析で既存判定・診断数不変。今回は検証の健全性改善であり、実サイトの Unknown 解消・新たな全ページ証明ではない。
+- 祖先・兄弟への状態 selector の伝播、複合状態、任意の途中アニメーション、hit-test、全ページ証明は未達。対象上限超過や未モデル化 consumer は Unknown。URL・固有 selector・固有パスによる特例なし。配信コード変更なし。
+- 全gate (d00e811): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 408 E2E passed、supervisor exit=0、692 PID追跡・残留0。初回gateは再解析時の契約重複不具合を確認して中断し、修正後に全gateを再実行。独立プロセス検査 CLEAN。
