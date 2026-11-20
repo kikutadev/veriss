@@ -271,7 +271,12 @@ test('F24, F25: table-layout: fixed without a width, border-spacing with collaps
 });
 
 test('F26: a child combinator through the tbody the parser inserts never matches', async ({page}) => {
-  for (const [html, sel, never] of [['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t > .r', true], ['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t .r', false], ['<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>', '.t > tbody > .r', false]]) {
+  for (const [html, sel, never] of [['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t > .r', true], ['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t .r', false], ['<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>', '.t > tbody > .r', false],
+    // The implied tbody in the middle of the selector (the subject is the cell or something inside it).
+    ...[['.t > .r > td', true], ['.t > tr > .c', true], ['table > tr td', true], ['.t > .r > .c > .s', true], ['.t > .r .s', true],
+      ['.t .r > td', false], ['.t td', false], ['.t > tbody > .r > td', false], ['.r > .c > .s', false]]
+      .map(([sel, never]) => ['<table class="t"><tr class="r"><td class="c"><span class="s">x</span></td></tr></table>', sel, never]),
+    ['<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>', '.t > tbody > .r > td', false]]) {
     await page.setContent(`<!doctype html><html lang="en"><body>${html}</body></html>`);
     expect(await page.evaluate(s => document.querySelector(s) !== null, sel), sel).toBe(!never);
     expect((analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `${sel}{color:red}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}}).layoutWarnings ?? []).some(w => w.code === 'W_CSS_SELECTOR_IMPLIED_PARENT'), sel).toBe(never);
