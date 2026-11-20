@@ -220,3 +220,9 @@ Svelte の class が既にある場合の compiler marker が公開 AST に残�
 推測による付与はしない。初回 E2E はテスト側が scoped type selector を ID selector より
 高優先と誤って期待し失敗した。実際の cascade の対照に訂正後9/9成功。
 GALLERY の実ビルド観測12/12。paint-only transition は css-tree lexer を再利用。
+
+統合版 9eec244: 並行の ae7995b を取り込み、paint-only transition を CSS AST 判定へ一本化。
+旧版で進行中の gate は中断し、監督ランナーにより残留0を確認。統合版で全 gate を再実行して
+6単体群 fail=0、component-lint 4評価不変、396 E2E 成功、supervisor exit 0 / 667 PID / 残留0。
+今回の捕捉済み15 DOM/CSS snapshot の統合版での再解析も21環境別契約中18成立、
+3 Unknown、矩形照合72/72、実測契約84/84。一つの残存対象は HOME island。
