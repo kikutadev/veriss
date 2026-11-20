@@ -1,3 +1,6 @@
+import {verifyUI} from './relational-contract.mjs';
+import {expandPredicate} from './layout/relational-predicate.mjs';
+import {easingRange,overshoots} from './layout/easing.mjs';
 // Endpoint relations over extracted CSS geometry, independent of UI syntax.
 import {createLayoutIR} from './layout-contract.mjs';
 import {verifyLayoutModel} from './layout-z3.mjs';
@@ -119,4 +122,31 @@ export async function verifyTransitionObligation(obligation,api,options) {
     delta:{value:number(sub(rational(proof.witness.requiredExact),rational(proof.witness.availableExact))),exact:exact(sub(rational(proof.witness.requiredExact),rational(proof.witness.availableExact)))},
   } : null;
   return {version:1,status:proof.status,contract:obligation.contract,coverage,proof,...(change ? {change} : {})};
+}
+
+/** Conditional invariant over a shared affine interpolation at a fixed
+ * viewport. The implementation-to-interpolation connection is a supplied
+ * assumption, not inferred from CSS. Only convex conjunctions are supported:
+ * endpoint truth does not imply truth of a disjunction or disequality. */
+export function verifyInterpolatedPredicate({profile,from,to,evidence,predicate,interpolation}){
+ const assumptions=interpolation?.assumptions;
+ const unknown=reason=>({status:'unknown',reason,assumptions:Array.isArray(assumptions)?assumptions:[]});
+ if(interpolation?.kind!=='shared-affine'||!Array.isArray(assumptions)||!assumptions.length||!assumptions.every(a=>typeof a==='string'&&a.trim()))return unknown('Explicit shared affine interpolation assumptions required');
+ // For a universal convex proof, use a sufficient exact bound: a
+ // cubic Bezier is in the convex hull of its control points. Restrict
+ // control-point literals to the engine's exact decimal grammar rather
+ // than relying on numerical root finding near an endpoint. The ordinary
+ // easing engine is still used to check the accepted timing function.
+ const timing=typeof interpolation.easing==='string'?interpolation.easing.trim().toLowerCase():'';
+ const curve=/^cubic-bezier\(([^()]*)\)$/.exec(timing);
+ const unitDecimal=/^(?:0(?:\.\d{1,6})?|1(?:\.0{1,6})?|\.\d{1,6})$/;
+ const guaranteed=curve?curve[1].split(',').length===4&&curve[1].split(',').every(v=>unitDecimal.test(v.trim())):['linear','ease','ease-in','ease-out','ease-in-out'].includes(timing);
+ const range=guaranteed?easingRange(timing):undefined;
+ if(!range||overshoots(range))return unknown('Unknown or unproved bounded easing progress');
+ const expanded=expandPredicate(predicate);
+ const convex=p=>p.op==='all'?p.items.every(convex):p.op==='compare'&&p.relation!=='ne';
+ if(!convex(expanded))return unknown('Predicate is not in the supported convex conjunction subset');
+ if(from===to)return unknown('Distinct endpoint states required');
+ const endpoints=verifyUI({model:{version:1,initial:from,states:[from,to],transitions:[{from,event:'interpolate',to}],profiles:[profile],contracts:[{id:'invariant',kind:'predicate',predicate:expanded}]},evidence});
+ return {status:endpoints.status,endpoints,assumptions:[...new Set([...assumptions,...endpoints.assumptions,'All referenced coordinates are a shared affine combination of the corresponding endpoint coordinates at the same fixed viewport; progress is bounded in [0,1]. CSS implementation correspondence is not established by this proof.'])],progress:{min:range.min,max:range.max}};
 }

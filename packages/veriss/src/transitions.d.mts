@@ -33,3 +33,13 @@ export function createNoShiftContract(input:NoShiftInput):NoShiftContract;
 export function createTransitionIR(input:{before:LayoutSummary;after:LayoutSummary}):TransitionIR;
 export function createTransitionObligation(contract:NoShiftContract,transition:TransitionIR):TransitionObligation;
 export function verifyTransitionObligation(obligation:TransitionObligation,api:LayoutSolverAPI,options?:{timeoutMs?:number}):Promise<NoShiftProof>;
+
+/** Conditional proof; caller establishes that all referenced coordinates
+ * interpolate with the same bounded progress at each fixed viewport. */
+export function verifyInterpolatedPredicate(input:{
+ profile:import('./relational-contract.mjs').EnvironmentProfile;
+ from:string;to:string;
+ evidence:readonly import('./relational-contract.mjs').GeometryEvidence[];
+ predicate:import('./relational-contract.mjs').Predicate;
+ interpolation:{kind:'shared-affine';easing:string;assumptions:readonly string[]};
+}):{status:'verified'|'violated'|'unknown';reason?:string;assumptions:readonly string[];endpoints?:import('./relational-contract.mjs').RelationalProof;progress?:{min:string;max:string}};

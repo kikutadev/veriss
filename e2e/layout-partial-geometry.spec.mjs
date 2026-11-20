@@ -314,3 +314,42 @@ test('fixed block-axis projection preserves vertical coordinates without an intr
   }
  }
 });
+
+test('conditional convex transition proof agrees with a shared bounded width interpolation',async({page,browserName})=>{
+ const {verifyInterpolatedPredicate}=await import('../packages/veriss/src/transitions.mjs');
+ const {layoutGeometry,createLayoutIR}=await import('../packages/veriss/src/layout-contract.mjs');
+ const {analyzeHTML}=await import('../packages/veriss/src/html.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const source='<!doctype html><html lang="en"><head><title>QA</title></head><body><div id="outer"><div id="panel"></div></div></body></html>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}#outer{position:fixed;left:50%;top:0;transform:translateX(-50%);width:120px;height:80px;border:1px solid #123456}#panel{height:40px}';
+ const assumptions=['Fixed viewport; parent width changes between the two endpoints and all other inline coordinates depend affinely on it.'];
+ const evidence=['closed','open'].flatMap(state=>layoutGeometry({state,profile,layout:createLayoutIR(analyzeHTML(source,{css:css+(state==='open'?'#outer{width:300px}':''),viewport:profile.viewport,ua:browserName,integrity:true,scrollbars:[{name:'overlay',inlineSize:0,blockSize:0}]})),targets:['outer','panel'],local:{assumptions}}));
+ const predicate={op:'all',items:['outer','panel'].flatMap(target=>[{op:'compare',relation:'ge',left:{target,field:'inlineStart'},right:'0'},{op:'compare',relation:'le',left:{target,field:'inlineEnd'},right:{environment:'width'}}])};
+ const input={profile,from:'closed',to:'open',evidence,predicate,interpolation:{kind:'shared-affine',easing:'cubic-bezier(.3,.7,.2,1)',assumptions}};
+ expect(verifyInterpolatedPredicate(input).status).toBe('verified');
+ for(const width of [320,400,1000]){
+  await page.setViewportSize({width,height:600});
+  await page.setContent(source.replace('</head>','<style>'+css+'</style></head>'));
+  const frames=await page.evaluate(()=>{
+   const outer=document.querySelector('#outer'),panel=document.querySelector('#panel');
+   const animation=outer.animate([{width:'120px'},{width:'300px'}],{duration:540,easing:'cubic-bezier(.3,.7,.2,1)',fill:'both'});
+   animation.pause();
+   const frames=[];
+   for(const t of [0,1,27,81,135,270,405,539,540]){
+    animation.currentTime=t;
+    const a=outer.getBoundingClientRect(),b=panel.getBoundingClientRect();
+    frames.push({outer:{x:a.x,right:a.right,width:a.width},panel:{x:b.x,right:b.right,width:b.width}});
+   }
+   animation.cancel();return frames;
+  });
+  for(const {outer,panel} of frames){
+   expect(outer.x).toBeGreaterThanOrEqual(0);
+   expect(outer.right).toBeLessThanOrEqual(width);
+   expect(outer.width).toBeGreaterThanOrEqual(120);
+   expect(outer.width).toBeLessThanOrEqual(300);
+   expect(panel.x).toBeCloseTo(outer.x+1,1);
+   expect(panel.width).toBeCloseTo(outer.width-2,1);
+  }
+ }
+ expect(verifyInterpolatedPredicate({...input,interpolation:{...input.interpolation,easing:'cubic-bezier(.3,2,.2,1)'}}).status).toBe('unknown');
+});
