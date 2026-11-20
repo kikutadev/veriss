@@ -27,4 +27,9 @@ set_option maxRecDepth 20000
 set_option maxHeartbeats 5000000
 def concrete : Certificate := {
   version := """+num(c["version"])+"\n  profile := "+tup(*(num(p[k]) for k in ("widthMin","widthMax","heightMin","heightMax","safeLeft","safeRight")))+"\n  scale := "+num(c["scale"])+"\n  rows := "+seq(c["rows"],row)+"\n  coverage := "+tree(c["coverage"])+"\n  safety := "+seq(c["safety"],lambda x:seq(x,num))+"\n  agreement := "+seq(c["agreement"],lambda x:seq(x,num))+"\n}\ntheorem concreteChecked : concrete.check = true := by decide\n#print axioms concreteChecked\n"
-if __name__=="__main__":print(produce(json.loads(Path(sys.argv[1]).read_text())))
+if __name__=="__main__":
+    if len(sys.argv)<2:raise SystemExit("usage: kernelize.py CERTIFICATE.json [CERTIFICATE.json ...]")
+    print("import VerissLean\nopen VerissLean\nset_option maxRecDepth 20000\nset_option maxHeartbeats 5000000")
+    for i,path in enumerate(sys.argv[1:]):
+        source=produce(json.loads(Path(path).read_text())).split("def concrete :",1)[1]
+        print("def concrete_"+str(i)+" :"+source.replace("concreteChecked","concreteChecked_"+str(i)).replace("concrete.check","concrete_"+str(i)+".check"))

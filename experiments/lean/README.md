@@ -85,3 +85,14 @@ or changes to the TypeScript worktrees were made.
   validated counterexamples, component implication, and a fast batch checker;
   leave source extraction and TypeScript production integration for a separate
   stage. No new CSS exceptions or site-specific behavior.
+
+
+Additional saved evidence:
+- Separate UI experiment: 3 verified, 15 skipped, one empty report (3 rows).
+- Three games: 14 verified, 8 skipped (19 rows).
+- Total: 35 accepted model certificates, 109 rows; all 35 checked with
+  concrete Lean kernel reduction. No new browser measurements were performed.
+  Missing geometry remains unsupported. The batch replay exits Unknown (2)
+  if entries are skipped, a report contains no evidence, or the manifest
+  omits an entry. It also checks the original report and certificate digests.
+  `kernelize.py` accepts multiple certificate files for a single Lean module.
