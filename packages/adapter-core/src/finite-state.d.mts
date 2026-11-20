@@ -39,7 +39,7 @@ export interface FiniteDerived {
     variants: FiniteVariant[];
     css: string;
     assumptions: string[];
-    reason?: never;
+    reason?: string;
 }
 export interface FiniteUnknown {
     status: 'unknown';

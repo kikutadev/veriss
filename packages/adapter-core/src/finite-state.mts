@@ -12,7 +12,7 @@ export type FiniteExpression = {value:boolean;variable?:never} | (Condition & {v
 export interface FiniteHandler {variable:string;expression:FiniteExpression}
 export interface FiniteVariant {id:string;values:BooleanValues;html:string}
 interface FiniteExpansion {states:{html:string;choices:Choices}[];unknowns:readonly unknown[];assumptions:readonly string[];css:string}
-export interface FiniteDerived {status:'derived';framework:Framework;scopedCSS:boolean;state:StateIR;variants:FiniteVariant[];css:string;assumptions:string[];reason?:never}
+export interface FiniteDerived {status:'derived';framework:Framework;scopedCSS:boolean;state:StateIR;variants:FiniteVariant[];css:string;assumptions:string[];reason?:string}
 export interface FiniteUnknown {status:'unknown';reason:string;scopedCSS?:boolean}
 export type FiniteAnalysis = FiniteDerived|FiniteUnknown;
 export interface FiniteUIOptions {
