@@ -2,6 +2,8 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_SELECTOR_LIST_VENDOR: note => ({ code: 'W_CSS_SELECTOR_LIST_VENDOR', severity: 'warning', selector: note.selector, browsers: { drops: note.drops }, css: [{ property: 'selector', file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector}: ${note.pseudo} is not a valid selector in ${note.drops.length === 3 ? 'any of Chrome, Firefox and Safari' : 'Chrome and Safari'}, and one invalid selector drops the whole list, so ${note.drops.length === 3 ? 'this rule never applies' : 'there the rule does not apply to the other selectors either'}. Put ${note.vendor} in a rule of its own (or inside :is() / :where(), which forgive it)` }),
   W_CSS_SCROLLBAR_WEBKIT_IGNORED: note => ({ code: 'W_CSS_SCROLLBAR_WEBKIT_IGNORED', severity: 'warning', selector: note.base,
     css: [{ property: '::-webkit-scrollbar', file: note.webkit.file, line: note.webkit.line, selector: note.webkit.selector }, ...note.standard.map(s => ({ property: s.property, file: s.file, line: s.line, selector: note.base }))],
     message: `${note.base}: ${note.standard.map(s => `${s.property}: ${s.value}`).join(', ')} is set, so Chrome and Safari ignore ${note.webkit.selector} (they use the standard properties when either is set), and Firefox never takes it: those rules do nothing. Style the scrollbar with scrollbar-width / scrollbar-color only` }),

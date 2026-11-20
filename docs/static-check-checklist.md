@@ -406,6 +406,7 @@
 - [x] **F129. リセット CSS で中央に来なくなる `<dialog>`**(`W_CSS_DIALOG_NOT_CENTRED`): dialog は UA の `margin: auto`(モーダルでは inset 0 も)で中央に置かれる。`* { margin: 0 }` のようなリセットが届くと左上に出る(Chromium・Firefox・WebKit で実測、`open` でも `showModal()` でも)。dialog の要素名・class・id を書いた規則は意図した配置なので報告しない。閉じた dialog も、スクリプトで開くので対象
 - [x] **F130. `::-webkit-scrollbar` と標準の `scrollbar-width` / `scrollbar-color`**(`W_CSS_SCROLLBAR_WEBKIT_IGNORED`、`W_CSS_SCROLLBAR_FIREFOX_SHOWN`、解析は `::-webkit-scrollbar` で Unknown のまま): 標準のプロパティを書いた要素では Chromium と WebKit が `::-webkit-scrollbar` を無視し(Chromium は `--hide-scrollbars` を外した従来型のスクロールバーで、WebKit はそのまま実測)、Firefox は `::-webkit-scrollbar` を受け付けない(`CSS.supports` で実測)。前者は効かない規則として、`::-webkit-scrollbar` だけで隠したものは Firefox で出たままとして報告する。`scrollbar-width: none` と並べて隠す定番の組み合わせは報告しない
 - [x] **F131. 後の規則に負けて見えない `:hover` / `:focus` / `:active`**(`W_CSS_STATE_SHADOWED`): `a:hover { color }` を `a:link { color }` の前に書くと、ホバーしても色が変わらない(Chromium・Firefox・WebKit でホバーして実測。LVHA の順)。状態を有効にして計算した値の勝者が、状態のいらない規則で、値が違うときに報告する(後に書いたものも、詳細度が高いものも)
+- [x] **F132. セレクタリストの中の `-moz-` / `-ms-` の擬似**(`W_CSS_SELECTOR_LIST_VENDOR`、解析はこの規則で Unknown のまま): 1 つでも無効なセレクタがあるとリスト全体が捨てられる。`-moz-` は Chromium と WebKit で、`-ms-` と `-o-` はどこでも無効(実測)。`-webkit-` は 3 ブラウザーとも受け付け、`:is()` / `:where()` の中は許される(実測)ので報告しない
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

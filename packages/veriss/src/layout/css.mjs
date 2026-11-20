@@ -856,6 +856,16 @@ export function parseLayoutCSS(sheets, diagnostic) {
         } catch (error) { problem('U_LAYOUT_QUERY', error.message, node.source.start.line); }
         continue;
       }
+      // F132: a selector list is dropped whole when one of its selectors is invalid in a browser. -moz- pseudo-classes and
+      // pseudo-elements are invalid in Chromium and WebKit, -ms- and -o- ones everywhere (measured; -webkit- ones are
+      // valid in all three, and :is() / :where() forgive an invalid branch). Then the other selectors of the list lose
+      // the rule too.
+      if (node.type === 'rule' && postcss.list.comma(node.selector).length > 1) {
+        const outside = sel => { let out = '', depth = 0; for (let i = 0; i < sel.length; i++) { const rest = sel.slice(i); const m = depth === 0 && /^:(?:is|where)\(/i.exec(rest); if (m) { depth = 1; i += m[0].length - 1; continue; } if (depth) { if (sel[i] === '(') depth++; else if (sel[i] === ')') depth--; continue; } out += sel[i]; } return out; };
+        const vendor = postcss.list.comma(node.selector).map(sel => ({ sel: sel.trim(), m: /::?-(moz|ms|o)-[a-z-]+/i.exec(outside(sel)) })).find(x => x.m);
+        if (vendor) { const prefix = vendor.m[1].toLowerCase(), drops = prefix === 'moz' ? ['chromium', 'webkit'] : ['chromium', 'firefox', 'webkit'];
+          note('W_CSS_SELECTOR_LIST_VENDOR', { selector: node.selector, vendor: vendor.sel, pseudo: vendor.m[0], drops, file: filename, line: node.source.start.line }); }
+      }
       let selectors;
       try {
         if (node.type !== 'rule') throw new Error(`Unsupported CSS node: ${node.type}`);

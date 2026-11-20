@@ -1547,3 +1547,13 @@ test('F131: a :hover rule a later rule without the state beats shows nothing whe
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_STATE_SHADOWED'), css).toBe(reported);
   }
 });
+
+test('F132: a selector list with a -moz- selector is dropped by Chrome and Safari, with a -ms- one everywhere; :is() forgives', async ({page, browserName}) => {
+  for (const [css, applies, reported] of [['.a::-moz-selection,.a{color:red}', browserName === 'firefox', true], ['.a:-moz-focusring,.a{color:red}', browserName === 'firefox', true], ['.a::-ms-clear,.a{color:red}', false, true],
+    ['.a:is(:-moz-focusring,.x),.a{color:red}', true, false], ['.a::-webkit-input-placeholder,.a{color:red}', true, false]]) {
+    await page.setContent(`<!doctype html><style>${css}</style><input class="a">`);
+    expect((await page.evaluate(() => getComputedStyle(document.querySelector('.a')).color)) === 'rgb(255, 0, 0)', css).toBe(applies);
+    const r = analyzeHTML('<html lang="en"><body><div class="a">t</div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SELECTOR_LIST_VENDOR'), css).toBe(reported);
+  }
+});

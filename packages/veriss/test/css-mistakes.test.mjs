@@ -1413,3 +1413,12 @@ test('F131: a :hover / :focus rule beaten by a later or more specific rule witho
   for (const css of ['a:link{color:blue}a:hover{color:red}', '.b:hover{color:red}.b{color:blue}', 'a:hover{color:red}a:link{color:red}', 'a:hover{color:red}'])
     assert.equal(hit(css).length, 0, css);
 });
+
+test('F132: a -moz- or -ms- selector in a list drops the whole rule where it is invalid', () => {
+  const hit = css => codes(run(css), 'W_CSS_SELECTOR_LIST_VENDOR');
+  assert.deepEqual(hit('.a::-moz-selection,.a{color:red}')[0]?.browsers, { drops: ['chromium', 'webkit'] });
+  assert.match(hit('.a::-ms-clear,.a{color:red}')[0]?.message ?? '', /this rule never applies/);
+  assert.equal(hit('.a:hover:-moz-any(b),.a{color:red}').length, 1);
+  for (const css of ['.a:is(:-moz-focusring,.x),.a{color:red}', '.a:where(:-moz-focusring),.a{color:red}', '.a::-webkit-input-placeholder,.a{color:red}', '.a::-moz-selection{color:red}', '.a,.b{color:red}'])
+    assert.equal(hit(css).length, 0, css);
+});
