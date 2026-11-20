@@ -15,12 +15,12 @@ export interface Finding {
 export interface SelectorWarning {code:string; selector:string; message:string; line?:number|undefined}
 export interface LintResult {
   operation?:never;
-  states:readonly {report:{diagnostics:readonly {code:string; severity:string; message:string;box?:string|undefined}[]; sizes?:readonly unknown[]}}[];
+  states:readonly {choices?:Choices;report:{status?:string;diagnostics:readonly {code:string; severity:string; message:string;box?:string|undefined}[]; sizes?:readonly unknown[]}}[];
   findings:readonly Finding[];
   unknowns:readonly ContractUnknown[];
   selectors?:{warnings:readonly SelectorWarning[]};
   browsers?:readonly string[];
-  coverage?:{assumptions:readonly string[]};
+  coverage?:{assumptions?:readonly string[]};
 }
 export interface LintOptions {file?:string;source?:string;profile?:string;page?:boolean}
 // Practical lint output on top of an adapter's result: the recommended rule set (rules whose verdicts the Chromium
