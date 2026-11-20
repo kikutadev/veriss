@@ -98,3 +98,10 @@ Additional saved evidence:
   `kernelize.py` accepts multiple certificate files for a single Lean module.
 
 Baseline gate (unchanged production code at 722fbfd): all six unit-test groups, four component-lint evaluations unchanged, 408/408 E2E; supervisor exit 0, 658 tracked PIDs, 0 remaining. Lean research is isolated in experiments/lean.
+
+## Next milestone: relational certificates
+Prove model validity (coverage, dimensions, overlap agreement) separately from
+contract truth. Extend to both axes and multiple boxes, construct the negation
+of a linear Boolean predicate in the Lean checker, and validate exact
+counterexamples. Replay saved positive and negative contract cases unchanged.
+Only research files change; state reachability and CSS extraction remain premises.
