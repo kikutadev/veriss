@@ -235,6 +235,7 @@ def sourceProblem (raw : Json) (state profile target : String) : Except String P
       (← sb.getObjValAs? Int "blockSize") == 0) "Unsupported scrollbar"
   let e ← selectOne (← items raw "evidence") (fun j =>
     matchesId j "state" state && matchesId j "profile" profile && matchesId j "target" target)
+  checkProfileBinding env e true
   require (e.getObjValD "reason" == .null && e.getObjValD "axes" == .null &&
     e.getObjValD "source" == toJson "dom") "Missing full DOM geometry"
   let rs ← items e "rows"

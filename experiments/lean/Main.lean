@@ -4,6 +4,7 @@ import VerissLeanCSS
 import VerissLeanComposition
 import VerissLeanFinite
 import VerissLeanMotion
+import VerissLeanCascade
 open Lean VerissLean
 
 def readJson (file : String) : IO (Except String Json) := do
@@ -98,8 +99,31 @@ def fragmentInput (source report state profile : String) : IO (Except String (CS
     let p ← b >>= fun raw => CSS.sourceProblem raw state profile s.target
     return (s,p)
 
+def cascadeInput (source report state profile : String) : IO (Except String (Cascade.Source × Relation.Problem)) := do
+  let a ← readJson source
+  let b ← readJson report
+  return do
+    let s ← a >>= Cascade.readSource
+    let p ← b >>= fun raw => CSS.sourceProblem raw state profile s.target
+    return (s,p)
+
 def main (args : List String) : IO UInt32 := do
   match args with
+  | ["cascade-plan",source,report,state,profile] =>
+    match ← cascadeInput source report state profile with
+    | .error msg => fail msg
+    | .ok (s,p) =>
+      IO.println (s.plan p).compress
+      return 0
+  | ["cascade-check",source,report,state,profile,cert] =>
+    match (← cascadeInput source report state profile),
+      ((← readJson cert) >>= fromJson? (α := Cascade.Certificate)) with
+    | .ok (s,p), .ok c =>
+      if s.check p c then
+        IO.println "Verified: canonical CSS cascade fragment and piecewise formal geometry"
+        return 0
+      else fail "Invalid cascade certificate or geometry mismatch"
+    | .error msg, _ | _, .error msg => fail msg
   | ["motion-plan",file] =>
     match (← readJson file) >>= Motion.readRequest >>= Motion.Request.model with
     | .error msg => fail msg
@@ -211,4 +235,4 @@ def main (args : List String) : IO UInt32 := do
   | ["violate",report,state,profile,contract,file] => relational "violate" report state profile contract (some file)
   | [file] => checkFile file none
   | ["report",report,state,profile,target,file] => checkFile file (some (report,state,profile,target))
-  | _ => fail "usage: css-source-plan|css-source-check SOURCE REPORT STATE PROFILE [CERTIFICATE], motion-plan|motion-check INPUT [CERTIFICATE], finite-check INPUT, composition-plan|composition-check INPUT [CERTIFICATE], css-plan|css-check STYLE REPORT STATE PROFILE TARGET [CERTIFICATE], time-domain TRACE.json, state-cases OBLIGATION.json, state-plan OBLIGATION.json, state-proofs OBLIGATION.json CERTIFICATES.json, plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"
+  | _ => fail "usage: cascade-plan|cascade-check SOURCE REPORT STATE PROFILE [CERTIFICATE], css-source-plan|css-source-check SOURCE REPORT STATE PROFILE [CERTIFICATE], motion-plan|motion-check INPUT [CERTIFICATE], finite-check INPUT, composition-plan|composition-check INPUT [CERTIFICATE], css-plan|css-check STYLE REPORT STATE PROFILE TARGET [CERTIFICATE], time-domain TRACE.json, state-cases OBLIGATION.json, state-plan OBLIGATION.json, state-proofs OBLIGATION.json CERTIFICATES.json, plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"

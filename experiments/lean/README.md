@@ -471,3 +471,102 @@ existing import binding and multi-child abstract proof composition
 (C1–C5), CSS timing extraction, complete profile provenance and
 full TypeScript opt-in export/adapter integration. None of those are
 implied by a successful normalized or canonical-fragment check.
+
+
+## Sixth milestone: closed cascade and profile identity
+
+`VerissLeanCascade` extends the canonical source fragment to a target with
+one simple class, multiple competing author declarations, and viewport media
+queries. It independently determines applicability, specificity, importance
+and source order for each of left/top/width/height. The full original strings
+must match the rendered fragment. Supported selector syntax is an optional
+div type with at most one ID and one class (at least one ID/class); the ID
+must not be the root's. Selectors that do not match the sole target are
+excluded, not treated as overrides. The complete base stylesheet from the
+fifth milestone remains at ID specificity, ordinary importance; subsequent
+declarations can override the four supported properties. Each subsequent
+rule must contain exactly one such declaration and may be wrapped in one
+min/max width/height query at a nonnegative integer px boundary. At most 32
+declarations, six media-bearing declarations (64 branches), 32 evidence
+rows. Both impossible and possible source-branch/evidence-row pairs are
+checked by existing exact refutation certificates; no pruning is trusted.
+
+Theorems:
+- `Media.atom_sound` proves each closed integer threshold against its
+  independent real-valued semantics.
+- `winner_spec` and `best_later_tie` establish maximum eligible priority
+  and the later-wins step. The ordered list is the source order.
+- `branches_cover` establishes that every real viewport has a branch
+  with exactly the independently active ordered rules, including equality
+  at min/max boundaries.
+- `Source.exact` proves the supplied canonical strings are bound, the
+  evidence covers the viewport domain, and **every applicable evidence
+  row** agrees with the resolved box geometry. The theorem is for the
+  formal fragment, not the full CSS language or a real browser.
+
+`cascade-plan SOURCE REPORT STATE PROFILE` / `cascade-check SOURCE REPORT
+STATE PROFILE CERTIFICATE`. SOURCE = {version:1,root,target,cls,html,css,
+base,rules}. Base is the earlier computed-style object. Each rule is
+{selector:{id,cls,tag},property,value,important,media}; id/cls may be null,
+tag/important boolean, property one of left/top/width/height, value an
+earlier length literal (integer single unit), media null or
+{horizontal,minimum,bound}. Input order is semantic. The plan returns
+{plan,admissibility,agreement}. Generate the model certificate with
+`create_model(plan)` and the other two lists with `prove` on each
+obligation. See test_cascade.py.
+
+The `profileIdentity`/ `checkProfileBinding` JSON adapter rebuilds the
+existing veriss v1 profileKey using original viewport dimensions, safe
+insets, UA, DPR, scrollbar metadata, input, font profile, ordered
+assumptions and the three supported finite media features in canonical
+order. Stored key is parsed as JSON, not trusted or compared by a hash.
+CSS extraction and motion now require a matching key, and ordinary
+relational/state proof checking validates it whenever present, requiring it
+for DOM/local-DOM evidence with nonempty finite media features. Legacy
+unkeyed mathematical evidence without those features is still accepted by
+the ordinary relational path; the initial inline legacy CLI is unchanged.
+This is identity/metadata checking, not proof that a physical browser
+actually used the declared profile. Duplicate raw JSON property handling
+and JSON parser semantics remain in the trusted boundary.
+
+### Evaluation and limitations
+
+- 25 new integration tests passed, including actual veriss LayoutIR
+  production with overlapping selectors, 601–603px width interval, both
+  viewport axes, max thresholds, important/source-order, and tampered
+  source/geometry/metadata. A wholly re-planned geometric model with a
+  shifted 602px breakpoint cannot discharge the exact source agreement
+  obligations. Both positive fixtures passed kernel reduction on typed
+  inputs. Raw JSON parser reduction was attempted but gets stuck on Lean's
+  standard parser; it is **not** claimed as a kernel proof. The concrete
+  typed tests include the actual source strings. All 152 previous fixtures
+  passed again (94 earlier state/time/relational and 58 research integration
+  cases). The previous four representative typed research certificates
+  also passed kernel reduction after refactoring the generator.
+- Real browser observations at DPR 1: 49 points each on Chromium
+  156.0.8078.4 and WebKit 27.2, max absolute field error 0.0125 CSS px
+  (tolerance 0.03125). These are observations of the two CSS fixtures,
+  not proof of browser/profile correspondence for every viewport or DPR
+  (second synthetic profile-key fixture declares DPR 1.25).
+  Firefox 1555 launch failed with "Could not find profile folder" even
+  with explicit TMPDIR and persistent profile, so no Firefox observation.
+  Existing guarded Chromium launcher passed a separate SIGKILL cleanup
+  probe; post-run Chrome PID inspection was clean.
+- The full production gate was not run. No production package or TypeScript
+  worktree edits. General cascade (descendants, inheritance, layers,
+  inline style, selector lists, arbitrary CSS parser, media boolean
+  expressions), min/max/calc branches, axis projection, Flex/Grid,
+  JS source linking, multi-child composition, actual CSS timing and
+  production integration remain open. Exact canonical source is intentionally
+  restricted and ordinary formatting may be rejected. No new W_* warning.
+
+Reproduce (from this directory):
+```sh
+lake build VerissLean
+python3 test_cascade.py CHECKER OUTPUT_DIR
+python3 kernel_cascade.py OUTPUT_DIR > CascadeConcrete.lean
+lake env lean CascadeConcrete.lean
+# Optional point observations; supply a tested guarded Chromium launcher.
+node test_cascade_browser.mjs OUTPUT_DIR GUARDED_CHROMIUM_MODULE
+# Or individually append chromium, firefox, or webkit.
+```

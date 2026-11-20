@@ -329,6 +329,57 @@ def selectOne (xs : List Json) (test : Json → Bool) : Except String Json :=
 def matchesId (j : Json) (key value : String) : Bool :=
   j.getObjValD key == toJson value
 
+-- Rebuild the v1 producer profile key as structured JSON, without relying
+-- on JavaScript's serialization or a hash. Only the declared identity is
+-- checked: this is not evidence that the browser used those settings.
+def profileIdentity (p : Json) : Except String Json := do
+  shape p ["id","viewport","safeArea","ua","dpr","scrollbar","input","fontProfile","assumptions","mediaFeatures"]
+  let v ← p.getObjVal? "viewport"
+  shape v ["min","max","height"]
+  let h ← v.getObjVal? "height"
+  shape h ["min","max"]
+  let sa := p.getObjValD "safeArea"
+  if sa != .null then shape sa ["top","right","bottom","left"]
+  let sb := p.getObjValD "scrollbar"
+  if sb != .null then shape sb ["name","inlineSize","blockSize","thinInlineSize","thinBlockSize"]
+  let field (j : Json) (k : String) (fallback : Json) : Json :=
+    let x := j.getObjValD k
+    if x == .null then fallback else x
+  let zeroJ := toJson (0 : Nat)
+  let ua := field p "ua" (toJson "chromium")
+  require (["chromium","firefox","webkit"].any (fun u => toJson u == ua)) "Unsupported UA"
+  let assumptions := field p "assumptions" (.arr #[])
+  let _ ← fromJson? (α := List String) assumptions
+  let media := p.getObjValD "mediaFeatures"
+  let supported := [("hover",["none","hover"]),("pointer",["none","coarse","fine"]),
+    ("prefers-reduced-motion",["no-preference","reduce"])]
+  let mut entries : Array Json := #[]
+  if media != .null then
+    shape media (supported.map Prod.fst)
+    for (name,values) in supported do
+      if let .ok value := media.getObjVal? name then
+        require (values.any (fun v => toJson v == value)) "Unsupported media feature value"
+        entries := entries.push (.arr #[toJson name,value])
+  let base : Array Json := #[
+    ← v.getObjVal? "min",← v.getObjVal? "max",← h.getObjVal? "min",← h.getObjVal? "max",
+    field sa "top" zeroJ,field sa "right" zeroJ,field sa "bottom" zeroJ,field sa "left" zeroJ,
+    ua,p.getObjValD "dpr",field sb "name" (toJson "overlay"),field sb "inlineSize" zeroJ,
+    field sb "blockSize" zeroJ,sb.getObjValD "thinInlineSize",sb.getObjValD "thinBlockSize",
+    p.getObjValD "input",p.getObjValD "fontProfile",assumptions]
+  return .arr (if entries.isEmpty then base else base.push (.arr entries))
+
+def checkProfileBinding (p e : Json) (required : Bool := false) : Except String Unit := do
+  let expected ← profileIdentity p
+  match e.getObjVal? "profileKey" with
+  | .ok j =>
+    let actual ← Json.parse (← j.getStr?)
+    require (actual == expected) "Geometry evidence profile mismatch"
+  | .error _ =>
+    let media := p.getObjValD "mediaFeatures"
+    let nonempty := media != .null && media != Json.mkObj []
+    let dom := ["dom","local-dom"].any (fun k => e.getObjValD "source" == toJson k)
+    require (!required && !(nonempty && dom)) "Missing geometry profile key"
+
 def selectAllowed (j : Json) (key value : String) : Except String Unit := do
   if j.getObjValD key == .null then return ()
   let choices ← j.getObjValAs? (List String) key
@@ -414,6 +465,7 @@ def getProblemFor (raw : Json) (state profile contract : String)
     let (after,t) := ref
     let sourceState := if after then afterState.getD state else state
     let e ← selectOne evidence (fun j => matchesId j "state" sourceState && matchesId j "profile" profile && matchesId j "target" t)
+    checkProfileBinding p e
     require (e.getObjValD "reason" == .null) "Unresolved geometry"
     let axes ← if e.getObjValD "axes" == .null then pure ["inline","block"] else e.getObjValAs? (List String) "axes"
     require (axes == ["inline"] || axes == ["block"] || axes == ["inline","block"] || axes == ["block","inline"]) "Unsupported axes"

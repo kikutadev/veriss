@@ -435,38 +435,24 @@ JSON/AST の decoder を信頼する範囲を記録し、受理済み型付き I
 
 ## 6. 実装ロードマップと担当境界
 
-実装状況（第五段階）: S1–S4 の宣言グラフ、必須ケース、遷移前後の
-幾何、到達経路付き反例に加え、S5 の normalized boolean dispatch の
-forward simulation と逆向き辺検証、C1/C2 の単一矩形 normalized
-合成（affine 代入・割当・幾何等値・含意）、X2/X3 の明示位置・明示
-サイズ・padding/border の exact box model、および X0b の閉じた
-canonical HTML/CSS 文字列照合を実装。時間は元 ObligationIR の
-到達イベントと両 endpoint 証拠から全 viewport・全実数時刻の
-共有進捗補間に対する安全領域内の fit を検算できるようにした。
-これらは個別の model/fragment checker であり、任意 JS/CSS/UA
-の全域同値性を定理にしたわけではない。
-実行手順、検証結果、正確な信頼境界は README.md を正本とする。
+実装状況（第六段階）: S1–S4 の宣言グラフ、必須ケース、状態間
+幾何と経路付き反例、S5 の normalized boolean dispatch、C1/C2
+の単一矩形 normalized 合成、X2/X3 の明示位置・サイズ・padding/border、
+X0b の閉じた source 文字列照合、共有進捗の全実数時刻 fit に加え、
+X1 の単一対象・単純複合 selector・important・source order・
+min/max width/height の closed cascade の winner と全分岐、全
+evidence row との幾何等値を検証。profileKey の正規化 JSON 比較を
+relational/state/CSS/motion 経路に追加した。
+実行手順と検証範囲は README.md を正本とする。
+CSS/JS/browser の全域同値性、実 source parser/cascade 全体、X4
+の対象軸抽出、X5 Flex/Grid、複数子・抽象含意・実 import、実 CSS
+時間導出、TypeScript 公開経路の接続は未完。元の完了条件は変更しない。
 
-次の作業: 既存 exporter からの source-to-normalized AST/DOM
-binding (S5)、一般 selector/cascade の X0/X1 と実 CSS の部分抽出
-X2–X5、既存 composition import との結合・多子の抽象含意
-C1–C5、CSS timing の source binding、環境 provenance を進める。
-TypeScript 移行と競合しない opt-in の接続には先に schema の
-照合が必要。全体完了の条件は第0節・第6.1節を変更しない。
-TypeScript 作業ツリーは変更しない。
-
-今回の着手（第六段階）: X1 の閉じた cascade/media fragment。
-既存 canonical HTML/CSS の一つの viewport-root absolute child に class
-を追加し、対象のみを候補にする単純な class/id/type 複合 selector、
-left/top/width/height の宣言、important・specificity・source order、
-min/max width/height の単一 media query を扱う。元 CSS 全文字列を
-照合し、全条件分岐を Lean 内で列挙、各分岐で勝者と幾何を再構成する。
-全 evidence row × source branch の実現可能領域における等値と、
-各 branch の box admissibility を既存 exact certificate で検査。
-未対応 selector/property/media/過大入力は Unknown。成功条件は
-winner/分岐被覆/幾何の定理、実 veriss IR の肯定・改変対照、
-kernel reduction と文書。汎用 parser/cascade や browser 同値性は
-まだ完成扱いしない。TypeScript 作業ツリーの編集はしない。
+次は X2 の min/max clamp と区分計算、X4 の軸依存検査を優先する。
+閉じた fragment を広げる場合は source 全体の照合と未対応拒否を
+維持し、形式モデルの精度を実 CSS の対応範囲と混同しない。
+S5/C3–C5 も実 exporter/interface と整合をとって進める。
+TypeScript の作業ツリーは変更しない。
 
 | 順序 | 作業束 | 入力依存 | 完了成果 |
 |---|---|---|---|
