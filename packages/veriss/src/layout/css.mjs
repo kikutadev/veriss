@@ -2361,5 +2361,5 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
     // A logical side was taken as ltr; in an rtl box cascade again with the sides flipped.
     if (!rtl && flipped && values.direction === 'rtl')
         return computeStyle(rules, box, active, inherited, { spend, state, rtl: true });
-    return { ...values, ...metadata };
+    return { ...values, ...metadata, $sources: sources, $invalid: invalid };
 }

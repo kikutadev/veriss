@@ -540,22 +540,22 @@ export interface LayoutTextFontFacts {
     varied?: false;
     placeholder?: boolean | undefined;
     classes?: string[];
-    text?: string;
-    family?: string;
-    size?: string;
-    lineHeight?: string;
-    weight?: string;
-    style?: string;
-    whiteSpace?: string;
-    overflowWrap?: string;
-    letterSpacing?: string;
-    lang?: string;
-    textOverflow?: string;
-    overflowX?: string;
-    label?: string;
+    text?: string | undefined;
+    family?: string | undefined;
+    size?: string | undefined;
+    lineHeight?: string | undefined;
+    weight?: string | undefined;
+    style?: string | undefined;
+    whiteSpace?: string | undefined;
+    overflowWrap?: string | undefined;
+    letterSpacing?: string | undefined;
+    lang?: string | undefined;
+    textOverflow?: string | undefined;
+    overflowX?: string | undefined;
+    label?: string | undefined;
     oneLine?: boolean;
-    maxLength?: string;
-    characters?: string;
+    maxLength?: string | undefined;
+    characters?: string | undefined;
 }
 export type LayoutTextFont = LayoutTextFontFacts | {
     path: string;
@@ -696,9 +696,9 @@ export interface LayoutSummary {
         range: LayoutRange;
         heightRange?: LayoutRange;
         region?: LayoutRegion;
-        name?: string;
-        target?: string;
-        targetPath?: string;
+        name?: string | undefined;
+        target?: string | undefined;
+        targetPath?: string | undefined;
         matched: boolean;
     })[];
     /** Resolved shared tracks, local line numbering, effective gap and edge insets. Build-only. */

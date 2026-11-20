@@ -9,7 +9,7 @@ import { px } from './css.mjs';
 import { intersect } from './integrity.mjs';
 
 const zero = q(0), one = q(1);
-interface FontStyle { 'font-size'?: string }
+interface FontStyle { 'font-size'?: string|undefined }
 interface ShiftRow {
   path: string;
   rect?: LayoutRectangle | null;

@@ -2,7 +2,7 @@ import type { Rational } from './linear.mjs';
 import type { Affine2, Point, Region } from './region.mjs';
 import type { LayoutRectangle, LayoutRange, LayoutRegion } from '../layout-contracts.d.ts';
 interface FontStyle {
-    'font-size'?: string;
+    'font-size'?: string | undefined;
 }
 interface ShiftRow {
     path: string;

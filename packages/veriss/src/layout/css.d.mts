@@ -148,7 +148,7 @@ declare const textInitial: {
 };
 export interface CSSBox extends SelectorBox {
     controls?: boolean;
-    focusable?: boolean;
+    focusable?: boolean | 'dynamic';
     hiddenAttr?: boolean | 'until-found' | 'dynamic';
     popover?: boolean | 'dynamic';
     dialogOpen?: boolean | 'dynamic';
@@ -191,7 +191,7 @@ interface ComputedMetadata extends DroppedStyle {
     $lang?: string;
     $scheme?: string;
     $fixed?: true;
-    $sticky?: true;
+    $sticky?: boolean;
     $stacks?: true;
     $contentsRemoved?: true;
     $sources?: SourceMap;
@@ -206,7 +206,9 @@ interface ComputedMetadata extends DroppedStyle {
 }
 type KnownComputedProperties = Partial<Record<keyof ReturnType<typeof defaultStyle> | keyof typeof textInitial | `scroll-${'margin' | 'padding'}-${'top' | 'right' | 'bottom' | 'left'}` | 'content' | 'clear' | 'column-count' | 'column-width' | 'list-style-image', string | undefined>>;
 export interface ComputedStyle extends ComputedMetadata, KnownComputedProperties {
-    [key: string]: string | boolean | SourceMap | LayerShadow[] | OriginLists | InvalidDeclaration[] | VariableEnvironment | CSSValueMap | DroppedStyle['$dropped'] | undefined;
+    $sources: SourceMap;
+    $invalid: InvalidDeclaration[];
+    [key: string]: unknown;
 }
 export interface InheritedStyle {
     [key: string]: unknown;

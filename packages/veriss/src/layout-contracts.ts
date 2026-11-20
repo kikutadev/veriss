@@ -190,10 +190,10 @@ export interface LayoutInlineBound extends LayoutScenarioIdentity {
   regionConstraints?:LayoutRegion['constraints'];outer:LayoutRectangle|null;inner:LayoutRectangle|null;
 }
 export interface LayoutTextFontFacts {
-  path:string;varied?:false;placeholder?:boolean|undefined;classes?:string[];text?:string;
-  family?:string;size?:string;lineHeight?:string;weight?:string;style?:string;
-  whiteSpace?:string;overflowWrap?:string;letterSpacing?:string;lang?:string;
-  textOverflow?:string;overflowX?:string;label?:string;oneLine?:boolean;maxLength?:string;characters?:string;
+  path:string;varied?:false;placeholder?:boolean|undefined;classes?:string[];text?:string|undefined;
+  family?:string|undefined;size?:string|undefined;lineHeight?:string|undefined;weight?:string|undefined;style?:string|undefined;
+  whiteSpace?:string|undefined;overflowWrap?:string|undefined;letterSpacing?:string|undefined;lang?:string|undefined;
+  textOverflow?:string|undefined;overflowX?:string|undefined;label?:string|undefined;oneLine?:boolean;maxLength?:string|undefined;characters?:string|undefined;
 }
 export type LayoutTextFont = LayoutTextFontFacts|{path:string;varied:true;placeholder?:never;classes?:never};
 export interface LayoutSummary {
@@ -221,7 +221,7 @@ export interface LayoutSummary {
   policies: (LayoutScenarioIdentity & { box: string; path: string; axis: 'inline' | 'block'; overflow: 'fit' | 'scroll' | 'clip' | 'visible'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion })[];
   checks: (LayoutScenarioIdentity & { box: string; path: string; code: string; axis: 'inline' | 'block'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; available: LayoutAffine; required: LayoutAffine; enforced: boolean })[];
   sizes: (LayoutScenarioIdentity & LayoutPosition & { box: string; path: string; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; allocatedInlineSize:LayoutAffine;allocatedBlockSize?:LayoutAffine;inlineSize: LayoutAffine; blockSize?: LayoutAffine;contentInlineSize:LayoutAffine;contentBlockSize?:LayoutAffine;paddingInlineSize?:LayoutAffine;paddingBlockSize?:LayoutAffine; boxSizing: 'border-box' | 'content-box'; boxSizingSource?: { file: string; line: number; selector: string; layer?: string; specified: string } })[];
-  queries: (LayoutScenarioIdentity & { box: string; path: string; range: LayoutRange; heightRange?:LayoutRange;region?:LayoutRegion;name?: string; target?: string; targetPath?: string; matched: boolean })[];
+  queries: (LayoutScenarioIdentity & { box: string; path: string; range: LayoutRange; heightRange?:LayoutRange;region?:LayoutRegion;name?: string|undefined; target?: string|undefined; targetPath?: string|undefined; matched: boolean })[];
   /** Resolved shared tracks, local line numbering, effective gap and edge insets. Build-only. */
   subgrids: LayoutSubgrid[];
 }

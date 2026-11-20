@@ -1168,7 +1168,7 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
 const textInitial = { 'font-family': 'ua-default', 'font-size': 'medium', 'line-height': 'normal', 'font-weight': 'normal', 'font-style': 'normal', 'font-stretch': 'normal', 'font-variant': 'normal', 'text-transform': 'none', 'letter-spacing': 'normal', 'word-spacing': 'normal', 'text-align': 'start' };
 
 export interface CSSBox extends SelectorBox {
-  controls?: boolean; focusable?: boolean; hiddenAttr?: boolean | 'until-found' | 'dynamic';
+  controls?: boolean; focusable?: boolean|'dynamic'; hiddenAttr?: boolean | 'until-found' | 'dynamic';
   popover?: boolean | 'dynamic'; dialogOpen?: boolean | 'dynamic';
 }
 type CascadeRank = [0 | 1, number, number, ...Specificity, number];
@@ -1185,7 +1185,7 @@ interface InvalidDeclaration extends CSSLocation {property: string; code: string
 interface ComputedMetadata extends DroppedStyle {
   $uaBorder?: true;
   $lang?: string; $scheme?: string;
-  $fixed?: true; $sticky?: true; $stacks?: true; $contentsRemoved?: true;
+  $fixed?: true; $sticky?: boolean; $stacks?: true; $contentsRemoved?: true;
   $sources?: SourceMap; $layerShadowed?: LayerShadow[]; $dormant?: OriginLists; $overridden?: OriginLists;
   $invalid?: InvalidDeclaration[]; $variables?: VariableEnvironment;
   $hiddenInputDisplay?: string | undefined; $pseudoNotRendered?: string | undefined;
@@ -1200,7 +1200,8 @@ type KnownComputedProperties = Partial<Record<
   string | undefined
 >>;
 export interface ComputedStyle extends ComputedMetadata, KnownComputedProperties {
-  [key: string]: string | boolean | SourceMap | LayerShadow[] | OriginLists | InvalidDeclaration[] | VariableEnvironment | CSSValueMap | DroppedStyle['$dropped'] | undefined;
+  $sources:SourceMap; $invalid:InvalidDeclaration[];
+  [key: string]: unknown;
 }
 export interface InheritedStyle {
   [key: string]: unknown;
@@ -1672,5 +1673,5 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
     for (const key of ['overflow-x', 'overflow-y']) { if (sources[key] || sources.overflow) (metadata.$tableOverflow ??= {})[key] = values[key]; values[key] = 'visible'; }
   // A logical side was taken as ltr; in an rtl box cascade again with the sides flipped.
   if (!rtl && flipped && values.direction === 'rtl') return computeStyle(rules, box, active, inherited, {spend, state, rtl: true});
-  return {...values, ...metadata};
+  return {...values, ...metadata, $sources:sources, $invalid:invalid};
 }
