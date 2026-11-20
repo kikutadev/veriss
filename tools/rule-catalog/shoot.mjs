@@ -2,9 +2,10 @@
 //   node tools/rule-catalog/shoot.mjs            (CHROMIUM_PATH=/path/to/chromium when Playwright has no browser)
 import {createRequire} from 'node:module'; const {chromium} = createRequire(import.meta.url)('playwright');
 import {writeFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {examples} from './examples.mjs';
 import {run, reset} from './run.mjs';
-const out = new URL('../../docs/rule-catalog/', import.meta.url).pathname;
+const out = fileURLToPath(new URL('../../docs/rule-catalog/', import.meta.url));
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {});
 const ctx = await b.newContext({deviceScaleFactor: 2});
@@ -23,7 +24,7 @@ async function snap(ex, state) {
 for (const ex of examples) {
   const res = run(ex);
   const shown = res.findings.filter(f => f.code !== 'W_A11Y_FORCED_COLORS' && !(f.code === 'W_LAYOUT_HEIGHT_FIXED_TEXT')).slice(0, 3);
-  const shots = [await snap(ex, null)];
+  const shots = [await snap(ex, ex.focus ? 'focus' : null)];
   if (ex.hover) shots.push(await snap(ex, 'hover'));
   const shotsHtml = shots.map((s, i) => `<figure><div class="frame" style="width:${s.w}px;height:${s.h}px"><img src="data:image/png;base64,${s.png}" width="${s.w}" height="${s.h}">
     <div class="mark" style="left:${s.r.x - 3}px;top:${s.r.y - 3}px;width:${s.r.w + 6}px;height:${s.r.h + 6}px"></div>
