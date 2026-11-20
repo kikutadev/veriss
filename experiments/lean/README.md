@@ -172,7 +172,7 @@ reachable states. It does not make new CSS models.
   evaluations and 408/408 E2E, supervisor exit 0, 688 tracked PIDs, 0 remaining.
   TypeScript worktrees, npm packages and main were not modified.
 
-Next: verify reachability and cross-state contracts, certify the full
-source semantic bridge and component implication/composition, then connect
-to the TypeScript pipeline on an agreed stable IR. Do not claim complete CSS
-semantics until extraction itself is validated.
+Next: [detailed design for state reachability, component proof composition,
+and CSS extraction soundness (DESIGN.md)](DESIGN.md). This is a proposed
+implementation plan, not an assertion that its theorems already hold. The
+TypeScript integration remains separate.
