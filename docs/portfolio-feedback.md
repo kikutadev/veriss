@@ -317,3 +317,11 @@ HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラ
 レビュー済み portfolio island の CSS から実際の transition 宣言を抽出し、閉じたコンポーネント射影に対して 3/3 UA の自動導出を確認。連続する同じ media 条件に分割されたコンパイル済み CSS にも対応。射影と元ページの同値性は引き続きレビュー前提であり、全ページの自動縮約・全アニメーションの証明ではない。配信コード変更なし。
 
 追加の3 UA差分計測: max の拡大/違反、min の縮小、右寄せ、左寄せ違反、反対方向の枝の6条件。幅6点・5成立/違反モデルで720フレーム、正常モデルの逸脱0、違反モデルのはみ出し27フレーム。反対方向の枝は3/3 UA Unknown。監督 runner exit 0、14 PID、残留0。レビュー済み射影のみの再実行は `node tools/ui-build-examples/portfolio-pages/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist --proof-only`。
+
+### 追加の汎用性確認
+実装差分 51dbd0a..60e9997 の package source を再確認し、サイト名、アプリ名、island 専用セレクター、入力ハッシュなどの分岐がないことを確認。幅遷移 API は閉じた固定幅コンポーネントの厳格な部分集合で、任意の CSS からの一般的な時間意味論の導出ではない。レビュー済みサイト固有射影が利用例側で必要な点は変わらない。
+既存 runner に学習カタログ Again Drill、3D 鑑賞 UI Projection Room、Liquid UI Lab のタブ画面の設定を追加（4f2536b）。既存ビルドを変更せず3 UA、4 viewport 点、同一範囲の横収容3契約ずつ:
+- Again Drill: 0/3 形式証明、36/36観測成立、外部 stylesheet のため捕捉エラー12。未捕捉を成功にしない。
+- Projection Room: 0/3 形式証明、36/36観測成立、捕捉エラー0。fullscreen 疑似クラス、複合寸法式と配置依存。
+- Liquid UI Lab: 1/3 形式証明、36/36観測成立、モデル照合12/12、捕捉エラー0。role 属性照合と絶対配置・複合幅・transform 依存。
+追加9契約27環境ケース中3成立、24 Unknown。実測108/108、監督 runner残留0。旧 5d17082 の partial-geometry に差し替えた保存入力の inline projection でも Projection Room 0/3、Liquid UI Lab 1/3 で不変。属性が存在しない場合の非一致と role の限定照合を試験的に改善しても、次に複合幅の依存へ進み、成立数が増えなかったため、カバレッジだけを狙った別の小修正は採用しない。今後は明示された browser state・軸独立の lengths/positioning を既存意味論と接続する一般化を優先し、サイト専用の寸法条件を足さない。
