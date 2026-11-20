@@ -107,7 +107,36 @@ function declarations(nodes){
   if(nodes.some(n=>!['decl','comment'].includes(n.type)))refuse('CSS nesting is not a closed independent projection');
   return nodes.filter(n=>n.type==='decl');
 }
-const ignorable=d=>/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
+// Do not use the broader paint list here: custom properties, fonts,
+// filters, transforms, visibility and discrete properties may change
+// layout or its coordinate system. Only explicitly named, non-geometric
+// transition targets are removable. Omitted transition-property means all.
+const paintTransitionTarget=/^(?:none|color|background(?:-color|-image|-position(?:-[xy])?|-size|-repeat|-attachment|-origin|-clip)?|opacity|box-shadow|text-shadow|border(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?-color|outline-color|text-decoration-color|fill|stroke)$/i;
+function paintTransition(d){
+ const property=d.prop.toLowerCase();
+ if(!['transition','transition-property'].includes(property))return false;
+ if(d.raws?.before?.trim()||/\\|\b(?:var|attr|env)\s*\(/i.test(d.value))return false;
+ try{
+  const ast=csstree.parse(d.value,{context:'value'});
+  if(!csstree.lexer.matchProperty(property,ast).matched)return false;
+  const groups=[[]];
+  for(const t of ast.children){
+   if(t.type==='Operator'&&t.value===',')groups.push([]);
+   else groups.at(-1).push(t);
+  }
+  return groups.every(tokens=>{
+   const targets=tokens.filter(t=>t.type==='Identifier'&&paintTransitionTarget.test(t.name));
+   if(targets.length!==1)return false;
+   if(property==='transition-property')return tokens.length===1;
+   // lexer validates grammar; only time and an explicit standard easing
+   // can accompany the selected property.
+   return tokens.every(t=>t===targets[0]||t.type==='Dimension'&&/^(ms|s)$/i.test(t.unit)||
+    t.type==='Identifier'&&/^(?:ease|linear|ease-in|ease-out|ease-in-out|step-start|step-end|normal|allow-discrete)$/i.test(t.name)||
+    t.type==='Function'&&/^(?:cubic-bezier|steps|linear)$/i.test(t.name));
+  });
+ }catch{return false}
+}
+const ignorable=d=>paintTransition(d)||/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
 function validateDecl(d){
   const p=d.prop.toLowerCase(),v=d.value.trim();
   if(ignorable(d))return false;

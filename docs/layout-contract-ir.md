@@ -400,3 +400,13 @@ HMAC で認証されたキャッシュのみ読み込み、破損/版不一致�
 この仕組みは同じ OS ユーザーと実行時の依存が信頼できることを前提とする。
 配布可能な独立検証証明書や、不信な同一ユーザーによるコード/鍵改変に対する防御ではない。
 既定では無効。削除して再生成可能。session.clear() はメモリだけを破棄する。
+
+### 描画のみの明示的 transition
+
+独立矩形の依存縮約では、既存の css-tree lexer が解釈でき、transition-property を
+明示的に color/background/opacity/shadow/border-color 等の描画専用の許可リストから
+選んだ transition (longhand または shorthand) を幾何から除外できる。
+property の暗黙の all、transform、width/height、custom property、var()/env()/attr()、
+混在する未対応値などは除外しない。既存の構造、カスケード、領域被覆条件は変えない。
+この保証は unscrolled CSS border box の寸法・座標に限定し、
+描画中の合成レイヤー、色、可視性、ユーザー操作の正しさを保証するものではない。

@@ -223,3 +223,15 @@ GALLERY は色・背景の transition を含む cascade の縮約未対応、HOM
 軸独立版の全gate: 6単体群 fail=0、component-lint 4評価不変、3ブラウザー369 E2E passed、supervisor exit=0（660 PID追跡、残留0）。並行開発の有限状態解析・永続キャッシュ・割当写像による合成を保持するため fork main f99ab46 を取り込み d135ca9 に統合した。統合後の関連単体32件成功、実ビルド保存済み15 snapshotから再抽出した21証拠はすべて統合前と完全一致。
 
 統合後 d135ca9 の全gate: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 381 E2E passed、supervisor exit=0、654 PID追跡・残留0。gate中の変更はこの検証記録のみ。
+
+### 描画専用 transition の縮約 (2026-11-20)
+
+GALLERY の root/body にある background/color transition は、明示的に幾何へ影響しない
+property に限り、独立した unscrolled inline geometry から除外できることを確認。
+既存の `tools/ui-build-examples/portfolio-pages/gallery.json` を現行ローカル dist で再実行。
+Chromium/Firefox/WebKit の 3 profile すべてで main-horizontal-fit が Verified、
+矩形比較12/12・契約観測12/12・捕捉エラー0。保存済みの旧 GALLERY 入力でも
+閉じたオフライン cascade から inlineSize=viewport width の証拠を抽出。
+既存4ページの証明と合わせ7契約のうち解析可能な横方向契約は5件。
+HOME の island/selected-work は別課題。全ページ・全状態・描画の完全証明ではない。
+本番変更なし。

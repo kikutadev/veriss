@@ -212,3 +212,11 @@ CSS grammar は既存 css-tree lexer で検査する。実 GALLERY 入力を再�
 3ブラウザーで測る。finite-state は既存 Vue/Svelte compiler から scoped stylesheet と
 対応する実 DOM の scope を復元できる範囲を追加し、未確認の動的 class/scoping は Unknown。
 全 gate と fork main の統合を完了条件とする。
+
+native compiler CSS scope の実装は [component-lint.md](../component-lint.md#有限状態の実装からの導出)。
+Vue compileStyle の scope ID を用いる。Svelte は compiler の synthetic class marker が
+判明する classless template に限定した。任意の source/生成 JS を実行する必要はない。
+Svelte の class が既にある場合の compiler marker が公開 AST に残らないため、
+推測による付与はしない。初回 E2E はテスト側が scoped type selector を ID selector より
+高優先と誤って期待し失敗した。実際の cascade の対照に訂正後9/9成功。
+GALLERY の実ビルド観測12/12。paint-only transition は css-tree lexer を再利用。

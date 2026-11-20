@@ -31,7 +31,7 @@ function condition(source, node) {
  * Enumerate the component's trees.
  * @returns {{ states: { html: string, choices: Record<string, unknown> }[], css: string, unknowns: { code: string, message: string }[], assumptions: string[] }}
  */
-export function expandSvelte(source, { maxStates = 64, eachCounts = [0, 1, 2], sourceLines = false } = {}) {
+export function expandSvelte(source, { maxStates = 64, eachCounts = [0, 1, 2], sourceLines = false, finiteScopeClasses, ignoreValidatedEvents = false } = {}) {
   const ast = parse(source, { modern: true });
   const unknowns = [], assumptions = new Set();
   const unknown = (code, message) => { if (!unknowns.some(u => u.message === message)) unknowns.push({ code, message }); };
@@ -65,8 +65,9 @@ export function expandSvelte(source, { maxStates = 64, eachCounts = [0, 1, 2], s
   function attributes(node) {
     // Static attributes, class: directives (a choice each) and literal-conditional class={a ? 'x' : 'y'}.
     const statics = [], classVariants = [[{ html: '', choices: {} }]], attrVariants = [];
-    let classes = [];
+    let classes = finiteScopeClasses?.has(node.start) ? [finiteScopeClasses.get(node.start)] : [];
     for (const attr of node.attributes) {
+      if(ignoreValidatedEvents&&attr.type==='Attribute'&&attr.name==='onclick')continue;
       if (attr.type === 'Attribute') {
         if (attr.value === true) { statics.push(` ${attr.name}`); continue; }
         const parts = Array.isArray(attr.value) ? attr.value : [attr.value];
@@ -188,8 +189,10 @@ export function analyzeSvelte(source, { maxStates, eachCounts, sourceLines, ...o
 import {requireFinite as need,finiteName,finiteBool,finiteString,finiteCondition,finiteUpdate,finiteTag,finiteAttribute,finiteAttempt,buildFiniteState} from '@mizchi/veriss-adapter-core';
 export function deriveSvelteState(source){
  return finiteAttempt(()=>{
-  compile(source,{generate:'client',filename:'Component.svelte'});
-  const ast=parse(source,{modern:true}),vars=new Map(),handlers=new Map(),ids=new Set(),erase=[];
+  const scopeClass='svelte-veriss-finite';
+  const compiled=compile(source,{generate:'client',filename:'Component.svelte',modernAst:true,cssHash:()=>scopeClass});
+  const ast=parse(source,{modern:true}),vars=new Map(),handlers=new Map(),ids=new Set();
+  let ambiguousScope=false;
   need(ast.instance&&!ast.module&&!ast.options,'Expected closed Svelte instance script');
   for(const stmt of ast.instance.content.body){
    need(stmt.type==='VariableDeclaration'&&stmt.kind==='let','Only local state declarations are supported');
@@ -212,23 +215,35 @@ export function deriveSvelteState(source){
     if(attr.type==='Attribute'&&attr.name==='onclick'||attr.type==='OnDirective'&&attr.name==='click'){
      const f=attr.type==='OnDirective'?attr.expression:expr,a=f?.body;
      need(!event&&!attr.modifiers?.length&&f?.type==='ArrowFunctionExpression'&&!f.async&&!f.params.length&&a?.type==='AssignmentExpression'&&a.operator==='='&&a.left.type==='Identifier'&&vars.has(a.left.name),'Unsupported click assignment');
-     event={variable:a.left.name,expression:finiteUpdate(a.right,vars)};erase.push([attr.start,attr.end]);continue;
+     event={variable:a.left.name,expression:finiteUpdate(a.right,vars)};continue;
     }
+    if(attr.name==='class'||attr.type==='ClassDirective')ambiguousScope=true;
     if(attr.type==='ClassDirective'){finiteCondition(attr.expression??{type:'Identifier',name:attr.name},vars);continue}
     if(attr.type==='Attribute'&&attr.name==='class'&&expr?.type==='ConditionalExpression'){
      finiteCondition(expr.test,vars);need(finiteString(expr.consequent)&&finiteString(expr.alternate),'Only literal class branches');continue;
     }
     need(attr.type==='Attribute'&&parts.every(p=>p?.type==='Text'),'Unsupported Svelte attribute');
-    const value=parts.map(p=>p.data).join('');finiteAttribute(attr.name,value);if(attr.name==='id')id=value;
+    const value=parts.map(p=>p.data).join('');need(attr.name!=='className','Unsupported Svelte attribute');finiteAttribute(attr.name,value);if(attr.name==='id')id=value;
    }
    if(id){need(!ids.has(id),'Duplicate id');ids.add(id)}
    if(event){need(n.name==='button'&&id,'Click handler requires button id');handlers.set(id,event)}
    n.fragment.nodes.forEach(c=>render(c,[...ancestors,n.name]));
   }
   ast.fragment.nodes.forEach(n=>render(n));
-  // The existing adapter ignores directives but does not recognize all modern
-  // event attributes. Remove validated handlers only; no other source change.
-  let template=source;for(const [start,end] of erase.sort((a,b)=>b[0]-a[0]))template=template.slice(0,start)+template.slice(end);
-  return buildFiniteState(expandSvelte(template),vars,handlers,{framework:'svelte',scopedCSS:!!ast.css});
+  // The public compiler AST inserts a synthetic class attribute where it
+  // scopes a classless element. Match its source position to the existing
+  // template enumerator. Existing classes obscure this marker, so those
+  // components keep their state graph but not an invented scope assignment.
+  const classes=new Map();
+  const walk=n=>{
+   if(n.type==='RegularElement'&&n.attributes.some(a=>a.type==='Attribute'&&a.name==='class'&&a.start===-1&&a.end===-1))classes.set(n.start,scopeClass);
+   if(n.type==='IfBlock'){n.consequent.nodes.forEach(walk);n.alternate?.nodes.forEach(walk)}
+   else n.fragment?.nodes.forEach(walk);
+  };
+  compiled.ast.fragment.nodes.forEach(walk);
+  const uncertain=!!ast.css&&ambiguousScope;
+  const result=buildFiniteState(expandSvelte(source,{ignoreValidatedEvents:true,finiteScopeClasses:uncertain?undefined:classes}),vars,handlers,{framework:'svelte',scopedCSS:uncertain});
+  if(uncertain)return {...result,reason:'Svelte compiler scope assignment for pre-existing classes requires a compiled DOM snapshot'};
+  return {...result,css:compiled.css?.code??'',assumptions:[...result.assumptions,...(ast.css?['Svelte scoped CSS is compiled with standalone hash '+scopeClass+'; use the same compiler hash for exact external selector matching.']:[])]};
  });
 }

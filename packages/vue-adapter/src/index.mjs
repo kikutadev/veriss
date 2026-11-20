@@ -6,7 +6,7 @@
 // Unknown (never verified): child components, <slot>, v-html, <component :is>, a dynamic :class or :style that is
 // not a literal shape, <style module>, and more states than maxStates. Scoped styles are unscoped (:deep(x),
 // :slotted(x) and :global(x) become x): analysed alone, a component's scoped selectors match its own elements.
-import { parse, compileScript, compileTemplate } from 'vue/compiler-sfc';
+import { parse, compileScript, compileTemplate, compileStyle } from 'vue/compiler-sfc';
 import { parseExpression, parse as parseScript } from '@babel/parser';
 import { product, merge, choose, conditionKey, analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/veriss-adapter-core';
 
@@ -18,7 +18,7 @@ const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'in
 
 export const unscopeVueCSS = css => css.replace(/:(?:deep|slotted|global)\(([^()]*)\)/g, '$1');
 
-export function expandVue(source, { maxStates = 64, eachCounts = [0, 1, 2], sourceLines = false } = {}) {
+export function expandVue(source, { maxStates = 64, eachCounts = [0, 1, 2], sourceLines = false, finiteScopeAttr } = {}) {
   const { descriptor, errors } = parse(source);
   const unknowns = [], assumptions = new Set();
   const unknown = (code, message) => { if (!unknowns.some(u => u.message === message)) unknowns.push({ code, message }); };
@@ -99,7 +99,7 @@ export function expandVue(source, { maxStates = 64, eachCounts = [0, 1, 2], sour
     if (node.tagType === COMPONENT) { unknown('U_VUE_COMPONENT', `child component <${node.tag}>: its markup is analysed with that component, not here`); return [{ html: boundary('component', node.tag, node.props.some(p => p.name === 'data-noshift' || p.arg?.content === 'data-noshift') ? 'data-noshift' : undefined), choices: {} }]; }
     if (node.tagType === SLOT) { unknown('U_VUE_SLOT', '<slot> content comes from the parent'); return [{ html: boundary('slot'), choices: {} }]; }
     if (node.tag === 'component') { unknown('U_VUE_DYNAMIC_COMPONENT', '<component :is> has a dynamic tag'); return empty; }
-    const statics = [], classes = [];
+    const statics = finiteScopeAttr ? [' '+finiteScopeAttr+'=""'] : [], classes = [];
     let classLists = [{ classes: [], choices: {} }], show = null;
     const attrLists = []; let rawHTML = false;
     for (const p of node.props) {
@@ -200,8 +200,9 @@ export function deriveVueState(source){
  return finiteAttempt(()=>{
   const {descriptor:d,errors}=parse(source);
   need(!errors.length&&d.scriptSetup&&!d.script&&d.template&&!d.customBlocks.length&&!d.template.lang&&!d.template.src&&!d.scriptSetup.src&&d.styles.every(s=>!s.src&&!s.module&&!s.lang),'Expected closed script setup and native template');
-  const script=compileScript(d,{id:'finite-ui'});
-  const compiled=compileTemplate({source:d.template.content,filename:'Component.vue',id:'finite-ui',compilerOptions:{bindingMetadata:script.bindings}});
+  const scopeAttr='data-v-veriss-finite';
+  const script=compileScript(d,{id:scopeAttr});
+  const compiled=compileTemplate({source:d.template.content,filename:'Component.vue',id:scopeAttr,scoped:d.styles.some(s=>s.scoped),compilerOptions:{bindingMetadata:script.bindings}});
   need(!compiled.errors.length,'Vue template does not compile');
   const body=parseScript(d.scriptSetup.content,{sourceType:'module',plugins:['typescript']}).program.body;
   const imp=body[0];
@@ -222,7 +223,7 @@ export function deriveVueState(source){
    for(const p of n.props){
     need(!attrs.has(p.type===ATTRIBUTE?p.name:p.name+':'+(p.arg?.content??'')),'Duplicate template attribute');
     attrs.add(p.type===ATTRIBUTE?p.name:p.name+':'+(p.arg?.content??''));
-    if(p.type===ATTRIBUTE){finiteAttribute(p.name,p.value?.content);if(p.name==='id')id=p.value.content;continue}
+    if(p.type===ATTRIBUTE){need(p.name!==scopeAttr&&p.name!=='className','Reserved or unsupported Vue attribute');finiteAttribute(p.name,p.value?.content);if(p.name==='id')id=p.value.content;continue}
     need(p.type===DIRECTIVE&&!p.modifiers?.length,'Unsupported Vue directive');
     if(['if','else-if'].includes(p.name)){finiteCondition(parseExpression(p.exp.content),vars);continue}
     if(p.name==='else')continue;
@@ -242,6 +243,13 @@ export function deriveVueState(source){
    n.children.forEach(c=>render(c,[...ancestors,n.tag]));
   }
   d.template.ast.children.forEach(n=>render(n));
-  return buildFiniteState(expandVue(source),vars,handlers,{framework:'vue',scopedCSS:d.styles.some(s=>s.scoped&&s.content.trim())});
+  const scoped=d.styles.some(s=>s.scoped);
+  const result=buildFiniteState(expandVue(source,{finiteScopeAttr:scoped?scopeAttr:undefined}),vars,handlers,{framework:'vue'});
+  // CSS vars are installed by Vue at runtime, not the static cascade.
+  // The compiler's CSS transformation is used directly, not a selector rewrite.
+  if(d.cssVars.length)return {...result,scopedCSS:true,reason:'Vue runtime CSS variables are not modeled'};
+  const styles=d.styles.map(s=>compileStyle({source:s.content,filename:'Component.vue',id:scopeAttr,scoped:!!s.scoped}));
+  if(styles.some(s=>s.errors.length))return {...result,scopedCSS:true,reason:'Vue scoped stylesheet failed compilation'};
+  return {...result,css:styles.map(s=>s.code).join('\n'),assumptions:[...result.assumptions,...(scoped?['Vue scoped CSS is compiled for standalone scope ID '+scopeAttr+'; use the same build ID for exact external selector matching.']:[])]};
  });
 }

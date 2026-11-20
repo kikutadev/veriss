@@ -140,3 +140,17 @@ test('snapshot root descendant presence is frozen without losing selector specif
  assert.ok(!domGeometry({...opts,css:style+String.raw`header{fl\6f at:left}`})[0].rows?.length);
  assert.ok(!domGeometry({...opts,html:source.replace('</main>','</main><main></main>')})[0].rows?.length);
 });
+
+test('paint-only transitions do not prevent independent inline geometry; unknown and mixed transitions do',()=>{
+ const source='<!doctype html><html lang="en"><head><title>T</title></head><body><main id="shell"><kbd>native</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}#shell{max-width:520px;margin:0 auto}';
+ for(const value of ['background .18s,color .18s','color 300ms ease-in-out, border-color 1s linear','opacity .2s cubic-bezier(.1,.2,.3,.4)','none']){
+  const r=check(source,style+'body{transition:'+value+'}',['shell'])[0];
+  assert.ok(r.rows?.length,JSON.stringify({value,r}));
+ }
+ for(const value of ['all .2s','width .2s','color .2s,transform 1s','opacity 2s,width 1s','--size 1s','1s ease','var(--transition)','color .1s nonsense']){
+  assert.ok(!check(source,style+'body{transition:'+value+'}',['shell'])[0].rows?.length,value);
+ }
+ assert.ok(check(source,style+'body{transition-property:color, background-color;transition-duration:.2s}',['shell'])[0].rows?.length);
+ assert.ok(!check(source,style+'body{transition-property:color, width}',['shell'])[0].rows?.length);
+});

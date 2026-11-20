@@ -453,3 +453,13 @@
   判定と通常経路を照合 (`tests/persistent-cache.test.mjs`)。
 
 - [x] **H9. 軸独立の幾何証拠**: 通常 block flow の高さ・兄弟内容を除外して横位置/幅を自動証明し、未証明の縦座標を補わない。html/body の単純 :has() を存在・非存在の対照で検証し、元の詳細度を保つ。幅320–1920px、高さ390/900pxの境界点と root presence の幅380/520px境界を3ブラウザーで照合 (`e2e/layout-partial-geometry.spec.mjs`)。不足軸・負寸法・被覆・重複矛盾・サブピクセル実測・float依存拒否を `relational-contract.test.mjs` と `partial-geometry.test.mjs` で確認。
+
+- [x] **H9. Paint-only transition 射影**: 色と背景の transition の前/途中に
+  320/520/521/1000px で独立 block の横配置を3ブラウザ照合し、
+  幅120%の実違反、all/transform/width/変数の未対応を対照にした
+  (`e2e/layout-partial-geometry.spec.mjs`, `partial-geometry.test.mjs`)。
+- [x] **H10. 有限 component scope**: Vue compiler-sfc と Svelte compiler の
+  scoped CSS、実 scope 属性/class、ページ CSS との specificity と
+  click 後の native DOM を照合。操作高48/30pxを320/601/900pxの3ブラウザで比較。
+  runtime CSS variables/既存 class の Svelte scope 不明は Unknown
+  (`e2e/layout-finite-ui.spec.mjs`, `tests/finite-ui.test.mjs`)。

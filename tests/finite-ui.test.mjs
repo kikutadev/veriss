@@ -49,11 +49,15 @@ test('derived graph connects to relational contracts, while unknown state analys
  assert.equal(verifyFiniteUI({status:'unknown',reason:'external code'},options).status,'unknown');
 });
 
-test('scoped stylesheet is not silently treated as a global author sheet',()=>{
+test('scoped geometry remains unknown for runtime CSS variables or ambiguous compiler class assignment',()=>{
  const profile={id:'web',viewport:{min:320,max:800,height:{min:400,max:900}}};
- for(const [derive,source] of fixtures.slice(1)){
-  const scoped=derive(source+(derive===deriveVueState?'<style scoped>body{margin:0}</style>':'<style>main{height:48px}</style>'));
-  assert.equal(scoped.status,'derived');
+ const inputs=[
+  [deriveVueState,fixtures[1][1]+'<style scoped>main{height:v-bind(open)}</style>'],
+  [deriveSvelteState,fixtures[2][1].replace('<main>','<main class="panel">')+'<style>.panel{height:48px}</style>']
+ ];
+ for(const [derive,source] of inputs){
+  const scoped=derive(source);
+  assert.equal(scoped.status,'derived',JSON.stringify(scoped));
   assert.equal(verifyFiniteUI(scoped,{profiles:[profile],contracts:[],targets:['toggle']}).status,'unknown');
  }
 });
@@ -64,4 +68,22 @@ test('two independent boolean variables explore their full reachable product wit
  assert.equal(r.state.states.length,4);
  assert.equal(r.state.transitions.length,6);
  assert.ok(r.state.transitions.every(t=>t.event!=='click:dirty'||r.variants.find(v=>v.id===t.from).values.open));
+});
+
+test('native compiler scope attributes/classes preserve the component cascade instead of unscoping it',()=>{
+ const profile={id:'web',viewport:{min:320,max:800,height:{min:400,max:900}}};
+ const options={profiles:[profile],contracts:[{id:'size',kind:'min-size',target:'toggle',width:44,height:44}],targets:['toggle'],
+ css:'*{box-sizing:border-box;margin:0;padding:0}html,body,#app,main{display:grid;grid-template-columns:minmax(0,1fr)}button{width:100%;height:32px;border:0;appearance:none}#panel{height:80px}'};
+ for(const [derive,original] of fixtures.slice(1)){
+  const source=original.replace('>Toggle</button>',' aria-label="Toggle"></button>')+
+    (derive===deriveVueState?'<style scoped>button{height:48px}body{padding:200px}</style>':'<style>button{height:48px}body{padding:200px}</style>');
+  const r=derive(source);
+  assert.equal(r.status,'derived',JSON.stringify(r));
+  assert.equal(r.scopedCSS,false,JSON.stringify(r));
+  assert.ok(r.variants.every(v=>v.html.includes(derive===deriveVueState?'data-v-veriss-finite':'svelte-veriss-finite')));
+  const proof=verifyFiniteUI(r,options);
+  assert.equal(proof.status,'verified',JSON.stringify(proof));
+  const broken=derive(source.replace('height:48px','height:30px'));
+  assert.equal(verifyFiniteUI(broken,options).status,'violated');
+ }
 });

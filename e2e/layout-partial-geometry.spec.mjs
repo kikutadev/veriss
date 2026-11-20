@@ -238,3 +238,29 @@ test('child proof transfers to a different allocation and affine origin only wit
   }
  }finally{await killThreads(api.em)}
 });
+
+test('paint-only transition cannot alter independent inline geometry, mixed geometry transition is refused',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:400,max:900}}};
+ const html='<!doctype html><html lang="en"><head><title>Panel</title></head><body><main id="shell"><kbd>native</kbd></main></body></html>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}body{background:black;color:white;transition:background 180ms,color 180ms}body.alt{background:white;color:black}#shell{max-width:520px;margin:0 auto}';
+ const horizontal={op:'compare',relation:'le',left:{target:'shell',field:'inlineEnd'},right:{environment:'safeRight'}};
+ const model={version:1,initial:'ready',states:['ready'],transitions:[],profiles:[profile],contracts:[{id:'fit',kind:'predicate',predicate:horizontal}]};
+ const input={state:'ready',profile,html,css,targets:['shell']};
+ const evidence=domGeometry(input);
+ expect(evidence[0].axes).toEqual(['inline']);
+ expect(verifyUI({model,evidence}).status).toBe('verified');
+ for(const width of [320,520,521,1000]){
+  await page.setViewportSize({width,height:600});
+  await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
+  const r=await page.locator('#shell').boundingBox();
+  expect(r.x).toBeCloseTo((width-Math.min(width,520))/2,1);expect(r.width).toBeCloseTo(Math.min(width,520),1);
+  await page.locator('body').evaluate(n=>n.classList.add('alt'));
+  await page.waitForTimeout(80);
+  const moving=await page.locator('#shell').boundingBox();expect(moving.x).toBe(r.x);expect(moving.width).toBe(r.width);
+ }
+ const wide=css+'#shell{width:120%;max-width:none}';
+ expect(verifyUI({model,evidence:domGeometry({...input,css:wide})}).status).toBe('violated');
+ expect(verifyUI({model,evidence:domGeometry({...input,css:css+'body{transition:color .2s,width .2s}'})}).status).toBe('unknown');
+ await page.setViewportSize({width:320,height:600});await page.setContent(html.replace('</head>','<style>'+wide+'</style></head>'));
+ expect((await page.locator('#shell').boundingBox()).width).toBeCloseTo(384,1);
+});

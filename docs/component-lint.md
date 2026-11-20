@@ -268,8 +268,15 @@ CSS visibility、actionability、フォーカス、click の到達可能性で�
 単一 event を settled render ごとにモデル化している。
 `verifyFiniteUI(analysis,{profiles,contracts,targets,css,...})` は standalone #app div mount
 (本文 HTML と caller-supplied の閉じた CSS) での契約を検証。
-scoped Vue / Svelte component style の意味論は未移植なので、状態グラフは導出できても
-そのままの geometry verification は Unknown。外部ページ/任意の親文脈には自動適用しない。
+Vue の scoped style は compiler-sfc の compileStyle が出力する CSS と、
+standalone 用の scope ID `data-v-veriss-finite` を各所有 native DOM 要素に付けて検証する。
+Svelte の style は実 compiler の出力 CSS と公開 AST の synthetic class 属性を照合し、
+class 属性/ class directive が無いテンプレートでコンパイラーが選んだ要素にだけ
+`svelte-veriss-finite` を付ける。既存 class を持つ Svelte scoped component、
+Vue の runtime CSS variables (`v-bind()`)、compiler が解決できない scoped CSS は
+状態グラフを導出できても geometry verification は Unknown。
+実際のビルド・外部 CSS が scope ID/hash を直接参照する場合は同じ ID/hash を使う必要があり、
+外部ページ/任意の親文脈には自動適用しない。closed template subset は従来と同じ。
 
 CLI は通常の relational manifest の代わりに以下を扱う。model の graph や geometry を
 手で指定して上書きすることはできない。`finiteAnalysis` が JSON report に付く。
