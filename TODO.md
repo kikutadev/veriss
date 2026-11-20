@@ -14,7 +14,9 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 パターンの一覧(カテゴリ 1〜13)は F95 を除いて済み(88 / 89)。次は次の順で進める。
 
-1. **パターンの追加を続ける**(新しい観点を足すときはカテゴリの表と一覧の両方に足す)。まだ調べていない候補:
+0. **F26 の修正(PR #2)の 3 ブラウザー照合**: `.t > .r > td` など、補われた tbody をセレクタの途中で飛ばす場合の e2e は Chromium でしか
+   回していない(作業した環境に Firefox・WebKit がなかった)。`tools/gate.sh` を回して Firefox・WebKit でも通ることを確かめる
+1. **パターンの追加を続ける**(新しい観点を足すときはカテゴリの表と一覧の両方に足す。[検査ルール一覧](docs/rule-catalog.md) の該当する役割の表にも行を足す)。まだ調べていない候補:
    - `:focus-visible` とキーボード / マウスでの見え方の差、`:has()` の重さと無効な引数
    - `@container` の単位(`cqw` / `cqh`)を container のない要素で使う、`container-type: size` で高さが 0 になる
    - `writing-mode: vertical-*` と物理プロパティ(`width` / `margin-top`)の取り違え
@@ -28,6 +30,10 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 作業の進め方の約束:
 
 - ゲート `tools/gate.sh`(全パッケージの単体テスト、component-lint の eval が変わらないこと、css-mistakes の e2e を 3 ブラウザーで)を通してから commit し、main と claude ブランチへ push
+  (claude ブランチからは PR を作って merge する。PR では CodeRabbit がレビューする)
+- [検査ルール一覧](docs/rule-catalog.md) は main に push すると `.github/workflows/pages.yml` が https://mizchi.github.io/veriss/ に出す。
+  実例の画像(NG / OK の組)は CI では作らないので、`tools/rule-catalog/examples.mjs` を変えたら `node tools/rule-catalog/shoot.mjs` で
+  作り直して commit する(`node tools/rule-catalog/run.mjs all` で、NG に狙いのコードが出て OK が verified かを確かめる)
 - ゲートの実行中はソースを変えない(テストが途中の変更を読む)。測るだけの使い捨てスクリプトは `tools/_m.mjs` に置いて消す
 - スクロールバーを測るときは Chromium を `ignoreDefaultArgs: ['--hide-scrollbars']` で起動する(F130)
 - 実測は Chromium・Firefox(157)・WebKit。結果が分かれるものは `browsers` を付けて報告し、レイアウトは Unknown のまま
@@ -224,6 +230,9 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 実装済み(最近)
 
+- F26 の見逃しの修正: 補われた tbody をセレクタの途中で飛ばす子の結合子(`.t > .r > td`、`table > tr .x`)も報告する(PR #2)
+- [検査ルール一覧](docs/rule-catalog.md): 約 420 のコードを 13 の役割に分け、検査できるもの・Unknown のものを表にし、役割ごとに
+  NG / OK の実例の画像を付けた。GitHub Pages(https://mizchi.github.io/veriss/)に出し、README からリンク(PR #1)
 - F79. media query の単位なし長さ・単位前の空白
 - F80. `white-space: nowrap` / `pre` の下の `overflow-wrap`
 - F81. 段組の外の `column-span`
