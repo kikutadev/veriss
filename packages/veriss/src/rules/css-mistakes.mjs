@@ -255,8 +255,31 @@ export function createCssMistakes({ report, facts, tools }) {
     layoutWarnings.push({ code: 'W_CSS_DIALOG_NOT_CENTRED', severity: 'warning', box: box.label, path: box.path, properties: keys, css: [{ property: 'margin', file: src.file, line: src.line, selector: src.selector }],
       message: `${box.label}: ${src.selector} sets ${keys.map(key => `${key}: ${style.$sources[key].specified}`).join(', ')} on this <dialog>, which takes away the margin: auto the browser centres it with: it opens at the top-left corner. Add dialog { margin: auto } after the reset` });
   }
+  // F131: a :hover / :focus / :active rule that a later (or more specific) rule without the state always beats shows
+  // nothing: a:hover { color } before a:link { color } leaves a hovered link blue (measured in Chromium, Firefox and
+  // WebKit; the LVHA order). Judged per box and declaration: with the state on, the winning declaration comes from a
+  // rule that does not need the state and sets another value.
+  function stateShadowed(box, style, ancestors, inherited, r) {
+    if (box.pseudo || r === undefined) return;
+    for (const st of ['hover', 'focus', 'focus-visible', 'active']) {
+      const own = rules.flatMap(rule => rule.selectors.filter(sel => sel.state === st && !sel.pseudoElement && matches(sel, box, new Set([st]))).map(sel => ({ rule, sel })));
+      if (!own.length) continue;
+      let on; try { [on] = styles(box, r, ancestors, inherited, false, false, new Set([st])); } catch { continue; }
+      if (!on) continue;
+      for (const { rule, sel } of own) for (const d of rule.declarations) {
+        const winner = on.style.$sources?.[d.property];
+        if (!winner || (winner.file === d.file && winner.line === d.line && winner.selector === sel.source) || new RegExp(`:${st}(?![\\w-])`, 'i').test(String(winner.selector))) continue;
+        if (String(winner.specified ?? '').trim().toLowerCase() === String(d.value ?? '').trim().toLowerCase()) continue;
+        if (layoutWarnings.some(w => w.code === 'W_CSS_STATE_SHADOWED' && w.path === box.path && w.selector === sel.source && w.property === d.property)) continue;
+        layoutWarnings.push({ code: 'W_CSS_STATE_SHADOWED', severity: 'warning', box: box.label, path: box.path, selector: sel.source, property: d.property, state: `:${st}`,
+          css: [{ property: d.property, file: d.file, line: d.line, selector: sel.source }, { property: d.property, file: winner.file, line: winner.line, selector: winner.selector }],
+          message: `${box.label}: ${sel.source} { ${d.property}: ${d.value} } never shows: ${winner.selector} { ${d.property}: ${winner.specified} } also applies while it is :${st} and wins (it comes later or is more specific). Put the :${st} rule after it (for links: :link, :visited, :hover, :active), or make it more specific` });
+      }
+    }
+  }
   function cssMistakes(box, style, ancestors, inherited, gridItem, r, state) {
     firstPseudoInert(box, style);
+    stateShadowed(box, style, ancestors, inherited, r);
     dialogMarginReset(box, style);
     overflowPromoted(box, style);
     selectIndent(box, style, ancestors);
@@ -725,5 +748,5 @@ export function createCssMistakes({ report, facts, tools }) {
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, dialogMarginReset, overflowPromoted, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, stateShadowed, dialogMarginReset, overflowPromoted, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }

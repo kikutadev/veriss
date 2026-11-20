@@ -28,7 +28,8 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 10. ブラウザで結果が違うもの | 5 / 5 | 済 |
 | 11. 単位と計算値の落とし穴(書いた値と計算値が違う) | 4 / 4 | 済 |
 | 12. HTML 要素ごとの既定の振る舞いとリセット CSS | 4 / 4 | 済 |
-| 合計 | 86 / 87(99%) | |
+| 13. 状態のセレクタとカスケードの順 | 1 / 1 | 済 |
+| 合計 | 87 / 88(99%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -155,6 +156,11 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] `<sup>` / `<sub>` で行が高くなる(実測: 3 ブラウザーとも。解析は baseline 以外の vertical-align を Unknown にする)
 - [x] `<details>` の `display: flex`、`<hr>` の `color`(実測: 3 ブラウザーとも効く。報告することはない)
 
+### 13. 状態のセレクタとカスケードの順
+
+- [x] 後の規則に負けて見えない `:hover` / `:focus` / `:active`(F131。LVHA の順)
+- 確かめて既存で足りていたもの: flex / grid コンテナの `text-overflow`(効かない宣言として報告済み)、中身のある `aspect-ratio`(理由付きの Unknown)
+
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
 - [x] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
@@ -217,6 +223,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F131. 後の規則に負けて見えない `:hover` / `:focus` / `:active`
 - F130. `::-webkit-scrollbar` と標準の `scrollbar-width` / `scrollbar-color`
 - F129. リセット CSS で中央に来なくなる `<dialog>`
 - F128. 縦の `margin` の % は幅に対する割合

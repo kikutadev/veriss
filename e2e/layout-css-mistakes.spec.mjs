@@ -1536,3 +1536,14 @@ test('F130: Chrome and Safari ignore ::-webkit-scrollbar beside scrollbar-width 
   expect(lint('.a::-webkit-scrollbar{display:none}')).toEqual(['W_CSS_SCROLLBAR_FIREFOX_SHOWN']);
   expect(lint('.a{scrollbar-width:none}.a::-webkit-scrollbar{display:none}')).toEqual([]);
 });
+
+test('F131: a :hover rule a later rule without the state beats shows nothing when hovered (the LVHA order)', async ({page}) => {
+  for (const [css, hovered, reported] of [['a:hover{color:red}a:link{color:blue}', 'rgb(0, 0, 255)', true], ['.b:hover{color:red}.b.c{color:blue}', 'rgb(0, 0, 255)', true],
+    ['a:link{color:blue}a:hover{color:red}', 'rgb(255, 0, 0)', false], ['.b:hover{color:red}.b{color:blue}', 'rgb(255, 0, 0)', false]]) {
+    await page.setContent(`<!doctype html><style>${css}</style><a href="#x" class="b c" id="l">link text</a>`);
+    await page.hover('#l');
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('#l')).color), css).toBe(hovered);
+    const r = analyzeHTML('<html lang="en"><body><a href="/x" class="b c">link text</a></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_STATE_SHADOWED'), css).toBe(reported);
+  }
+});

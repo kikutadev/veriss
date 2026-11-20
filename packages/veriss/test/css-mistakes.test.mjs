@@ -1404,3 +1404,12 @@ test('F130: ::-webkit-scrollbar is ignored by Chrome beside scrollbar-width / -c
   for (const css of ['.a{scrollbar-width:none}.a::-webkit-scrollbar{display:none}', '.a::-webkit-scrollbar{width:6px}', '.a{scrollbar-width:thin}', '.b{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}'])
     assert.equal([...hit(css, 'W_CSS_SCROLLBAR_WEBKIT_IGNORED'), ...hit(css, 'W_CSS_SCROLLBAR_FIREFOX_SHOWN')].length, 0, css);
 });
+
+test('F131: a :hover / :focus rule beaten by a later or more specific rule without the state never shows', () => {
+  const hit = css => codes(run(css, '<a href="/x" class="b c">link text</a>'), 'W_CSS_STATE_SHADOWED');
+  assert.match(hit('a:hover{color:red}a:link{color:blue}')[0]?.message ?? '', /a:hover \{ color: red \} never shows: a:link/);
+  assert.equal(hit('.b:hover{background:red}.b.c{background:blue}').length, 1);
+  assert.equal(hit('a:focus{color:red}a:link{color:blue}')[0]?.state, ':focus');
+  for (const css of ['a:link{color:blue}a:hover{color:red}', '.b:hover{color:red}.b{color:blue}', 'a:hover{color:red}a:link{color:red}', 'a:hover{color:red}'])
+    assert.equal(hit(css).length, 0, css);
+});

@@ -98,6 +98,7 @@ export const recommended = {
   W_CSS_DIALOG_NOT_CENTRED: ['warning', 'add dialog { margin: auto } after a margin reset: the browser centres a dialog with margin: auto'],
   W_CSS_SCROLLBAR_WEBKIT_IGNORED: ['warning', 'style scrollbars with scrollbar-width / scrollbar-color: Chrome ignores ::-webkit-scrollbar on an element that sets them'],
   W_CSS_SCROLLBAR_FIREFOX_SHOWN: ['warning', 'add scrollbar-width: none: Firefox does not take ::-webkit-scrollbar'],
+  W_CSS_STATE_SHADOWED: ['warning', 'put the :hover / :focus / :active rule after the rules it overrides (links: :link, :visited, :hover, :active), or make it more specific'],
   W_CSS_GRID_TRACKS_INVALID: ['warning', 'fix the grid track list: repeat(auto-fill) takes fixed sizes (minmax(200px, 1fr)), minmax() cannot start with fr, and a repeat count is a positive whole number'],
   W_CSS_COUNTER_UNUSED: ['warning', 'show the counter with content: counter(name), or remove the counter-reset / -increment / -set'],
   W_LAYOUT_ALIGN_BROWSER_DEPENDENT: ['warning', 'centre a block with margin-inline: auto (and a width), or make the parent a grid: justify-self / justify-items in block layout work in Chromium and Safari only'],
