@@ -1,3 +1,4 @@
+import {createObligationCollector} from './engine-obligations.mjs';
 import {createPositionSolver, subgridError, isDescendant, intersectRegions} from './engine-positioning.mjs';
 import { createQuerySolver, compare } from './engine-queries.mjs';
 import { createFlexLayout } from './engine-flex.mjs';
@@ -61,9 +62,10 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   const component = options.name ?? 'Document';
   const h = options.viewport.height ?? { min: 0, max: 0 };
   const initial = rectangle(domain, { min: q(h.min), max: q(h.max) });
-  const diagnostics = [...inputDiagnostics], findings = [], checks = [], policies = [], sizes = [], queries = [], queryFacts = [], sourceUse = new Map(), subgrids = [], scrollbars = [], invalidSubstitutions = [];
+  const diagnostics = [...inputDiagnostics], policies = [], sizes = [], queries = [], queryFacts = [], sourceUse = new Map(), subgrids = [], scrollbars = [], invalidSubstitutions = [];
   // Live geometry and waived obligations for the opt-in integrity rules.
-  const geometry = [], waived = [];
+  const geometry = [];
+  const {checks, waived, ranges, cellGrows, scrolls, obligation, flush:flushObligations} = createObligationCollector({block, diagnostics, scrollIntent:options.scrollIntent});
   // Paint facts of the options.ancestors chain (html, body, …) for the accessibility rules.
   let ancestorPaint = [];
   let work = 0;
@@ -73,7 +75,6 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     if (work > 2_000_000) throw Object.assign(new Error('Layout analysis work limit exceeded'),{code:'U_LAYOUT_LIMIT'});
   };
   const unknown = (code, message, line, box, file = options.cssFile ?? '<css>') => diagnostics.push({ code, severity: 'unknown', message, ...(line ? { css: { file, line } } : {}), ...(box ? { box: box.label, path: box.path, source: box.source } : {}) });
-  const ranges = region => ({ range: projection(region, 'x'), ...(block ? { heightRange: projection(region, 'y'), region: serialize(region) } : {}) });
   const issue = (code, message, box, region, axis) => diagnostics.push({ code, severity: 'error', message, box: box.label, path: box.path, source: box.source, ...(axis ? { axis } : {}), ...ranges(region) });
   const boxes = [];
   // Parent links for combinator matching (a symbol: a structuredClone of the tree drops them, so set them here).
@@ -205,37 +206,6 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   }
   for (const rule of rules) rule.layerName = rule.layer === null ? undefined : layers[rule.layer];
   const bounded = values => { spend(values.length); if (values.length > 512) throw new Error('Layout state limit exceeded'); return values; };
-
-  // Table cells do not overflow their height: the row grows with the content (not modeled), so it is Unknown there.
-  function cellGrows(available, required, box, region) {
-    const failed = clip(region, diff(required, available), true);
-    if (failed) diagnostics.push({ code: 'U_LAYOUT_TABLE', severity: 'unknown', message: `${box.label}: the content is taller than the cell here; a table row grows with its content`, box: box.label, path: box.path, source: box.source, axis: 'block', ...ranges(failed) });
-  }
-  // scrollIntent: 'css' (an option; the component lint sets it): a container that scrolls on an axis (overflow auto or
-  // scroll) states that its content may be scrolled to, as an overflow: 'scroll' contract does, so its tracks or items
-  // going past its content box on that axis are not reported (hidden or clip, which cut the content off, still are).
-  // By default the intent must be a contract (ADR: overflow policy), and CSS alone does not waive the obligation.
-  const scrolls = (style, axis) => options.scrollIntent === 'css' && ['auto', 'scroll'].includes(String(style[`overflow-${axis}`]));
-  function obligation(available, required, box, region, code, axis, enabled = true, explain, annotate) {
-    checks.push({ box: box.label, path: box.path, code, axis, ...ranges(region), available: affine(available), required: affine(required), enforced: enabled });
-    if (!enabled) {
-      // A contract allowed this overflow; the integrity rules still report where it happens.
-      const failed = clip(region, diff(required, available), true);
-      if (failed) waived.push({ box, path: box.path, code, axis, region: failed, self: code !== 'E_LAYOUT_ITEM_SIZE' });
-      return;
-    }
-    const failed = clip(region, diff(required, available), true);
-    if (!failed) return;
-    const p = sample(failed), need = evaluate(required, p), offered = evaluate(available, p);
-    findings.push({ code, severity: 'error', box: box.label, path: box.path, source: box.source, axis,
-      message: code === 'E_LAYOUT_ABSOLUTE_CLIPPED' ? `${box.label} reaches past its containing block ${box[PARENT]?.label ?? ''}, which hides its overflow: it needs ${exact(need)}px but only ${exact(offered)}px is visible on the ${axis} axis at viewport ${exact(p.x)}px${block ? ` × ${exact(p.y)}px` : ''}, so the rest is cut off`
-        : `${box.label} requires ${exact(need)}px but receives ${exact(offered)}px on ${axis} axis at viewport ${exact(p.x)}px${block ? ` × ${exact(p.y)}px` : ''}`,
-      ...ranges(failed), signature: JSON.stringify([box.path, code, axis, affine(available), affine(required)]),
-      witness: { viewport: number(p.x), viewportExact: exact(p.x), ...(block ? { viewportHeight: number(p.y), viewportHeightExact: exact(p.y) } : {}), available: number(offered), required: number(need) },
-      ...(explain ? { explanation: explain() } : {}),
-      ...(annotate ? annotate(offered) : {}),
-    });
-  }
 
   // The file an img or source loads: its one srcset candidate, or (under a device pixel ratio) the smallest density at
   // least that ratio, else the densest. An img's src is its 1x candidate. 'dynamic' when not decided (w descriptors,
@@ -2332,15 +2302,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const open = boxes.find(box => !box.pseudo && note.selectors.some(sel => matches(sel, box, new Set([`::${sel.pseudoElement}`, ...(sel.state ? [sel.state] : [])])) && !firstInert.has(`${box.path}|${sel.source}`)));
     if (open) unknown('U_LAYOUT_SELECTOR', `${note.selector} restyles the first letter or line of ${open.label}, which is not modeled`, note.line, open, note.file);
   }
-  // Preserve compact one-dimensional diagnostics; 2-D regions retain correlated constraints.
-  findings.sort((a, b) => a.signature.localeCompare(b.signature) || a.range.min - b.range.min);
-  const merged = [];
-  for (const finding of findings) {
-    const previous = merged.at(-1);
-    if (!block && previous?.signature === finding.signature && previous.range.maxExact === finding.range.minExact && (previous.range.maxInclusive || finding.range.minInclusive)) previous.range = { ...previous.range, max: finding.range.max, maxExact: finding.range.maxExact, maxInclusive: finding.range.maxInclusive };
-    else merged.push({ ...finding });
-  }
-  diagnostics.push(...merged.map(({ signature, ...finding }) => finding));
+  flushObligations();
   let integrityWarnings = [], integrityExempted = [], accessibilityWarnings = [], accessibilityNotes = [], accessibilityExempted = [];
   if (options.integrity && !untransformed && hovered === undefined && !options.$animationFrame && !options.$slideVariant && !diagnostics.some(d => d.severity === 'unknown')) {
     const judged = judgeIntegrity({ geometry, waived }, { block, targetSize: options.integrity.targetSize ?? 24, protrusion: options.integrity.protrusion ?? 'all', ranges });

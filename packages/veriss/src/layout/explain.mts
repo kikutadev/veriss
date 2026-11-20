@@ -2,7 +2,7 @@
 // sides of an obligation. They are attached to findings after the geometry is
 // decided and are never read by the proof, the region split or Z3.
 
-import type { LayoutBoxContract, LayoutCSSOrigin } from '../layout-contracts.d.ts';
+import type { LayoutBoxContract, LayoutCSSOrigin, LayoutExplanation, LayoutExplanationFact } from '../layout-contracts.d.ts';
 
 export type ExplanationAxis = 'inline' | 'block';
 type Side = 'left' | 'right' | 'top' | 'bottom';
@@ -26,23 +26,9 @@ export interface ExplanationStyle extends Partial<Record<ExplanationProperty, st
   $dormant?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[]>>>;
   $overridden?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[]>>>;
 }
-interface CascadeBase {
-  path: string;
-  box: string;
-  owner: string | undefined;
-  property: ExplanationProperty;
-  value: string | undefined;
-  overridden?: { css: LayoutCSSOrigin }[];
-  dormant?: { css: LayoutCSSOrigin }[];
-}
-export type ExplanationFact = (CascadeBase & ({ origin: 'author'; css: LayoutCSSOrigin } | { origin: 'default' }))
-  | { kind: 'viewport'; axis: ExplanationAxis; hostInset?: number }
-  | { kind: 'contract'; path: string; box: string; owner: string | undefined; property: ContractProperty; value: number | undefined; selector: string | undefined; trusted: true; derivedFrom?: string };
-export interface Explanation {
-  version: 1;
-  available: { facts: readonly ExplanationFact[] };
-  required: { facts: readonly ExplanationFact[] };
-}
+// Both the internal producer and the public report use the same evidence schema.
+export type ExplanationFact = LayoutExplanationFact;
+export type Explanation = LayoutExplanation;
 
 const sides = (axis: ExplanationAxis): Side[] => axis === 'inline' ? ['left', 'right'] : ['top', 'bottom'];
 const sizeProperty = (axis: ExplanationAxis): SizeProperty => axis === 'inline' ? 'inline-size' : 'block-size';
@@ -100,4 +86,4 @@ export function contractFact(box: ContractBox, property: ContractProperty): Expl
   return {kind: 'contract', path: box.path, box: box.label, owner: box.owner, property, value: box.contract[property], selector: box.contractSelector, trusted: true};
 }
 
-export const explanation = (available: readonly ExplanationFact[], required: readonly ExplanationFact[]): Explanation => ({version: 1, available: {facts: available}, required: {facts: required}});
+export const explanation = (available: ExplanationFact[], required: ExplanationFact[]): Explanation => ({version: 1, available: {facts: available}, required: {facts: required}});

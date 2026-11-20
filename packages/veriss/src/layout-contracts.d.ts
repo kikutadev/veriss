@@ -315,6 +315,8 @@ export interface LayoutDiagnostic {
     };
     /** Build/debug provenance of both sides (ADR-0002). Never consulted by the proof. */
     explanation?: LayoutExplanation;
+    /** The layout algorithm that produced this capacity obligation, when reported. */
+    layout?: 'flex';
 }
 /** A declaration whose var() reference is guaranteed-invalid; it computes as unset (CSS Variables 1 section 3). */
 export interface LayoutInvalidSubstitution {
@@ -373,9 +375,9 @@ export interface LayoutCSSOrigin {
 export type LayoutExplanationFact = {
     path: string;
     box: string;
-    owner: string;
+    owner?: string | undefined;
     property: string;
-    value: string;
+    value: string | undefined;
     origin: 'author';
     css: LayoutCSSOrigin;
     overridden?: {
@@ -387,9 +389,9 @@ export type LayoutExplanationFact = {
 } | {
     path: string;
     box: string;
-    owner: string;
+    owner?: string | undefined;
     property: string;
-    value: string;
+    value: string | undefined;
     origin: 'default';
     overridden?: {
         css: LayoutCSSOrigin;
@@ -405,11 +407,12 @@ export type LayoutExplanationFact = {
     kind: 'contract';
     path: string;
     box: string;
-    owner: string;
+    owner?: string | undefined;
     property: 'minInlineSize' | 'minBlockSize';
-    value: number;
-    selector: string;
+    value: number | undefined;
+    selector: string | undefined;
     trusted: true;
+    derivedFrom?: string;
 };
 export interface LayoutExplanation {
     version: 1;

@@ -404,9 +404,9 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -463,9 +463,9 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -511,20 +511,21 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
             readonly required: {
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -581,9 +582,9 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -629,14 +630,16 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
         };
+        readonly layout?: "flex";
     }[];
     diagnostics: readonly {
         readonly variant?: number;
@@ -720,9 +723,9 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -779,9 +782,9 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -827,20 +830,21 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
             readonly required: {
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -897,9 +901,9 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -945,14 +949,16 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
         };
+        readonly layout?: "flex";
     }[];
     complete: boolean;
     geometryComplete: boolean;
@@ -1390,9 +1396,9 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -1449,9 +1455,9 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -1497,20 +1503,21 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
             readonly required: {
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -1567,9 +1574,9 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -1615,14 +1622,16 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
         };
+        readonly layout?: "flex";
     }[];
     version: 1;
     kind: "layout";
@@ -1745,9 +1754,9 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -1804,9 +1813,9 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -1852,20 +1861,21 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
             readonly required: {
                 readonly facts: readonly ({
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "author";
                     readonly css: {
                         readonly file: string;
@@ -1922,9 +1932,9 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 } | {
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: string;
-                    readonly value: string;
+                    readonly value: string | undefined;
                     readonly origin: "default";
                     readonly overridden?: readonly {
                         readonly css: {
@@ -1970,14 +1980,16 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                     readonly kind: "contract";
                     readonly path: string;
                     readonly box: string;
-                    readonly owner: string;
+                    readonly owner?: string | undefined | undefined;
                     readonly property: "minInlineSize" | "minBlockSize";
-                    readonly value: number;
-                    readonly selector: string;
+                    readonly value: number | undefined;
+                    readonly selector: string | undefined;
                     readonly trusted: true;
+                    readonly derivedFrom?: string;
                 })[];
             };
         };
+        readonly layout?: "flex";
     }[];
     complete: boolean;
     geometryComplete: boolean;
