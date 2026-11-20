@@ -203,3 +203,12 @@ template adapter を使う。Svelte/Vue scoped CSS の実際の属性・scope �
 Chromium/Firefox/WebKit E2E 375成功 (新規12件含む)、監督ランナー exit 0、674 PID追跡、残留0。
 並行の片軸幾何開発と作業場所が衝突したため専用 worktree に分離し、
 元の checkout から本作業の重複変更だけを除去した。片軸担当の変更はそのまま保持。
+
+## 次段階: scoped CSS と実入力の残存依存
+
+目的: 実入力の Unknown を減らす。寸法に影響しない明示的な paint-only transition を
+既存の独立矩形射影で取り除けるようにし、all・transform・寸法・custom property 等は拒否。
+CSS grammar は既存 css-tree lexer で検査する。実 GALLERY 入力を再評価し、正常・違反・拒否の対照を
+3ブラウザーで測る。finite-state は既存 Vue/Svelte compiler から scoped stylesheet と
+対応する実 DOM の scope を復元できる範囲を追加し、未確認の動的 class/scoping は Unknown。
+全 gate と fork main の統合を完了条件とする。
