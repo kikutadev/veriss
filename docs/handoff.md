@@ -133,3 +133,5 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - pnpm build:ts / check:ts / test / git diff --check 成功。全867件 (root 29, verifier 742, adapter-core 66, Vue 6, React 12, Svelte 12)、失敗・skip 0。
 - e98f09a のクリーンな既存 worktree と analyzeHTML を同一入力69件で比較し、JSON 化した全レポートが69/69一致 (verified 29, violated 9, unknown 31)。grid/flex/block、media/container query、画像・picture、hover/focus、フォント、絶対配置、sticky、アニメーション、未対応CSS等の回帰確認であり、全入力の同値性証明やブラウザー照合ではない。
 - 最終 gate (3ブラウザーE2E/既存eval)、Git依存導入、性能比較は今回未実施。既存 main を変更せず、remote へ push していない。残るエンジン本体・手書き宣言・テスト/補助スクリプトの移行が必要。
+
+第五段階の方針: 残る engine のインライン境界・生成コンテンツ・幾何行の形成を優先して型付けし、計測プロファイルと内部座標を明示する。実測根拠のない補完をしない。再帰 solve/finish の型境界へつなげる。
