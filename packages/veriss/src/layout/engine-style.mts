@@ -3,17 +3,17 @@ import {q,cmp} from './linear.mjs';
 import {affine,sample,evaluate,partition} from './region.mjs';
 import type {Region} from './region.mjs';
 import {computeStyle,matches,viewportLength} from './css.mjs';
-import type {ComputedStyle,CSSRule,InheritedStyle,CSSCondition,CSSBox} from './css.mjs';
+import type {ComputedStyle,CSSRule,CSSCondition} from './css.mjs';
 import {parseCondition} from './conditions.mjs';
 import type {ParsedCondition} from './conditions.mjs';
 import {compare} from './engine-queries.mjs';
 import type {createQuerySolver,LoadedSource} from './engine-queries.mjs';
 import {lengthPieces} from './engine-geometry.mjs';
 import type {EngineOptions} from './input.mjs';
-import type {NormalizedBox,ImageSize,SVGPaint} from '../tree.mjs';
+import type {ImageSize,SVGPaint} from '../tree.mjs';
 import type {Side} from './engine-types.mjs';
 import type {LayoutSummary,LayoutRange,LayoutRegion,LayoutWarning,LayoutAffine,LayoutTextFontFacts} from '../layout-contracts.d.ts';
-type StyleBox=NormalizedBox & CSSBox & {pseudo?:string;children:StyleBox[];inline?:StyleBox[]};
+import type {SolverBox as StyleBox,SolverStyle,SolverAncestor as StyleAncestor} from './engine-solver-types.mjs';
 type Condition=ParsedCondition|CSSCondition;
 type Compiled=ReturnType<ReturnType<typeof createQuerySolver>['context']>;
 type QueryFact={condition:Condition;target:string|undefined;box:string;matched:boolean;region:Region};
@@ -29,8 +29,8 @@ export interface EngineStyle extends ComputedStyle {
   $imageRatio?:{width:number;height:number;basis:'file'|'attributes';follows:boolean};
   $uaControl?:true;$viewportLengths?:Record<string,LayoutAffine & {source:string}>;
 }
-type StyleAncestor=Parameters<ReturnType<typeof createQuerySolver>['context']>[1][number]&{box:StyleBox;style:EngineStyle};
-type StylePiece={region:Region;style:EngineStyle};
+
+type StylePiece={region:Region;style:SolverStyle};
 const zero=q(0);
 const finite=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value);
 const known=<T,>(value:T|undefined):value is T=>value!==undefined;
@@ -42,11 +42,11 @@ interface StyleContext {
   layoutWarnings:LayoutWarning[];sourceUse:Map<string,SourceUse>;queryFacts:QueryFact[];
   queries:LayoutSummary['queries'];invalidSubstitutions:NonNullable<LayoutSummary['invalidSubstitutions']>;
   ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion};
-  cssMistakes:(box:StyleBox,style:EngineStyle,ancestors:readonly StyleAncestor[],inherited:InheritedStyle|undefined,gridItem:boolean,region:Region,state?:ReadonlySet<string>)=>void;
+  cssMistakes:(box:StyleBox,style:EngineStyle,ancestors:readonly StyleAncestor[],inherited:SolverStyle|undefined,gridItem:boolean,region:Region,state?:ReadonlySet<string>)=>void;
   noteTransform:()=>void;
 }
 export function createStyleResolver({rules,preferences,hovered,untransformed,options,spend,bounded,loadedSource,context,textFonts,layoutWarnings,sourceUse,queryFacts,queries,invalidSubstitutions,ranges,cssMistakes,noteTransform}:StyleContext) {
-  function styles(box:StyleBox, region:Region, ancestors:readonly StyleAncestor[], inherited:InheritedStyle|undefined, emit:boolean, gridItem=true, state?:ReadonlySet<string>):StylePiece[] {
+  function styles(box:StyleBox, region:Region, ancestors:readonly StyleAncestor[], inherited:SolverStyle|undefined, emit:boolean, gridItem=true, state?:ReadonlySet<string>):StylePiece[] {
     spend(rules.length + 1);
     if (preferences.length) state = new Set([...(state ?? []), ...preferences]);
     if (box.pseudo) state = new Set([...(state ?? []), `::${box.pseudo}`]);
@@ -89,7 +89,7 @@ export function createStyleResolver({rules,preferences,hovered,untransformed,opt
     return regions.map(r => {
       const p = sample(r), activeContext = (compiled:Compiled) => compiled.groups.some(group => group.every(atom => compare(cmp(evaluate(atom.slack, p), zero), atom.relation)));
       const active = (rule:CSSRule) => rule.contexts.every(condition => activeContext(contexts.get(condition)!));
-      let style:EngineStyle;
+      let style:SolverStyle;
       try {style=computeStyle(relevant,box,active,inherited,{spend:(n=1)=>spend(n),state});}
       catch(error) {if(error instanceof Error && !('box' in error))Object.assign(error,{box});throw error;}
       // reportTextFonts: the computed font of each text leaf (for a caller that measures it with a font file and

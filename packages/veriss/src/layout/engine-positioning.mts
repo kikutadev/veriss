@@ -14,7 +14,7 @@ import type {LayoutDiagnostic, LayoutRange, LayoutRegion, LayoutSubgrid, SourceS
 
 const zero=q(0);
 type OriginStyle = Record<'left'|'right'|'top'|'bottom'|'position'|'overflow-x'|'overflow-y'|'grid-template-columns'|'grid-template-rows', string> & {transform?: string|undefined; 'font-size'?: string|undefined};
-interface OriginAvailable { inline: Affine2; block?: Affine2 | null; origin?: Dimensions | null; root?: boolean; alignBlock?: Rational; alignInline?: Rational; containingBlock?: Dimensions & {origin?: Dimensions | null} }
+interface OriginAvailable { inline: Affine2; block?: Affine2 | null | undefined; origin?: Dimensions | null | undefined; root?: boolean; alignBlock?: Rational; alignInline?: Rational; containingBlock?: Dimensions & {origin?: Dimensions | null | undefined} }
 interface OriginAncestor {clipped?: boolean; subgrid?: boolean}
 interface GridBox {label: string; path: string; source?: SourceSpan | undefined}
 type TrackVector = Omit<SharedTracks<GridBox>, 'gap'> & {gap: DimensionValue};

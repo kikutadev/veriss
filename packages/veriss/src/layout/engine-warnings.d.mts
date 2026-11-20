@@ -1,4 +1,4 @@
-import type { Rational } from './linear.mjs';
+import type { Rational, RationalInput } from './linear.mjs';
 import type { Region, Affine2 } from './region.mjs';
 import type { createQuerySolver } from './engine-queries.mjs';
 import type { Dimensions, DimensionValue, Side } from './engine-types.mjs';
@@ -27,14 +27,14 @@ interface WarningGeometry {
     inline: Affine2 | null;
     block: Affine2 | null;
     content?: {
-        left: DimensionValue;
-        top: DimensionValue;
+        left: Affine2 | RationalInput;
+        top: Affine2 | RationalInput;
     };
     contentBlockSize?: Affine2 | null;
     sticky?: {
         parent: string | null;
     };
-    outsideMarker?: string;
+    outsideMarker?: string | undefined;
     overflow: string;
     overflowValue: string;
     clipAxes?: {
@@ -47,16 +47,16 @@ interface WarningGeometry {
         height: number;
         basis: 'file' | 'attributes';
         follows: boolean;
-    };
+    } | undefined;
     paint?: {
-        objectFit?: string;
+        objectFit?: string | undefined;
     };
-    fixedTracks?: string;
+    fixedTracks?: string | undefined;
     wrapsByWords?: boolean;
     widthFromAttribute?: number;
     fullWidthMargins?: string[];
     contentBoxFull?: string[];
-    vwInline?: string;
+    vwInline?: string | undefined;
 }
 export declare function checkLayoutWarnings({ block, options, scrollbarProfile, geometry, sizes, boxes, diagnostics, layoutWarnings, ranges, context, isZeroAffine }: {
     block: boolean;

@@ -88,7 +88,7 @@ export interface LayoutOptions {
     /** Trusted exact native gutter geometries of the target environments. */
     scrollbars?: readonly LayoutScrollbarProfile[];
     /** Static counterparts of vlmkit's box-model integrity rules (ADR-0012). */
-    integrity?: boolean | LayoutIntegrityOptions;
+    integrity?: boolean | LayoutIntegrityOptions | undefined;
     css: string;
     cssFile?: string;
     /** Ordered reset sources, before css in the same author cascade. */
@@ -306,7 +306,7 @@ export interface LayoutDiagnostic {
     scrollbarProfile?: string;
     devicePixelRatio?: number | undefined;
     code: string;
-    severity: 'error' | 'unknown';
+    severity: 'error' | 'unknown' | 'warning';
     message: string;
     box?: string;
     path?: string;
@@ -320,6 +320,20 @@ export interface LayoutDiagnostic {
         column?: number;
     };
     hint?: string;
+    rule?: string;
+    ancestor?: string;
+    ancestorPath?: string;
+    property?: string;
+    items?: readonly string[];
+    regionConstraints?: readonly LayoutRegion['constraints'][number][];
+    state?: string;
+    alsoUnder?: readonly string[];
+    preference?: string;
+    edge?: string;
+    cover?: string;
+    scrollOffset?: number;
+    focusedLayout?: boolean;
+    tier?: string;
     related?: {
         message: string;
         css: {
@@ -338,8 +352,8 @@ export interface LayoutDiagnostic {
         viewportExact: string;
         viewportHeight?: number;
         viewportHeightExact?: string;
-        available: number;
-        required: number;
+        available?: number;
+        required?: number;
     };
     /** For a text domain: how many characters fit at the witness (font-derived contracts only). */
     text?: {
@@ -533,6 +547,23 @@ export interface LayoutWarning {
     fontSize?: string | undefined;
     lineHeight?: string | undefined;
     intervals?: [number, number][];
+    state?: string | undefined;
+    browsers?: {
+        aligns: string[];
+        ignores: string[];
+    };
+    loserAt?: string;
+    winnerAt?: string;
+    winner?: string;
+    axes?: string[];
+    sides?: string[];
+    keyframes?: string;
+    needs?: number;
+    area?: string;
+    focused?: string;
+    focusedPath?: string;
+    field?: string;
+    delta?: string;
     lines?: number;
     ancestor?: string;
     items?: string[];
@@ -632,8 +663,8 @@ export interface LayoutSummary {
         contrast: 'AA' | 'AAA';
         targetLevel: 'AA' | 'AAA';
         targetSize: number;
-        warnings: LayoutWarning[];
-        exempted: LayoutWarning[];
+        warnings: import('./layout/accessibility.mjs').AccessibilityFinding[];
+        exempted: import('./layout/accessibility.mjs').AccessibilityExemption[];
         notes: readonly unknown[];
     };
     selectors?: {
@@ -672,7 +703,7 @@ export interface LayoutSummary {
         targetSize: number;
         protrusion: 'all' | 'painted';
         warnings: LayoutIntegrityRow[];
-        exempted: LayoutIntegrityRow[];
+        exempted: Omit<LayoutIntegrityRow, 'severity' | 'message'>[];
     };
     version: 1;
     ok: boolean;
@@ -694,7 +725,7 @@ export interface LayoutSummary {
     };
     assumptions: string[];
     styleSources: {
-        kind: 'reset' | 'app';
+        kind: 'reset' | 'app' | undefined;
         file: string;
     }[];
     diagnostics: LayoutDiagnostic[];

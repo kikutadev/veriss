@@ -16,7 +16,7 @@ interface ContractBox extends ExplanationBox {
     contractSelector?: string | undefined;
 }
 export interface ExplanationStyle extends Partial<Record<ExplanationProperty, string | undefined>> {
-    position?: string;
+    position?: string | undefined;
     $sources: Readonly<Partial<Record<ExplanationProperty, LayoutCSSOrigin | undefined>>>;
     $dormant?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[] | undefined>>>;
     $overridden?: Readonly<Partial<Record<ExplanationProperty, readonly LayoutCSSOrigin[] | undefined>>>;

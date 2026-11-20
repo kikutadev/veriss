@@ -1,19 +1,19 @@
 // TypeScript source. Run pnpm build:ts to regenerate adjacent ESM and declarations.
 // Flex container orchestration, with the recursive engine supplied by callbacks.
-import { q, cmp, add, sub, mul, div, number } from './linear.mjs';
+import {q,cmp,add,mul,div,number} from './linear.mjs';
 import type { Rational } from './linear.mjs';
 import { scalar, asAffine, sum, diff, times, clip, partition } from './region.mjs';
 import type { Affine2, Region } from './region.mjs';
 import { validateFlexContainer, flexItem, crossAlignment, flexUnknown } from './flex.mjs';
-import type { FlexItemStyle, FlexContainerStyle, FlexItemModel } from './flex.mjs';
+import type {FlexItemModel} from './flex.mjs';
 import { scaleGap, constantLess, maximumConstant } from './engine-tracks.mjs';
 import type { createTrackSolver } from './engine-tracks.mjs';
 import { maximum, clamp } from './engine-edges.mjs';
-import type { createEdgeSolver, EdgeStyle } from './engine-edges.mjs';
+import type {createEdgeSolver} from './engine-edges.mjs';
 import { offset } from './engine-transforms.mjs';
 import { lengthPieces } from './engine-geometry.mjs';
 import { explanation, sizeChain, trackProperties, fact } from './explain.mjs';
-import type { Explanation, ExplanationStyle } from './explain.mjs';
+import type {Explanation} from './explain.mjs';
 import type { Axis, Side, DimensionValue, Dimensions } from './engine-types.mjs';
 import { px } from './css.mjs';
 
@@ -29,32 +29,21 @@ function rationalMargin(value: DimensionValue): Rational {
   if ('x' in value) throw flexUnknown('Flex margin requires a constant length');
   return value;
 }
-interface FlexBox { label: string; path: string; owner?: string; text: boolean; children: readonly unknown[]; contract?: {overflow?: string; overflowBlock?: string} }
-type FlexStyle = EdgeStyle & FlexItemStyle & FlexContainerStyle & ExplanationStyle & {'align-self': string; 'font-size'?: string};
-interface FlexAvailable {
-  inline?: Affine2 | undefined; block?: Affine2 | undefined; origin?: Dimensions | null | undefined;
-  marginEnd?: {inline: DimensionValue; block: DimensionValue}; percentBlock?: Affine2;
-  fitInline?: boolean; fitBlock?: boolean; flexItem?: {main: Axis}; flexBlockMinimum?: boolean;
-  definiteBlock?: boolean; alignBlock?: Rational; alignInline?: Rational;
-  $crossMeasure?: boolean; $minNatural?: boolean;
-}
-interface SolvedBox {region: Region; inline: Affine2; block: Affine2 | null}
-interface FlexChild {box: FlexBox; style: FlexStyle; inherited?: FlexStyle | undefined }
-interface Ancestor {box: FlexBox; style?: FlexStyle | undefined}
+import type {SolverBox as FlexBox,SolverStyle as FlexStyle,SolverAvailable as FlexAvailable,SolvedBox,SolverChild as FlexChild,SolverAncestor as Ancestor} from './engine-solver-types.mjs';
 interface ModelEntry { child: FlexChild; item: MainItem; align: Rational | 'stretch'; margins: Record<Side, DimensionValue> }
 interface FlexInput {
   box: FlexBox; style: FlexStyle; region: Region; inline: Affine2; contentInline: Affine2; knownBlock: Affine2 | null; blockEdges: Affine2;
-  available: FlexAvailable; parents: Ancestor[]; ancestors: Ancestor[]; contentOrigin: Dimensions | null;
+  available: FlexAvailable; parents: readonly Ancestor[]; ancestors: readonly Ancestor[]; contentOrigin: Dimensions | null;
   collect: (region: Region) => {region: Region; children: FlexChild[]}[]; emit: boolean;
 }
 interface FlexContext extends Pick<ReturnType<typeof createEdgeSolver>, 'resolvedGap'|'hasViewportMargin'|'hasViewportPadding'|'resolvedViewportLength'|'isZeroAffine'>, Pick<ReturnType<typeof createTrackSolver>, 'constantItem'|'resolveFlexLine'|'breakLines'|'mainStarts'> {
   block: boolean; options: {hostInset?: number | undefined};
   viewportLength: (value: unknown) => boolean; bounded: <T>(values:T[]) => T[];
-  frAutoMinimums: (box: FlexBox, style: FlexStyle, region: Region, parents: Ancestor[], probe: 'min'|true) => {min: Rational; max?: Rational};
+  frAutoMinimums: (box: FlexBox, style: FlexStyle, region: Region, parents: readonly Ancestor[], probe: 'min'|true) => {min: Rational; max?: Rational};
   scrolls: (style: FlexStyle, axis: 'x'|'y') => boolean;
-  obligation: (available: Affine2, required: Affine2, box: FlexBox, region: Region, code: string, axis: Axis, enabled: boolean, explain: () => Explanation, annotate: () => {layout: string}) => void;
-  solve: (box: FlexBox, available: FlexAvailable, region: Region, parents: Ancestor[], inherited: FlexStyle, emit: boolean) => SolvedBox[];
-  finish: (box: FlexBox, style: FlexStyle, region: Region, inline: Affine2, contentInline: Affine2, blockSize: Affine2 | null, contentBlock: Affine2 | null, available: FlexAvailable, parents: Ancestor[], emit: boolean) => SolvedBox;
+  obligation: (available: Affine2, required: Affine2, box: FlexBox, region: Region, code: string, axis: Axis, enabled: boolean, explain: () => Explanation, annotate: () => {layout: 'flex'}) => void;
+  solve: (box: FlexBox, available: FlexAvailable, region: Region, parents: readonly Ancestor[], inherited: FlexStyle, emit: boolean) => SolvedBox[];
+  finish: (box: FlexBox, style: FlexStyle, region: Region, inline: Affine2, contentInline: Affine2, blockSize: Affine2 | null, contentBlock: Affine2 | null, available: FlexAvailable, parents: readonly Ancestor[], emit: boolean) => SolvedBox;
 }
 export function createFlexLayout({
   block, options, viewportLength, bounded, frAutoMinimums, scrolls, obligation, solve, finish,
@@ -185,7 +174,7 @@ export function createFlexLayout({
               .map(m => ({ region: m.region, lines: [...c.lines, { indices, values: r.values, starts: m.starts }] })))));
           for (const combo of combos) {
             // The last item's end margin may stick out (it hides nothing; measured for grid and flex items).
-            for (const line of combo.lines) if (emit) obligation(contentInline, diff(sum(total(line.values), gaps(mainGap, line.indices.length)), asAffine(line.indices.length ? model[line.indices.at(-1)!]!.margins.right : zero)), box, combo.region, 'E_LAYOUT_TRACKS', 'inline', fitInline && !scrolls(style, 'x'), explainTracks('inline'), () => ({ layout: 'flex' }));
+            for (const line of combo.lines) if (emit) obligation(contentInline, diff(sum(total(line.values), gaps(mainGap, line.indices.length)), asAffine(line.indices.length ? model[line.indices.at(-1)!]!.margins.right : zero)), box, combo.region, 'E_LAYOUT_TRACKS', 'inline', fitInline && !scrolls(style, 'x'), explainTracks('inline'), () => ({ layout: 'flex' as const }));
             if (!block) {
               let endings = [combo.region];
               for (const line of combo.lines) line.indices.forEach((i, k) => { endings = bounded(endings.flatMap(r => solve(model[i]!.child.box, itemAvailable(model[i]!, { inline: line.values[k]!, fitInline }), r, ancestors, inheritedOf(model[i]!), emit).map(result => result.region))); });
@@ -208,7 +197,7 @@ export function createFlexLayout({
               if (wrap && knownBlock && ['normal', 'stretch'].includes(style['align-content'])) stretched = clamp(m.region, diff(knownBlock, used)).map(({ region: r, value: extra }) => ({ region: r, sizes: m.sizes.map(v => sum(v, times(extra, div(one, q(combo.lines.length))))) }));
               for (const st of stretched) {
                 const contentBlock = knownBlock ?? used, blockSize = sum(contentBlock, blockEdges);
-                if (emit && knownBlock) obligation(knownBlock, used, box, st.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' }));
+                if (emit && knownBlock) obligation(knownBlock, used, box, st.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' as const }));
                 let endings = [st.region], lineStart = scalar(0);
                 combo.lines.forEach((line, l) => {
                   const top = lineStart;
@@ -260,7 +249,7 @@ export function createFlexLayout({
           const used = sum(total(line.values), gaps(mainGap, line.values.length));
           const contentBlock = knownBlock ?? used, blockSize = sum(contentBlock, blockEdges);
           // The last item's bottom margin may stick out (it hides nothing).
-          if (emit && knownBlock) obligation(knownBlock, diff(used, asAffine(model.length ? model.at(-1)!.margins.bottom : zero)), box, placed.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' }));
+          if (emit && knownBlock) obligation(knownBlock, diff(used, asAffine(model.length ? model.at(-1)!.margins.bottom : zero)), box, placed.region, 'E_LAYOUT_TRACKS', 'block', fitBlock && !scrolls(style, 'y'), explainTracks('block'), () => ({ layout: 'flex' as const }));
           let endings = [placed.region];
           model.forEach((entry, i) => {
             const origin = placed.starts ? offset(contentOrigin, scalar(0), placed.starts[i]!) : null;

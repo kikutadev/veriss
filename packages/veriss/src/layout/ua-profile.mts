@@ -1,5 +1,5 @@
 export type UAEngine = 'chromium' | 'firefox' | 'webkit';
-export type Sides = [string, string, string, string];
+export type Sides = readonly [string, string, string, string];
 interface ControlBox { padding: Sides; border: Sides }
 interface ToggleBox { margin: Sides; size: number }
 export interface UAValues {

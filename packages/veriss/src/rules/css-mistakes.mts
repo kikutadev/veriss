@@ -8,73 +8,13 @@
 // Structural contracts supplied by the syntax/style/layout stages. No dependency on a layout module;
 // the region is opaque to these rules, and only the reporter can turn it into viewport ranges.
 type State = ReadonlySet<string> | undefined;
-type CssValue = string | number | undefined;
-interface Source { file: string; line: number; selector: string; specified?: string; layer?: string | undefined }
-interface Declaration { property: string; value: CssValue; file?: string; line?: number }
-interface RuleLocation { file: string; line: number; selector: string; selectors: readonly RuleSelector[] }
-interface Rule extends RuleLocation { declarations: readonly Declaration[] }
-type SelectorPart =
-  | { [K in 'tag' | 'class' | 'id' | 'lang' | 'dir' | 'path']: { kind: K; value: string } }['tag' | 'class' | 'id' | 'lang' | 'dir' | 'path']
-  | { kind: 'required' | 'read-write' | 'disabled'; value: boolean }
-  | { kind: 'any' | 'not' | 'has' | 'root' | 'link' | 'placeholder-shown' | 'structural' | 'attribute' };
-interface RuleSelector { source: string; parts: readonly SelectorPart[]; state?: string | undefined; pseudoElement?: string | undefined; chain?: readonly unknown[] }
-export interface RuleBox {
-  tag: string;
-  path: string;
-  label: string;
-  classes: readonly string[];
-  children?: readonly RuleBox[] | undefined;
-  inline?: readonly RuleBox[] | undefined;
-  anonymous?: boolean;
-  pseudo?: string | undefined;
-  focusable?: boolean | 'dynamic';
-  inputType?: string | undefined;
-  canvasSize?: { width?: number | string; height?: number | string };
-  svgSize?: { paint?: { fillSet?: boolean; strokeSet?: boolean } };
-  nativeStates?: { required?: boolean | 'dynamic' };
-  tabIndex?: number | 'dynamic';
-  contentEditable?: boolean | string;
-  attributes?: Readonly<Record<string, unknown>>;
-  boundaries?: readonly { kind: string }[];
-  tablePart?: boolean | string;
-  text?: boolean | undefined;
-  textContent?: string | undefined;
-  whitespace?: boolean | undefined;
-  value?: string | undefined;
-  placeholder?: string | undefined;
-  placeholderAttr?: boolean | undefined;
-  href?: string | undefined;
-  [parent: symbol]: RuleBox | undefined;
-}
-export interface RuleStyle {
-  // Arbitrary CSS property names are looked up by the rule; metadata has explicit contracts below.
-  [property: string]: unknown;
-  display: string;
-  position: string;
-  direction?: string;
-  content?: string;
-  'max-block-size'?: string;
-  'text-align'?: string;
-  'text-wrap-style'?: string;
-  hyphens?: string;
-  'z-index'?: string;
-  $sources: Readonly<Record<string, Source>>;
-  $overridden?: Readonly<Record<string, readonly Source[] | undefined>>;
-  $invalid?: readonly { property: string; file: string; line: number; message: string }[];
-  $layerShadowed?: readonly { property: string; value: CssValue; winnerValue: CssValue; loser: Source; winner: Source }[];
-  $tableOverflow?: Readonly<Record<string, CssValue>>;
-}
-interface Ancestor { box: RuleBox; style: RuleStyle }
-interface ViewportRange { min: number; max: number; minInclusive: boolean; maxInclusive: boolean; minExact: string; maxExact: string }
-interface RangeFacts { range: ViewportRange; heightRange?: ViewportRange; region?: { vertices: readonly { width: string; height: string }[]; constraints: readonly { coefficient: string; constant: string; heightCoefficient?: string; strict: boolean }[] } }
-interface WarningSource { property: string; file: string; line: number; selector?: string }
-export interface CssMistakeWarning extends Partial<RangeFacts> {
-  code: string; severity: 'warning'; message: string;
-  box?: string; path?: string; property?: string | undefined; properties?: string[];
-  selector?: string; state?: string | undefined; css?: WarningSource[];
-  keyframes?: string; loserAt?: string; winnerAt?: string; winner?: string; scroller?: string;
-  axes?: string[]; sides?: string[]; browsers?: { aligns: string[]; ignores: string[] };
-}
+type CssValue = unknown;
+import type {SolverBox as RuleBox,SolverStyle as RuleStyle,SolverAncestor as Ancestor} from '../layout/engine-solver-types.mjs';
+import type {Selector as RuleSelector} from '../layout/selectors.mjs';
+import type {CSSRule as Rule,CSSOrigin as Source} from '../layout/css.mjs';
+import type {LayoutWarning as CssMistakeWarning} from '../layout-contracts.d.ts';
+interface RuleLocation {file:string;line:number;selector:string;selectors:readonly RuleSelector[]}
+type RangeFacts={range:import('../layout-contracts.d.ts').LayoutRange;heightRange?:import('../layout-contracts.d.ts').LayoutRange;region?:import('../layout-contracts.d.ts').LayoutRegion};
 interface TransitionSize { box: string; path: string; properties: string[]; values: Record<string, string> }
 interface Dropped { property: string; value: CssValue; reason: string; where?: string }
 interface Report<R> {
@@ -95,7 +35,7 @@ interface Facts<R> {
   styles: (box: RuleBox, region: R, ancestors: readonly Ancestor[], inherited: RuleStyle | undefined, emit: boolean, gridItem: boolean, state?: State) => readonly { style: RuleStyle }[];
 }
 interface Tools {
-  PARENT: symbol;
+  PARENT: typeof import('../layout/selectors.mjs').PARENT;
   matches: (selector: RuleSelector, box: RuleBox, state?: State) => boolean;
   droppedOf: (style: RuleStyle, reason: string) => readonly Dropped[];
   droppedPairs: (style: RuleStyle, reason: string) => [string, CssValue][];
@@ -120,7 +60,8 @@ export interface CssMistakeContext<R> { report: Report<R>; facts: Facts<R>; tool
 export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext<R>) {
   const { warnings: layoutWarnings, unknown, diagnostics, ranges } = report;
   const { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles } = facts;
-  const { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: focusableBox } = tools;
+  const PARENT:Tools['PARENT']=tools.PARENT;
+  const { matches, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: focusableBox } = tools;
   const neverRendered = new Set(['template', 'script', 'style', 'link', 'meta']);
   // F37: a box ::first-letter / ::first-line selects, and the boxes proven to have none (not a block container).
   const firstInert = new Set<string>();
@@ -386,9 +327,9 @@ export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext
       // F41: fill / stroke on an svg reach its shapes by inheritance only; a shape with its own fill / stroke attribute
       // (or a g around it) keeps that (measured in Chromium, Firefox and WebKit). Not where a rule could style the shapes.
     if (box.tag === 'svg' && !box.pseudo) {
-      const paint: Readonly<Record<string, boolean | undefined>> = box.svgSize?.paint ?? {};
+      const paint = box.svgSize?.paint;
       const shapeRule = (key: string) => rules.some(rule => (rule.declarations ?? []).some(d => d.property === key) && (rule.selectors ?? []).some(sel => /(?:^|[\s>+~(,])(?:path|circle|rect|g|use|polygon|polyline|line|ellipse|text|tspan|symbol)\b|\*/.test(sel.source)));
-      const keys = ['fill', 'stroke'].filter(key => style.$sources?.[key] && paint[`${key}Set`] && !shapeRule(key));
+      const keys = (['fill', 'stroke'] as const).filter(key => style.$sources?.[key] && paint?.[`${key}Set`] && !shapeRule(key));
       if (keys.length && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties!.includes(keys[0]!)))
         layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, css: keys.map(key => ({ property: key, file: style.$sources[key]!.file, line: style.$sources[key]!.line, selector: style.$sources[key]!.selector })),
           message: `${box.label}: ${keys.join(' and ')} on the svg ${keys.length === 1 ? 'has' : 'have'} no effect: every shape in it sets its own ${keys.join(' / ')} attribute, which wins over an inherited value. Remove the attribute${keys.length === 1 ? '' : 's'} (or set it to currentColor and use color), or style the shapes (.icon path { ${keys[0]!}: … })` });
@@ -410,7 +351,7 @@ export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext
     }
       // F3: a declaration whose var() has no value and no fallback is invalid at computed-value time: the property is
       // unset (inherited or initial), silently — a warning where it is written.
-    for (const entry of style.$invalid ?? []) if (!layoutWarnings.some(w => w.code === 'W_CSS_VAR_INVALID' && w.css?.[0]?.line === entry.line && w.css?.[0]?.file === entry.file && w.property === entry.property))
+    for (const entry of style.$invalid ?? []) if (!layoutWarnings.some(w => w.code === 'W_CSS_VAR_INVALID' && Array.isArray(w.css) && w.css[0]?.line === entry.line && w.css[0]?.file === entry.file && w.property === entry.property))
         layoutWarnings.push({ code: 'W_CSS_VAR_INVALID', severity: 'warning', box: box.label, path: box.path, property: entry.property, css: [{ property: entry.property, file: entry.file, line: entry.line }],
           message: `${box.label}: ${entry.property} uses a custom property with no value here and no fallback (${entry.message}), so the declaration is invalid at computed-value time and ${entry.property} falls back to inherited or initial. Define the property, or give var() a fallback` });
       // Checklist F: an animation that does nothing — its @keyframes do not exist (F1), or it runs for 0s (F2: an
@@ -578,7 +519,7 @@ export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext
           // (Focus: not where the adapter could not tell — a dynamic tabindex — nor on elements whose focusability the box
           // tree does not record: frames, media with controls, image map areas, editable content.) Any tabindex, -1 too,
           // makes an element focusable by a click or focus() (measured in Chromium, Firefox and WebKit).
-          const unrecordedBox = (b: RuleBox) => ['iframe', 'video', 'audio', 'embed', 'object', 'area', 'details'].includes(b.tag) || b.focusable === 'dynamic' || b.tabIndex === 'dynamic' || b.contentEditable !== undefined || b.attributes?.contenteditable !== undefined;
+          const unrecordedBox = (b: RuleBox) => ['iframe', 'video', 'audio', 'embed', 'object', 'area', 'details'].includes(b.tag) || b.focusable === 'dynamic' || String(b.tabIndex) === 'dynamic' || b.contentEditable !== undefined || b.attributes?.contenteditable !== undefined;
           const unrecorded = unrecordedBox(box);
           const takesFocus = (b: RuleBox) => focusableBox(b) || Number.isInteger(b.tabIndex) || unrecordedBox(b);
           // F35: :focus-within holds when the element or one inside it has focus; with none that can take focus (and no

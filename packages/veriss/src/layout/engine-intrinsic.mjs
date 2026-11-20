@@ -1,7 +1,7 @@
 // TypeScript source. Run pnpm build:ts to regenerate the adjacent ESM and declarations.
 // Intrinsic contribution and rendered legend measurement.
 import { q, add, sub, mul, cmp, div, number } from './linear.mjs';
-import { scalar, sum, diff, partition } from './region.mjs';
+import { scalar, diff, partition } from './region.mjs';
 import { px } from './css.mjs';
 import { expandTracks } from './grid.mjs';
 const zero = q(0);
@@ -19,15 +19,20 @@ export function createIntrinsicSolver(styles) {
         try {
             tokens = probe ? ['auto'] : expandTracks(source);
         }
-        catch {
+        catch (error) {
+            if (probe)
+                throw error;
             return style;
         }
         const frOf = (token) => { const m = token.match(/^(\d+(?:\.\d+)?)fr$/) ?? token.match(/^minmax\(\s*auto\s*,\s*(\d+(?:\.\d+)?)fr\s*\)$/); return m ? m[1] : null; };
         const bare = tokens.map(frOf);
         const kindOf = (token) => token === 'auto' ? 'auto' : token === 'min-content' ? 'min' : token === 'max-content' ? 'max' : /^fit-content\(\s*\d+(?:\.\d+)?px\s*\)$/.test(token) ? 'fit' : null;
         const kinds = tokens.map(kindOf);
-        if (!bare.some(Boolean) && !kinds.some(Boolean))
+        if (!bare.some(Boolean) && !kinds.some(Boolean)) {
+            if (probe)
+                throw new Error('Unresolved flex minimum');
             return style;
+        }
         const ancestors = [...parents, { box, style }];
         const single = (target, at, inherited) => { const list = styles(target, region, at, inherited, false, true); const keys = new Set(list.map(x => JSON.stringify(x.style))); if (keys.size !== 1)
             unknown(`has an item whose styles change across the viewport range (${target.label})`); return list[0].style; };
@@ -251,7 +256,7 @@ export function measureLegend(styles, box, style, region, parents) {
     const blockSize = ls['box-sizing'] === 'content-box' ? add(px(ls['block-size']), vertical) : px(ls['block-size']);
     const inlineSize = ls['box-sizing'] === 'content-box' ? add(px(ls['inline-size']), horizontal) : px(ls['inline-size']);
     const top = px(style['border-top']);
-    return { box: legendBox, style: ls, blockSize, inlineSize, vertical, horizontal, effectiveTop: cmp(blockSize, top) > 0 ? blockSize : top,
+    return { box: legendBox, hidden: false, style: ls, blockSize, inlineSize, vertical, horizontal, effectiveTop: cmp(blockSize, top) > 0 ? blockSize : top,
         // The legend sits at border-left + padding-left + margin-left; a thicker border is centred on it.
         offset: { inline: add(add(px(style['border-left']), px(style['padding-left'])), px(ls['margin-left'])), block: cmp(top, blockSize) > 0 ? div(sub(top, blockSize), q(2)) : zero } };
 }

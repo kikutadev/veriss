@@ -132,7 +132,7 @@ export function tableAsGrid({ styles, uaEngine }, table, style, region, parents,
             if (cs['vertical-align'] !== 'baseline')
                 continue;
             const metrics = cell.contract?.textMetrics, L = cell.contract?.font?.lineHeight;
-            if (spanning || !metrics?.baseline || !L)
+            if (spanning || !metrics || !('baseline' in metrics) || !metrics.baseline || !L)
                 return fail(`${cell.label}: a baseline-aligned text cell needs font-derived text metrics (its first baseline)`);
             const leading = L - metrics.baseline.ascent - metrics.baseline.descent;
             if (leading < 0 && leading % 2)

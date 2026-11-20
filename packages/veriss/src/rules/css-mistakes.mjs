@@ -1,7 +1,8 @@
 export function createCssMistakes({ report, facts, tools }) {
     const { warnings: layoutWarnings, unknown, diagnostics, ranges } = report;
     const { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles } = facts;
-    const { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: focusableBox } = tools;
+    const PARENT = tools.PARENT;
+    const { matches, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: focusableBox } = tools;
     const neverRendered = new Set(['template', 'script', 'style', 'link', 'meta']);
     // F37: a box ::first-letter / ::first-line selects, and the boxes proven to have none (not a block container).
     const firstInert = new Set();
@@ -303,9 +304,9 @@ export function createCssMistakes({ report, facts, tools }) {
         // F41: fill / stroke on an svg reach its shapes by inheritance only; a shape with its own fill / stroke attribute
         // (or a g around it) keeps that (measured in Chromium, Firefox and WebKit). Not where a rule could style the shapes.
         if (box.tag === 'svg' && !box.pseudo) {
-            const paint = box.svgSize?.paint ?? {};
+            const paint = box.svgSize?.paint;
             const shapeRule = (key) => rules.some(rule => (rule.declarations ?? []).some(d => d.property === key) && (rule.selectors ?? []).some(sel => /(?:^|[\s>+~(,])(?:path|circle|rect|g|use|polygon|polyline|line|ellipse|text|tspan|symbol)\b|\*/.test(sel.source)));
-            const keys = ['fill', 'stroke'].filter(key => style.$sources?.[key] && paint[`${key}Set`] && !shapeRule(key));
+            const keys = ['fill', 'stroke'].filter(key => style.$sources?.[key] && paint?.[`${key}Set`] && !shapeRule(key));
             if (keys.length && !layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties.includes(keys[0])))
                 layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, css: keys.map(key => ({ property: key, file: style.$sources[key].file, line: style.$sources[key].line, selector: style.$sources[key].selector })),
                     message: `${box.label}: ${keys.join(' and ')} on the svg ${keys.length === 1 ? 'has' : 'have'} no effect: every shape in it sets its own ${keys.join(' / ')} attribute, which wins over an inherited value. Remove the attribute${keys.length === 1 ? '' : 's'} (or set it to currentColor and use color), or style the shapes (.icon path { ${keys[0]}: … })` });
@@ -328,7 +329,7 @@ export function createCssMistakes({ report, facts, tools }) {
         // F3: a declaration whose var() has no value and no fallback is invalid at computed-value time: the property is
         // unset (inherited or initial), silently — a warning where it is written.
         for (const entry of style.$invalid ?? [])
-            if (!layoutWarnings.some(w => w.code === 'W_CSS_VAR_INVALID' && w.css?.[0]?.line === entry.line && w.css?.[0]?.file === entry.file && w.property === entry.property))
+            if (!layoutWarnings.some(w => w.code === 'W_CSS_VAR_INVALID' && Array.isArray(w.css) && w.css[0]?.line === entry.line && w.css[0]?.file === entry.file && w.property === entry.property))
                 layoutWarnings.push({ code: 'W_CSS_VAR_INVALID', severity: 'warning', box: box.label, path: box.path, property: entry.property, css: [{ property: entry.property, file: entry.file, line: entry.line }],
                     message: `${box.label}: ${entry.property} uses a custom property with no value here and no fallback (${entry.message}), so the declaration is invalid at computed-value time and ${entry.property} falls back to inherited or initial. Define the property, or give var() a fallback` });
         // Checklist F: an animation that does nothing — its @keyframes do not exist (F1), or it runs for 0s (F2: an
@@ -552,7 +553,7 @@ export function createCssMistakes({ report, facts, tools }) {
                     // (Focus: not where the adapter could not tell — a dynamic tabindex — nor on elements whose focusability the box
                     // tree does not record: frames, media with controls, image map areas, editable content.) Any tabindex, -1 too,
                     // makes an element focusable by a click or focus() (measured in Chromium, Firefox and WebKit).
-                    const unrecordedBox = (b) => ['iframe', 'video', 'audio', 'embed', 'object', 'area', 'details'].includes(b.tag) || b.focusable === 'dynamic' || b.tabIndex === 'dynamic' || b.contentEditable !== undefined || b.attributes?.contenteditable !== undefined;
+                    const unrecordedBox = (b) => ['iframe', 'video', 'audio', 'embed', 'object', 'area', 'details'].includes(b.tag) || b.focusable === 'dynamic' || String(b.tabIndex) === 'dynamic' || b.contentEditable !== undefined || b.attributes?.contenteditable !== undefined;
                     const unrecorded = unrecordedBox(box);
                     const takesFocus = (b) => focusableBox(b) || Number.isInteger(b.tabIndex) || unrecordedBox(b);
                     // F35: :focus-within holds when the element or one inside it has focus; with none that can take focus (and no

@@ -11,17 +11,17 @@ export interface SelectorBox {
   children?: readonly SelectorBox[]; inline?: readonly SelectorBox[]|undefined;
   id?: string | undefined; path?: string; label?: string; documentRoot?: boolean; anonymous?: boolean; pseudo?: string | boolean;
   boundaries?: readonly Boundary[];
-  inputType?: string; placeholderAttr?: boolean; value?: string; text?: boolean; whitespace?: boolean; textContent?: string;
+  inputType?: string; placeholderAttr?: boolean; value?: string|undefined; text?: boolean; whitespace?: boolean; textContent?: string|undefined;
   nativeStates?: Record<string, boolean | string | undefined>;
   contentEditable?: unknown; attributes?: Record<string, string | boolean | number | undefined>;
   disabled?: boolean | string; lang?: string; dirAttr?: string; href?: string|undefined;
 }
 type Nth = { a: number; b: number };
-type AttributePart = {kind: 'attribute'; name: string; operator?: string; value?: string; insensitive?: boolean};
+type AttributePart = {kind: 'attribute'; name: string; operator?: string; value?: string|undefined; insensitive?: boolean};
 type StructuralPart = {kind: 'structural'; name: string; a?: number; b?: number; of?: Selector[]};
 type HasPart = {kind: 'has'; relative: {combinator: Combinator; selector: Selector}[]; choices: Selector[]};
 export type SelectorPart =
-  | {kind: 'tag' | 'class' | 'id' | 'path' | 'lang' | 'dir'; value: string}
+  | {[K in 'tag'|'class'|'id'|'path'|'lang'|'dir']: {kind:K;value:string}}['tag'|'class'|'id'|'path'|'lang'|'dir']
   | {kind: 'disabled' | 'required' | 'read-write'; value: boolean}
   | {kind: 'root' | 'placeholder-shown'}
   | {kind: 'link'; name: string}

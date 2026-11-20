@@ -7,17 +7,19 @@ import type { Axis } from './engine-types.mjs';
 import type { LayoutSummary, LayoutWarning, LayoutRange, LayoutRegion } from '../layout-contracts.d.ts';
 type ValidationBox = NormalizedBox & {
     pseudo?: string | boolean;
-    contract?: EngineBoxContract;
+    contract?: EngineBoxContract | undefined;
 };
 interface ValidationAllocation {
     inline?: Affine2;
-    block?: Affine2 | null;
+    block?: Affine2 | null | undefined;
     gridItem?: boolean;
     blockFlowChild?: boolean;
     flexItem?: {
         main: Axis;
     };
-    autoMargins?: boolean;
+    autoMargins?: boolean | {
+        inline?: boolean;
+    };
     flexBlockMinimum?: boolean;
     alignBlock?: Rational;
     root?: boolean;

@@ -1,45 +1,17 @@
 import type { Rational } from './linear.mjs';
 import type { Affine2, Region } from './region.mjs';
+import type { SolverBox, SolverStyle, SolverAncestor } from './engine-solver-types.mjs';
 import type { EngineBoxContract } from './input.mjs';
-type Side = 'left' | 'right' | 'top' | 'bottom';
-type TableStyleKey = 'display' | 'position' | 'float' | 'table-layout' | 'border-collapse' | 'border-spacing' | 'inline-size' | 'block-size' | 'min-inline-size' | 'max-inline-size' | 'min-block-size' | 'max-block-size' | 'box-sizing' | 'vertical-align' | 'caption-side' | 'background-color' | 'background-image' | 'grid-template-columns' | 'grid-template-rows' | 'grid-row' | 'grid-column' | 'row-gap' | 'column-gap' | 'flex-direction' | 'flex-wrap' | 'flex-basis' | 'align-items' | 'align-self' | 'order' | `padding-${Side}` | `border-${Side}` | `margin-${Side}`;
-export type TableStyle = Record<TableStyleKey, string> & {
-    $sources?: Readonly<Record<string, unknown>>;
-    'grid-auto-rows'?: string;
-    'grid-auto-flow'?: string;
-    'align-content'?: string;
-    $fromCell?: boolean;
-    tableColumns?: Rational | null;
-    tableGaps?: Rational;
-    tableShrink?: Rational;
-    tableAutoMinimum?: Rational;
-};
+export type TableStyle = SolverStyle;
 type BlockProfile = NonNullable<EngineBoxContract['intrinsicBlockSize']>;
 type ProfileEntries = Exclude<BlockProfile, number>;
-type TableContract = Omit<EngineBoxContract, 'textMetrics'> & {
-    textMetrics?: NonNullable<EngineBoxContract['textMetrics']> & {
-        baseline?: {
-            ascent: number;
-            descent: number;
-        };
-    };
-};
 interface CellArea {
     column: number;
     row: number;
     span: number;
     down: number;
 }
-export interface TableBox {
-    tag: string;
-    label: string;
-    path: string;
-    text: boolean;
-    children: TableBox[];
-    inline?: readonly TableBox[] | undefined;
-    colSpan?: number | 'dynamic';
-    rowSpan?: number | 'dynamic';
-    contract?: TableContract | undefined;
+export interface TableMetadata {
     tableAt?: CellArea;
     tableArea?: CellArea;
     tablePart?: boolean;
@@ -71,10 +43,8 @@ export interface TableBox {
         };
     };
 }
-interface TableAncestor {
-    box: TableBox;
-    style: TableStyle;
-}
+type TableBox = SolverBox;
+type TableAncestor = SolverAncestor;
 interface TableStylePiece {
     region: Region;
     style: TableStyle;

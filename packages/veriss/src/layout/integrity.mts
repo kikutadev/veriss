@@ -37,15 +37,10 @@ interface SizedGeometry extends BaseGeometry {
   inline: Affine2;
   block: Affine2 | null;
   origin: Origin | null;
-  content: { left: Affine2 | RationalInput; top: Affine2 | RationalInput; inline: Affine2 };
-  textAlign: string;
+  content?: { left: Affine2 | RationalInput; top: Affine2 | RationalInput; inline: Affine2 };
+  textAlign?: string|undefined;
 }
-interface UnplacedInline extends BaseGeometry {
-  inline: null;
-  block: null;
-  origin: null;
-}
-export type IntegrityGeometry = SizedGeometry | UnplacedInline;
+export type IntegrityGeometry = BaseGeometry & {inline:Affine2|null;block:Affine2|null;origin:Origin|null;content?:SizedGeometry['content'];textAlign?:string|undefined};
 type PlacedGeometry = SizedGeometry & { origin: Origin; block: Affine2 };
 type BlockGeometry = SizedGeometry & { block: Affine2 };
 interface Extent { inline: [Affine2, Affine2][]; block: [Affine2, Affine2][]; basis: 'border-box' | 'text' }
@@ -62,8 +57,8 @@ interface Exemption extends Ranges, FindingExtras {
 }
 export interface IntegrityInput { geometry: readonly IntegrityGeometry[]; waived: readonly Waiver[] }
 export interface IntegrityOptions { block: boolean; targetSize?: number; protrusion?: 'all' | 'painted'; ranges: (region: Region) => Ranges }
-function placedGeometry(row: IntegrityGeometry): row is PlacedGeometry { return Boolean(row.origin && row.block); }
-function blockGeometry(row: IntegrityGeometry): row is BlockGeometry { return Boolean(row.block); }
+function placedGeometry(row: IntegrityGeometry): row is PlacedGeometry { return Boolean(row.origin && row.block && row.inline); }
+function blockGeometry(row: IntegrityGeometry): row is BlockGeometry { return Boolean(row.block && row.inline); }
 
 
 export function intersect(a: Region, b: Region): Region | null {
@@ -83,10 +78,11 @@ const alignments: Record<string, number> = { start: 0, left: 0, justify: 0, cent
  * for a domain, strings wider than the box start-align within [start, bound].
  */
 function textExtents(row: PlacedGeometry): { region: Region; extent: Extent }[] {
-  const contract = row.box.contract, factor = alignments[row.textAlign];
+  const content=row.content;
+  const contract = row.box.contract, factor = alignments[row.textAlign??''];
   // Wrapped lines (kind 'lines') are bounded by the border box.
-  if (!contract?.textMetrics || contract.textMetrics.kind === 'lines' || !contract.font || factor === undefined) return [{ region: row.region, extent: box(row) }];
-  const start = sum(row.origin.inline, asAffine(row.content.left)), top = sum(row.origin.block, asAffine(row.content.top));
+  if (!contract?.textMetrics || contract.textMetrics.kind === 'lines' || !contract.font || factor === undefined || !content) return [{ region: row.region, extent: box(row) }];
+  const start = sum(row.origin.inline, asAffine(content.left)), top = sum(row.origin.block, asAffine(content.top));
   const width = scalar(contract.minInlineSize!), block: Extent['block'] = [[top, sum(top, scalar(contract.font.lineHeight))]];
   const place = (left: Affine2): Extent => {
     const extent: Extent = { inline: [[left, sum(left, width)]], block: [...block], basis: 'text' };
@@ -94,8 +90,8 @@ function textExtents(row: PlacedGeometry): { region: Region; extent: Extent }[] 
     return extent;
   };
   if (factor === 0) return [{ region: row.region, extent: place(start) }];
-  const fits = partition(row.region, diff(row.content.inline, width), '>=');
-  return [...fits.yes.map(region => ({ region, extent: place(sum(start, times(diff(row.content.inline, width), q(factor)))) })),
+  const fits = partition(row.region, diff(content.inline, width), '>=');
+  return [...fits.yes.map(region => ({ region, extent: place(sum(start, times(diff(content.inline, width), q(factor)))) })),
     ...fits.no.map(region => ({ region, extent: place(start) }))];
 }
 const isParent = (parent: IntegrityGeometry, child: IntegrityGeometry) => child.path.startsWith(parent.path + '/') && !child.path.slice(parent.path.length + 1).includes('/');

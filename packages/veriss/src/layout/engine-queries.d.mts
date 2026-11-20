@@ -3,17 +3,15 @@ import type { ParsedCondition } from './conditions.mjs';
 export type LoadedSource = string | undefined | {
     candidates: string[];
 };
-interface QueryTarget {
-    inline: Affine2;
-    block: Affine2 | null;
+interface QueryAncestor {
+    inline?: Affine2 | null;
+    block?: Affine2 | null;
     box?: {
         label: string;
         path: string;
     };
-}
-interface QueryAncestor extends QueryTarget {
-    type: string;
-    names: readonly string[];
+    type?: string;
+    names?: readonly string[];
 }
 interface CompiledQuery {
     groups: {

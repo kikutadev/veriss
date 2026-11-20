@@ -61,7 +61,7 @@ export interface CSSRule extends CSSLocation {
     declarations: CSSDeclaration[];
     contexts: CSSCondition[];
     layer: number | null;
-    layerName?: string;
+    layerName?: string | undefined;
     attached?: boolean;
     preferences?: CSSPreference[];
     stateGeometry?: boolean;
@@ -111,10 +111,10 @@ export interface CSSSheet {
     css: string;
     file: string;
 }
-export type CSSDiagnostic = (code: string, message: string, line?: number, filename?: string, detail?: unknown) => void;
+export type CSSDiagnostic = (code: string, message: string, line?: number, filename?: string, detail?: Omit<import('../layout-contracts.d.ts').LayoutDiagnostic, 'code' | 'message'>) => void;
 interface CSSParseOptions {
-    scripting?: 'enabled';
-    mediaFeatures?: MediaFeatures;
+    scripting?: 'enabled' | undefined;
+    mediaFeatures?: MediaFeatures | undefined;
 }
 export declare function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagnostic, { scripting, mediaFeatures }?: CSSParseOptions): {
     rules: CSSRule[];
@@ -205,7 +205,9 @@ interface ComputedMetadata extends DroppedStyle {
     $tableOverflow?: CSSValueMap;
 }
 type KnownComputedProperties = Partial<Record<keyof ReturnType<typeof defaultStyle> | keyof typeof textInitial | `scroll-${'margin' | 'padding'}-${'top' | 'right' | 'bottom' | 'left'}` | 'content' | 'clear' | 'column-count' | 'column-width' | 'list-style-image', string | undefined>>;
-export interface ComputedStyle extends ComputedMetadata, KnownComputedProperties {
+declare const requiredComputedKeys: readonly ["display", "position", "direction", "float", "table-layout", "border-collapse", "border-spacing", "inline-size", "block-size", "min-inline-size", "max-inline-size", "min-block-size", "max-block-size", "box-sizing", "vertical-align", "caption-side", "background-color", "background-image", "grid-template-columns", "grid-template-rows", "grid-row", "grid-column", "grid-auto-rows", "grid-auto-flow", "grid-template-areas", "row-gap", "column-gap", "flex-direction", "flex-wrap", "flex-basis", "flex-grow", "flex-shrink", "justify-content", "align-content", "align-items", "align-self", "order", "overflow-x", "overflow-y", "container-type", "container-name", "left", "right", "top", "bottom", "scrollbar-gutter", "scrollbar-width", "aspect-ratio", "justify-items", "justify-self", "transform", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top", "border-right", "border-bottom", "border-left", "margin-top", "margin-right", "margin-bottom", "margin-left"];
+type RequiredComputedProperties = Record<typeof requiredComputedKeys[number], string>;
+export interface ComputedStyle extends ComputedMetadata, Omit<KnownComputedProperties, keyof RequiredComputedProperties>, RequiredComputedProperties {
     $sources: SourceMap;
     $invalid: InvalidDeclaration[];
     [key: string]: unknown;

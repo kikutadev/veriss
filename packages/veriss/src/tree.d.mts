@@ -49,10 +49,10 @@ interface DOMFacts {
     inputName?: string;
     ariaLabel?: string;
     href?: string | undefined;
-    textContent?: string;
+    textContent?: string | undefined;
     aria?: Record<string, string>;
     nameSource?: string;
-    value?: string;
+    value?: string | undefined;
     autocomplete?: string;
     scope?: string;
     controls?: boolean;

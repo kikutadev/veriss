@@ -19,9 +19,13 @@ type BoundRow = {
         region: Region;
         outer: BoundRect | null;
         inner: BoundRect | null;
-    }[];
+    }[] | undefined;
 };
-type ReportData = Pick<LayoutSummary, 'diagnostics' | 'policies' | 'checks' | 'sizes' | 'queries' | 'subgrids'>;
+import type { EngineSize } from './engine-finish.mjs';
+export type EngineReport = Omit<LayoutSummary, 'sizes'> & {
+    sizes: EngineSize[];
+};
+type ReportData = Pick<EngineReport, 'diagnostics' | 'policies' | 'checks' | 'sizes' | 'queries' | 'subgrids'>;
 type A11y = NonNullable<LayoutSummary['accessibility']>;
 type Integrity = NonNullable<LayoutSummary['integrity']>;
 interface ReportInput extends ReportData {
@@ -31,7 +35,7 @@ interface ReportInput extends ReportData {
     initial: Region;
     rules: readonly CSSRule[];
     styleSources: readonly {
-        kind: 'reset' | 'app';
+        kind?: 'reset' | 'app';
         file: string;
     }[];
     boxes: readonly NormalizedBox[];
@@ -56,5 +60,5 @@ interface ReportInput extends ReportData {
     integrityWarnings: Integrity['warnings'];
     integrityExempted: Integrity['exempted'];
 }
-export declare function buildLayoutReport({ component, block, options, initial, rules, styleSources, boxes, geometry, ranges, diagnostics, policies, checks, sizes, queries, subgrids, scrollbars, invalidSubstitutions, layoutWarnings, pageScroll, transitionSizes, textFonts, untransformed, hovered, generatedTexts, accessibilityWarnings, accessibilityExempted, accessibilityNotes, integrityWarnings, integrityExempted }: ReportInput): LayoutSummary;
+export declare function buildLayoutReport({ component, block, options, initial, rules, styleSources, boxes, geometry, ranges, diagnostics, policies, checks, sizes, queries, subgrids, scrollbars, invalidSubstitutions, layoutWarnings, pageScroll, transitionSizes, textFonts, untransformed, hovered, generatedTexts, accessibilityWarnings, accessibilityExempted, accessibilityNotes, integrityWarnings, integrityExempted }: ReportInput): EngineReport;
 export {};

@@ -32,19 +32,20 @@ interface SizedGeometry extends BaseGeometry {
     inline: Affine2;
     block: Affine2 | null;
     origin: Origin | null;
-    content: {
+    content?: {
         left: Affine2 | RationalInput;
         top: Affine2 | RationalInput;
         inline: Affine2;
     };
-    textAlign: string;
+    textAlign?: string | undefined;
 }
-interface UnplacedInline extends BaseGeometry {
-    inline: null;
-    block: null;
-    origin: null;
-}
-export type IntegrityGeometry = SizedGeometry | UnplacedInline;
+export type IntegrityGeometry = BaseGeometry & {
+    inline: Affine2 | null;
+    block: Affine2 | null;
+    origin: Origin | null;
+    content?: SizedGeometry['content'];
+    textAlign?: string | undefined;
+};
 interface Extent {
     inline: [Affine2, Affine2][];
     block: [Affine2, Affine2][];

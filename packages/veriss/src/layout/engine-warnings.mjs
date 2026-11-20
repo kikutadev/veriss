@@ -169,7 +169,7 @@ export function checkLayoutWarnings({ block, options, scrollbarProfile, geometry
             continue;
         if (layoutWarnings.some(w => w.code === 'W_LAYOUT_IMAGE_DISTORTED' && w.path === row.path))
             continue;
-        if (['left', 'right', 'top', 'bottom'].some(side => cmp(row.borders?.[side] ?? zero, zero) !== 0) || !isZeroAffine(row.content.left) || !isZeroAffine(row.content.top))
+        if (['left', 'right', 'top', 'bottom'].some(side => cmp(row.borders?.[side] ?? zero, zero) !== 0) || !isZeroAffine(asAffine(row.content.left)) || !isZeroAffine(asAffine(row.content.top)))
             continue;
         const { width: w, height: h } = row.imageRatio;
         // inline·h vs block·w: wider when inline·h·50 > block·w·51, taller when inline·h·51 < block·w·50.

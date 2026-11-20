@@ -234,7 +234,7 @@ interface RangeFacts { range: LayoutRange; heightRange?: LayoutRange; region?: L
 type DiagnosticDetails = {
   rule: string; other?: string; cover?: string; before?: string; previous?: string; outer?: string; reference?: string; id?: string; name?: string;
   ratio?: number; required?: number; foreground?: Color; background?: Color; control?: string; fontSize?: number;
-  clipper?: string; coverBox?: string; scroller?: string; axis?: string; part?: string; edge?: string; layer?: string; also?: string; first?: string;
+  clipper?: string; coverBox?: string; scroller?: string; axis?: 'inline'|'block'; part?: string; edge?: string; layer?: string; also?: string; first?: string;
   label?: string; parent?: string; child?: string; caption?: string; role?: string | undefined; attribute?: string; value?: string | undefined; visible?: string;
   content?: string; missing?: string; rotated?: string; state?: string; lines?: number; level?: string; animation?: AnimationPaint; transition?: TransitionPaint;
   perSecond?: number; accessKey?: string; target?: string; controls?: string; dialog?: string; message?: string;
@@ -966,7 +966,8 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }: Acce
   };
   if (scrollZero) for (const s of placed.filter(row => row.overflow === 'scroll' && row.path !== root?.path && !row.box.documentRoot && ['auto', 'scroll'].includes(String(row.overflowValue)) && row.paddingBlockEnd !== undefined && row.paddingInlineEnd !== undefined && row.direction !== 'rtl')) {
     const inside = placed.filter(row => isAncestor(s.path, row.path) && row.origin && visible(row) && !hiddenFrom(row.path) && row.position !== 'fixed');
-    for (const [axisName, a] of Object.entries(axes)) {
+    for (const axisName of ['block','inline'] as const) {
+      const a = axes[axisName];
       const innerEnd = diff(a.end(s), scalar(a.border(s))), crossInnerEnd = diff(a.crossEnd(s), scalar(a.crossBorder(s)));
       for (const target of inside.filter(row => (row.box.text || focusable(row)) && !row.box.pseudo)) {
         let base: Region | null = target.region;

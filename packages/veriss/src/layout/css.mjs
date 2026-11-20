@@ -1681,6 +1681,7 @@ export function parseLayoutCSS(sheets, diagnostic, { scripting, mediaFeatures } 
 // The UA default family and the user's default font size are not author
 // facts: `medium` and `ua-default` stay unresolved for text metrics.
 const textInitial = { 'font-family': 'ua-default', 'font-size': 'medium', 'line-height': 'normal', 'font-weight': 'normal', 'font-style': 'normal', 'font-stretch': 'normal', 'font-variant': 'normal', 'text-transform': 'none', 'letter-spacing': 'normal', 'word-spacing': 'normal', 'text-align': 'start' };
+const requiredComputedKeys = ["display", "position", "direction", "float", "table-layout", "border-collapse", "border-spacing", "inline-size", "block-size", "min-inline-size", "max-inline-size", "min-block-size", "max-block-size", "box-sizing", "vertical-align", "caption-side", "background-color", "background-image", "grid-template-columns", "grid-template-rows", "grid-row", "grid-column", "grid-auto-rows", "grid-auto-flow", "grid-template-areas", "row-gap", "column-gap", "flex-direction", "flex-wrap", "flex-basis", "flex-grow", "flex-shrink", "justify-content", "align-content", "align-items", "align-self", "order", "overflow-x", "overflow-y", "container-type", "container-name", "left", "right", "top", "bottom", "scrollbar-gutter", "scrollbar-width", "aspect-ratio", "justify-items", "justify-self", "transform", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top", "border-right", "border-bottom", "border-left", "margin-top", "margin-right", "margin-bottom", "margin-left"];
 function inheritedValue(inherited, property) {
     const value = inherited[property];
     if (value === undefined || typeof value === 'string')
@@ -1726,6 +1727,9 @@ function defaultStyle(box, inherited) {
         'writing-mode': inheritedValue(inherited, 'writing-mode') ?? 'horizontal-tb', direction: inheritedValue(inherited, "direction") ?? 'ltr',
         ...Object.fromEntries(textProperties.map(key => [key, inheritedValue(inherited, key) ?? textDefaults[key]])),
     };
+}
+function hasRequiredComputedProperties(style) {
+    return requiredComputedKeys.every(key => typeof style[key] === 'string');
 }
 export function computeStyle(rules, box, active, inherited = {}, { spend, state, rtl = false } = {}) {
     let flipped = false;
@@ -2361,5 +2365,8 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
     // A logical side was taken as ltr; in an rtl box cascade again with the sides flipped.
     if (!rtl && flipped && values.direction === 'rtl')
         return computeStyle(rules, box, active, inherited, { spend, state, rtl: true });
-    return { ...values, ...metadata, $sources: sources, $invalid: invalid };
+    const result = { ...values, ...metadata, $sources: sources, $invalid: invalid };
+    if (!hasRequiredComputedProperties(result))
+        throw new Error('Unresolved required computed CSS property');
+    return result;
 }

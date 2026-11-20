@@ -728,7 +728,7 @@ export type CSSDeclaration = DeclarationBase & (
 );
 export interface CSSRule extends CSSLocation {
   selectors: Selector[]; declarations: CSSDeclaration[]; contexts: CSSCondition[];
-  layer: number | null; layerName?: string; attached?: boolean; preferences?: CSSPreference[];
+  layer: number | null; layerName?: string|undefined; attached?: boolean; preferences?: CSSPreference[];
   stateGeometry?: boolean; stateLayout?: boolean; hoverLayout?: boolean;
 }
 interface CSSRuleReference extends CSSLocation {selectors: Selector[]; selector: string}
@@ -739,8 +739,8 @@ interface Keyframe {offset: number; props: CSSValueMap; layout?: string; easing?
 interface FontFace extends CSSLocation {family: string; display: string; local: boolean; embedded: boolean; overrides: string[]}
 interface StartingRule extends CSSLocation {selectors: Selector[]; declarations: {property: string; value: string; important: boolean}[]; order: number; contexts: CSSCondition[]}
 export interface CSSSheet {css: string; file: string}
-export type CSSDiagnostic = (code: string, message: string, line?: number, filename?: string, detail?: unknown) => void;
-interface CSSParseOptions {scripting?: 'enabled'; mediaFeatures?: MediaFeatures}
+export type CSSDiagnostic = (code: string, message: string, line?: number, filename?: string, detail?: Omit<import('../layout-contracts.d.ts').LayoutDiagnostic,'code'|'message'>) => void;
+interface CSSParseOptions {scripting?: 'enabled'|undefined; mediaFeatures?: MediaFeatures|undefined}
 function sourceStart(node: Node) { return present(node.source?.start); }
 function messageOf(error: unknown): string { return error instanceof Error ? error.message : String(error); }
 function codeOf(error: unknown): string | undefined { return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined; }
@@ -1199,7 +1199,9 @@ type KnownComputedProperties = Partial<Record<
   'content' | 'clear' | 'column-count' | 'column-width' | 'list-style-image',
   string | undefined
 >>;
-export interface ComputedStyle extends ComputedMetadata, KnownComputedProperties {
+const requiredComputedKeys = ["display", "position", "direction", "float", "table-layout", "border-collapse", "border-spacing", "inline-size", "block-size", "min-inline-size", "max-inline-size", "min-block-size", "max-block-size", "box-sizing", "vertical-align", "caption-side", "background-color", "background-image", "grid-template-columns", "grid-template-rows", "grid-row", "grid-column", "grid-auto-rows", "grid-auto-flow", "grid-template-areas", "row-gap", "column-gap", "flex-direction", "flex-wrap", "flex-basis", "flex-grow", "flex-shrink", "justify-content", "align-content", "align-items", "align-self", "order", "overflow-x", "overflow-y", "container-type", "container-name", "left", "right", "top", "bottom", "scrollbar-gutter", "scrollbar-width", "aspect-ratio", "justify-items", "justify-self", "transform", "padding-top", "padding-right", "padding-bottom", "padding-left", "border-top", "border-right", "border-bottom", "border-left", "margin-top", "margin-right", "margin-bottom", "margin-left"] as const;
+type RequiredComputedProperties=Record<typeof requiredComputedKeys[number],string>;
+export interface ComputedStyle extends ComputedMetadata, Omit<KnownComputedProperties,keyof RequiredComputedProperties>, RequiredComputedProperties {
   $sources:SourceMap; $invalid:InvalidDeclaration[];
   [key: string]: unknown;
 }
@@ -1251,6 +1253,9 @@ function defaultStyle(box: CSSBox, inherited: InheritedStyle) {
     'writing-mode': inheritedValue(inherited, 'writing-mode') ?? 'horizontal-tb', direction: inheritedValue(inherited, "direction") ?? 'ltr',
     ...Object.fromEntries<string | undefined>(textProperties.map(key => [key, inheritedValue(inherited, key) ?? textDefaults[key]])),
   };
+}
+function hasRequiredComputedProperties<T extends Record<string,unknown>>(style:T):style is T & RequiredComputedProperties {
+  return requiredComputedKeys.every(key=>typeof style[key]==='string');
 }
 export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (rule: CSSRule) => boolean, inherited: InheritedStyle = {}, {spend, state, rtl = false}: StyleOptions = {}): ComputedStyle {
   let flipped = false;
@@ -1673,5 +1678,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
     for (const key of ['overflow-x', 'overflow-y']) { if (sources[key] || sources.overflow) (metadata.$tableOverflow ??= {})[key] = values[key]; values[key] = 'visible'; }
   // A logical side was taken as ltr; in an rtl box cascade again with the sides flipped.
   if (!rtl && flipped && values.direction === 'rtl') return computeStyle(rules, box, active, inherited, {spend, state, rtl: true});
-  return {...values, ...metadata, $sources:sources, $invalid:invalid};
+  const result={...values,...metadata,$sources:sources,$invalid:invalid};
+  if(!hasRequiredComputedProperties(result))throw new Error('Unresolved required computed CSS property');
+  return result;
 }

@@ -1,11 +1,10 @@
-import type { Rational } from './linear.mjs';
 import type { Affine2, Region } from './region.mjs';
 import type { LayoutAffine } from '../layout-contracts.d.ts';
 import type { Side, DimensionValue } from './engine-types.mjs';
 type GapKey = 'column-gap' | 'row-gap';
 type EdgeKey = GapKey | `margin-${Side}` | `padding-${Side}`;
 export type EdgeStyle = Record<EdgeKey | `border-${Side}` | 'position' | 'block-size' | 'direction' | 'display' | 'max-block-size' | 'overflow-x' | 'overflow-y', string> & {
-    'font-size'?: string;
+    'font-size'?: string | undefined;
     $usedMarginTop?: LayoutAffine;
     $viewportLengths?: Partial<Record<EdgeKey, LayoutAffine & {
         source: string;
@@ -13,7 +12,7 @@ export type EdgeStyle = Record<EdgeKey | `border-${Side}` | 'position' | 'block-
     $blockFlow?: boolean;
 };
 type InlineSizingStyle = Record<'inline-size' | 'min-inline-size' | 'max-inline-size' | 'box-sizing', string> & {
-    'font-size'?: string;
+    'font-size'?: string | undefined;
 };
 interface MarginBox {
     label: string;
@@ -38,7 +37,7 @@ export declare const clamp: (region: Region, value: Affine2) => {
 }[];
 export declare const ratioOf: (style: {
     "aspect-ratio"?: string | undefined;
-}) => Rational | null;
+}) => import("./linear.mjs").Rational | null;
 export declare const minimumOf: (region: Region, a: Affine2, b: Affine2) => {
     region: Region;
     value: Affine2;
@@ -49,9 +48,9 @@ export declare function preferredInlinePieces(style: InlineSizingStyle, parent: 
 }[];
 export declare function createEdgeSolver(viewportLength: (value: unknown) => boolean, bounded: <T>(values: T[]) => T[], block: boolean): {
     fromAffineFact: (fact: LayoutAffine) => {
-        x: Rational;
-        y: Rational;
-        b: Rational;
+        x: import("./linear.mjs").Rational;
+        y: import("./linear.mjs").Rational;
+        b: import("./linear.mjs").Rational;
     };
     hasViewportMargin: (style: EdgeStyle, sides?: readonly Side[]) => boolean;
     marginValue: (style: EdgeStyle, side: Side) => Affine2;

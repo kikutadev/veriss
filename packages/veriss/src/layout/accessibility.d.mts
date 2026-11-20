@@ -263,7 +263,7 @@ type DiagnosticDetails = {
     clipper?: string;
     coverBox?: string;
     scroller?: string;
-    axis?: string;
+    axis?: 'inline' | 'block';
     part?: string;
     edge?: string;
     layer?: string;

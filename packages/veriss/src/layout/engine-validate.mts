@@ -13,9 +13,9 @@ import type {Region,Affine2} from './region.mjs';
 import type {Rational} from './linear.mjs';
 import type {Axis} from './engine-types.mjs';
 import type {LayoutSummary,LayoutWarning,LayoutRange,LayoutRegion} from '../layout-contracts.d.ts';
-type ValidationBox=NormalizedBox & {pseudo?:string|boolean;contract?:EngineBoxContract};
+type ValidationBox=NormalizedBox & {pseudo?:string|boolean;contract?:EngineBoxContract|undefined};
 interface ValidationAllocation {
-  inline?:Affine2;block?:Affine2|null;gridItem?:boolean;blockFlowChild?:boolean;flexItem?:{main:Axis};autoMargins?:boolean;
+  inline?:Affine2;block?:Affine2|null|undefined;gridItem?:boolean;blockFlowChild?:boolean;flexItem?:{main:Axis};autoMargins?:boolean|{inline?:boolean};
   flexBlockMinimum?:boolean;alignBlock?:Rational;root?:boolean;$crossMeasure?:boolean;$minNatural?:boolean;$minRaised?:boolean;
 }
 const fontValue=(value:unknown):string=>{if(typeof value!=='string')throw Object.assign(new Error('Computed font property is unresolved'),{code:'U_LAYOUT_TEXT_FONT'});return value;};

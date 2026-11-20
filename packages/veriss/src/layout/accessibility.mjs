@@ -1001,7 +1001,8 @@ export function judgeAccessibility({ geometry, waived = [], root, domain }, { ke
     if (scrollZero)
         for (const s of placed.filter(row => row.overflow === 'scroll' && row.path !== root?.path && !row.box.documentRoot && ['auto', 'scroll'].includes(String(row.overflowValue)) && row.paddingBlockEnd !== undefined && row.paddingInlineEnd !== undefined && row.direction !== 'rtl')) {
             const inside = placed.filter(row => isAncestor(s.path, row.path) && row.origin && visible(row) && !hiddenFrom(row.path) && row.position !== 'fixed');
-            for (const [axisName, a] of Object.entries(axes)) {
+            for (const axisName of ['block', 'inline']) {
+                const a = axes[axisName];
                 const innerEnd = diff(a.end(s), scalar(a.border(s))), crossInnerEnd = diff(a.crossEnd(s), scalar(a.crossBorder(s)));
                 for (const target of inside.filter(row => (row.box.text || focusable(row)) && !row.box.pseudo)) {
                     let base = target.region;

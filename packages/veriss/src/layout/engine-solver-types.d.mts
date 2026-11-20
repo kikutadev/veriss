@@ -1,11 +1,20 @@
-import type { InlineBox } from './engine-inline.mjs';
+import type { NormalizedBox } from '../tree.mjs';
+import type { EngineBoxContract } from './input.mjs';
+import type { PARENT } from './selectors.mjs';
 import type { EngineStyle } from './engine-style.mjs';
-import type { EdgeStyle } from './engine-edges.mjs';
-import type { TableBox, TableStyle } from './engine-table.mjs';
+import type { TableMetadata } from './engine-table.mjs';
 import type { Region, Affine2 } from './region.mjs';
 import type { Rational } from './linear.mjs';
+import type { LayoutAffine } from '../layout-contracts.d.ts';
 import type { Axis, DimensionValue, Dimensions } from './engine-types.mjs';
-export interface SolverBox extends InlineBox, Omit<TableBox, 'children' | 'inline' | 'contract' | 'tag' | 'label' | 'path' | 'text' | 'colSpan' | 'rowSpan' | 'tableCell'> {
+export interface SolverBox extends Omit<NormalizedBox, 'children' | 'inline'>, TableMetadata {
+    [PARENT]?: SolverBox;
+    pseudo?: string;
+    contract?: EngineBoxContract | undefined;
+    generated?: Partial<Record<'before' | 'after', string>>;
+    absolutePseudo?: ('before' | 'after')[] | undefined;
+    contractSelector?: string;
+    contentEditable?: unknown;
     children: SolverBox[];
     inline?: SolverBox[] | undefined;
     $foldedInline?: boolean;
@@ -14,10 +23,15 @@ export interface SolverBox extends InlineBox, Omit<TableBox, 'children' | 'inlin
         sizes: number;
     };
 }
-export type SolverStyle = EngineStyle & EdgeStyle & TableStyle & {
+export type SolverStyle = EngineStyle & {
     $collapsedTop?: boolean;
     $collapsedBottom?: boolean;
-    'container-type': string;
+    $usedMarginTop?: LayoutAffine;
+    tableColumns?: Rational | null;
+    tableGaps?: Rational;
+    tableShrink?: Rational;
+    tableAutoMinimum?: Rational;
+    $fromCell?: boolean;
 };
 export interface SolverAncestor {
     box: SolverBox;
@@ -64,7 +78,9 @@ export interface SolverAvailable {
     blockFlowChild?: boolean;
     definiteBlock?: boolean;
     justifyHandled?: boolean;
-    autoMargins?: boolean;
+    autoMargins?: boolean | {
+        inline?: boolean;
+    };
     fitInline?: boolean;
     fitBlock?: boolean;
     collapsedTop?: boolean;
@@ -85,7 +101,10 @@ export interface SolverAvailable {
     tracks?: Partial<Record<Axis, {
         values: Affine2[];
         gap: DimensionValue;
-        box: SolverBox;
+        box: {
+            label: string;
+            path: string;
+        };
         startLine: number;
     }>>;
     containingBlock?: Dimensions & {

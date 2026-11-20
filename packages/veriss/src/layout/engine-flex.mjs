@@ -1,6 +1,6 @@
 // TypeScript source. Run pnpm build:ts to regenerate adjacent ESM and declarations.
 // Flex container orchestration, with the recursive engine supplied by callbacks.
-import { q, cmp, add, sub, mul, div, number } from './linear.mjs';
+import { q, cmp, add, mul, div, number } from './linear.mjs';
 import { scalar, asAffine, sum, diff, times, clip, partition } from './region.mjs';
 import { validateFlexContainer, flexItem, crossAlignment, flexUnknown } from './flex.mjs';
 import { scaleGap, constantLess, maximumConstant } from './engine-tracks.mjs';

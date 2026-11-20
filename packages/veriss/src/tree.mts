@@ -23,8 +23,8 @@ interface DOMFacts {
   references?: ReferenceList; labelledBy?: ReferenceList; headers?: ReferenceList;
   tabIndex?: number|undefined; equivalent?: string; essential?: string;
   alt?: string; inputType?: string; labelFor?: string; placeholder?: boolean; placeholderAttr?: boolean;
-  role?: string|undefined; inputName?: string; ariaLabel?: string; href?: string|undefined; textContent?: string;
-  aria?: Record<string,string>; nameSource?: string; value?: string; autocomplete?: string; scope?: string;
+  role?: string|undefined; inputName?: string; ariaLabel?: string; href?: string|undefined; textContent?: string|undefined;
+  aria?: Record<string,string>; nameSource?: string; value?: string|undefined; autocomplete?: string; scope?: string;
   controls?: boolean; autoplay?: boolean; muted?: boolean; trackKind?: string; accessKey?: string; ismap?: boolean;
   colSpan?: number|'dynamic'; rowSpan?: number|'dynamic'; hiddenAttr?: true|'dynamic'|'until-found';
   inert?: true|'dynamic'; autofocus?: true|'dynamic'; popover?: true|'dynamic'; inlineStyle?: string; dirAttr?: string;

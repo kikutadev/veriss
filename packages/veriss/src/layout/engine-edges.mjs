@@ -1,6 +1,6 @@
 // TypeScript source. Run pnpm build:ts to regenerate adjacent ESM and declarations.
 // Box edges and finite-region margin/size resolution.
-import { q, div, cmp, add } from './linear.mjs';
+import { q, div, cmp } from './linear.mjs';
 import { scalar, asAffine, sum, diff, evaluate, affine, partition } from './region.mjs';
 import { px } from './css.mjs';
 import { lengthPieces } from './engine-geometry.mjs';

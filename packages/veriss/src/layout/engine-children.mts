@@ -13,7 +13,7 @@ export function collectLayoutChildren({region,box,style,ancestors,styles,bounded
   bounded:<T>(values:T[])=>T[];emit:boolean;rendered?:{box:{tag:string;path:string}}|null|undefined;isFlex:boolean;
   pseudoContracts:readonly PseudoContract[];layoutWarnings:LayoutWarning[];
   contentsInert:(box:SolverBox,style:SolverStyle,region:Region)=>unknown;
-  tableRowRadius:(box:SolverBox,style:SolverStyle)=>unknown;
+  tableRowRadius:(box:SolverBox,style:SolverStyle,state?:ReadonlySet<string>)=>unknown;
   aspectInert:(box:SolverBox,style:SolverStyle)=>unknown;
 }):ChildState[] {
   // Child boxes per region. display: contents is replaced by its
@@ -23,7 +23,7 @@ export function collectLayoutChildren({region,box,style,ancestors,styles,bounded
     let states:ChildState[] = [{region,children:[]}];
     const visit = (child:SolverBox,inheritedStyle:SolverStyle):void => {
       states = bounded(states.flatMap(s => styles(child, s.region, ancestors, inheritedStyle, false).flatMap((c):ChildState[] => {
-        if (child.tableCell || child.tableCaption) c = { ...c, style: {...c.style,...tablePlacement(child,c.style),$sources:c.style.$sources} };
+        if (child.tableCell || child.tableCaption) c = { ...c, style: tablePlacement(child,c.style) };
         if (child.tablePart && ['table-row-group', 'table-header-group', 'table-footer-group', 'table-row'].includes(c.style.display)) c = { ...c, style: { ...c.style, display: 'contents' } };
         if (c.style.display === 'none') return [{ region: c.region, children: s.children }];
         // F53: in block flow, an in-flow box's auto margin-top / margin-bottom are 0 (CSS 2.2 §10.6.3; measured in

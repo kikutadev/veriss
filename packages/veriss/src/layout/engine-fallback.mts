@@ -1,10 +1,10 @@
 // Independent fallback checks: report style/markup findings even when geometry is unknown.
 import type {InlineBox,createInlineSolver} from './engine-inline.mjs';
-import type {EngineStyle} from './engine-style.mjs';
+import type {SolverStyle as EngineStyle,SolverAncestor as Ancestor} from './engine-solver-types.mjs';
 import type {Region} from './region.mjs';
 import type {LayoutDiagnostic,LayoutRange,LayoutRegion} from '../layout-contracts.d.ts';
 
-type Ancestor={box:InlineBox;style:EngineStyle;names?:readonly string[]};
+
 type InlineContext=Parameters<typeof createInlineSolver>[0];
 type StyleContext=Pick<InlineContext,'styles'|'pseudoWithoutContent'|'inlineStateTransforms'|'inlineTextAlignment'|'inlineAutoMargin'|'inlineOverflow'|'decorationNone'|'firstPseudoInert'> & {
   root:InlineBox;initial:Region;
@@ -40,7 +40,7 @@ export function checkUnknownStyles({root,initial,styles,cssMistakes,pseudoWithou
 
 // The legacy diagnostics list also carries the placeholder-label warning.
 // Keep that runtime distinction explicit at this boundary.
-type MarkupDiagnostic=Omit<LayoutDiagnostic,'severity'> & {severity:'error'|'warning';rule:string};
+type MarkupDiagnostic=LayoutDiagnostic;
 export function checkMarkupAccessibility({root,initial,diagnostics,ranges}:{
   root:InlineBox;initial:Region;diagnostics:MarkupDiagnostic[];
   ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion}

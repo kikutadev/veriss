@@ -1,6 +1,6 @@
 // TypeScript source. Run pnpm build:ts to regenerate adjacent ESM and declarations.
 // Image resource selection and media/container-query geometry.
-import { q, sub, cmp } from './linear.mjs';
+import { q, sub } from './linear.mjs';
 import { scalar, width, height, diff } from './region.mjs';
 const inlineFeature = (feature) => ['width', 'inline-size'].includes(feature);
 export const compare = (value, relation) => relation === '>=' ? value >= 0 : relation === '>' ? value > 0 : relation === '<=' ? value <= 0 : relation === '<' ? value < 0 : value === 0;
@@ -35,10 +35,13 @@ export function createQuerySolver(heightKnown, ratioValue) {
             target = { inline: width, block: heightKnown ? height : null };
         else {
             const needsBlock = condition.groups.flat().some(atom => !inlineFeature(atom.feature));
-            target = ancestors.slice().reverse().find(ancestor => (!condition.name || ancestor.names.includes(condition.name)) &&
+            const ancestor = ancestors.slice().reverse().find(ancestor => (!condition.name || ancestor.names?.includes(condition.name)) &&
                 (ancestor.type === 'size' || (!needsBlock && ancestor.type === 'inline-size')));
-            if (!target)
+            if (!ancestor)
                 return { groups: [], target: undefined };
+            if (!ancestor.inline || ancestor.block === undefined)
+                throw new Error('Container query needs known ancestor size');
+            target = { inline: ancestor.inline, block: ancestor.block, ...(ancestor.box ? { box: ancestor.box } : {}) };
         }
         const selected = target;
         const groups = condition.groups.map(group => group.map(atom => {

@@ -13,7 +13,7 @@ export function prepareBlockChildren({children,box,style,parents,ancestors,avail
   available:{collapsedTop?:boolean;collapsedBottom?:boolean};emit:boolean;warningRegion:Region;
   layoutWarnings:LayoutWarning[];ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion};
   styles:ResolveStyle;positiveEdge:ReturnType<typeof createEdgeSolver>['positiveEdge'];positivePadding:ReturnType<typeof createEdgeSolver>['positivePadding'];
-  alignBrowserDependent:(box:SolverBox,property:string,value:unknown)=>void;
+  alignBrowserDependent:(box:SolverBox,property:string,value:string|number|undefined)=>void;
 }):void {
   if (style.$blockFlow) {
     const flow = children.children.filter(child => child.style.position !== 'absolute');

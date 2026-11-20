@@ -7,31 +7,27 @@ import {matches,px} from './css.mjs';
 import {compileSelector} from './selectors.mjs';
 import {paintFacts} from './accessibility.mjs';
 import type {AccessibilityGeometry,PaintFacts} from './accessibility.mjs';
-import type {EngineStyle} from './engine-style.mjs';
-import type {NormalizedBox} from '../tree.mjs';
-import type {EngineBoxContract} from './input.mjs';
+
 import type {Dimensions,DimensionValue} from './engine-types.mjs';
 import type {LayoutRange,LayoutRegion,LayoutWarning,LayoutGeneratedText,TextInlineBounds,TextMetricPair} from '../layout-contracts.d.ts';
 type Generated=Partial<Record<'before'|'after',string>>;
-export interface InlineBox extends Omit<NormalizedBox,'children'|'inline'> {
-  children:InlineBox[];inline?:InlineBox[]|undefined;pseudo?:string;contract?:EngineBoxContract|undefined;
-  generated?:Generated;absolutePseudo?:('before'|'after')[];contractSelector?:string;tableCell?:boolean;
-}
-interface InlineAncestor {box:InlineBox;style:EngineStyle;names?:readonly string[]}
+import type {SolverBox,SolverStyle,SolverAncestor} from './engine-solver-types.mjs';
+export type InlineBox=SolverBox;
+type InlineAncestor=SolverAncestor;
 interface InlineLeafRow {origin:Dimensions|null;block:Affine2|null;content:{left:DimensionValue;top:DimensionValue;inline:Affine2}}
 interface InlineContext {
-  styles:(box:InlineBox,region:Region,parents:readonly InlineAncestor[],inherited:EngineStyle|undefined,emit:boolean,gridItem:boolean,state?:ReadonlySet<string>)=>{style:EngineStyle;region:Region}[];
-  edgeValue:(style:EngineStyle,side:'top'|'bottom')=>Affine2;
+  styles:(box:InlineBox,region:Region,parents:readonly InlineAncestor[],inherited:SolverStyle|undefined,emit:boolean,gridItem:boolean,state?:ReadonlySet<string>)=>{style:SolverStyle;region:Region}[];
+  edgeValue:(style:SolverStyle,side:'top'|'bottom')=>Affine2;
   generatedTexts:LayoutGeneratedText[];layoutWarnings:LayoutWarning[];geometry:AccessibilityGeometry[];
   ranges:(region:Region)=>{range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion};
-  paints:(style:EngineStyle)=>boolean;
-  pseudoWithoutContent:(box:InlineBox,style:EngineStyle)=>unknown;
-  inlineStateTransforms:(box:InlineBox,style:EngineStyle)=>unknown;
-  inlineTextAlignment:(box:InlineBox,style:EngineStyle)=>unknown;
-  inlineAutoMargin:(box:InlineBox,style:EngineStyle)=>unknown;
-  inlineOverflow:(box:InlineBox,style:EngineStyle)=>unknown;
-  firstPseudoInert:(box:InlineBox,style:EngineStyle)=>unknown;
-  decorationNone:(box:InlineBox,style:EngineStyle,parents:readonly InlineAncestor[])=>unknown;
+  paints:(style:SolverStyle)=>boolean;
+  pseudoWithoutContent:(box:InlineBox,style:SolverStyle)=>unknown;
+  inlineStateTransforms:(box:InlineBox,style:SolverStyle)=>unknown;
+  inlineTextAlignment:(box:InlineBox,style:SolverStyle)=>unknown;
+  inlineAutoMargin:(box:InlineBox,style:SolverStyle, parentStyle?:SolverStyle)=>unknown;
+  inlineOverflow:(box:InlineBox,style:SolverStyle)=>unknown;
+  firstPseudoInert:(box:InlineBox,style:SolverStyle)=>unknown;
+  decorationNone:(box:InlineBox,style:SolverStyle,parents:readonly InlineAncestor[])=>unknown;
 }
 const zero=q(0);
 export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnings,geometry,ranges,paints,pseudoWithoutContent,inlineStateTransforms,inlineTextAlignment,inlineAutoMargin,inlineOverflow,firstPseudoInert,decorationNone}:InlineContext) {
@@ -44,7 +40,7 @@ export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnin
   // Generated text is allowed where it cannot change the geometry: in a leaf with px width and height, or in a
   // text leaf whose measured content already holds it (at its start for ::before, its end for ::after), set in the
   // leaf's font. It is recorded as the box's generated text (accessible names include it).
-  function generatedElsewhere(box:InlineBox,region:Region,parents:readonly InlineAncestor[],inheritedStyle:EngineStyle):Generated|null {
+  function generatedElsewhere(box:InlineBox,region:Region,parents:readonly InlineAncestor[],inheritedStyle:SolverStyle):Generated|null {
     if (box.pseudo) return null;
     const generated:Generated = {};
     let deferred:Error|null = null; // the first error, raised once both kinds are recorded
@@ -77,7 +73,7 @@ export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnin
   const sixtyfourths = (value:number,round:(v:number)=>number) => div(q(String(round(value * 64))), q(64));
   // A list of {region, outer, inner}: one piece for one line of text, one per width interval of the
   // line layout for wrapping text (none where the element is split across lines).
-  function inlineBounds(child:InlineBox,leaf:InlineBox,leafStyle:EngineStyle,leafRow:InlineLeafRow|undefined,region:Region,childStyle:Readonly<Record<string,unknown>>={}) {
+  function inlineBounds(child:InlineBox,leaf:InlineBox,leafStyle:SolverStyle,leafRow:InlineLeafRow|undefined,region:Region,childStyle:Readonly<Record<string,unknown>>={}) {
     const contract=leaf.contract, metrics=contract?.textMetrics;
     if(!contract || !metrics || metrics.kind==='domain')return null;
     // Checklist D3: text-align moves each line by (content width − line width) × f: 0 at the start, 1/2 centred, 1 at the
@@ -151,7 +147,7 @@ export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnin
     }
     return out;
   }
-  function inlineContent(leaf:InlineBox,leafStyle:EngineStyle,region:Region,parents:readonly InlineAncestor[],chain:PaintFacts[],leafRow?:InlineLeafRow) {
+  function inlineContent(leaf:InlineBox,leafStyle:SolverStyle,region:Region,parents:readonly InlineAncestor[],chain:PaintFacts[],leafRow?:InlineLeafRow) {
     for (const child of leaf.inline ?? []) for (const state of styles(child, region, parents.map(p => ({ ...p, names: [] })), parents.at(-1)?.style, false, false)) {
       const style = state.style;
       if (style.display === 'none') continue;

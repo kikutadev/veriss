@@ -1,17 +1,15 @@
 // Normalize computed styles to the supported formatting model before sizing.
 import {q,cmp,add} from './linear.mjs';
 import {evaluate} from './region.mjs';
-import type {Affine2,Region} from './region.mjs';
+import type {Region} from './region.mjs';
 import {px} from './css.mjs';
 import {crossAlignment} from './flex.mjs';
 import {phrasingTags} from '../tree.mjs';
-import type {EngineStyle} from './engine-style.mjs';
+import type {SolverStyle as EngineStyle,SolverBox as Box,SolverAncestor as Ancestor,SolverAvailable as Space} from './engine-solver-types.mjs';
 import type {InlineBox} from './engine-inline.mjs';
 import type {LayoutWarning,LayoutRange,LayoutRegion} from '../layout-contracts.d.ts';
 
-type Box=InlineBox & {$foldedInline?:boolean};
-type Ancestor={box:Box;style:EngineStyle;names?:readonly string[]};
-type Space={root?:boolean;percentBlock?:Affine2|null;inline:Affine2;block?:Affine2|null;flexItem?:{main:'inline'|'block'}};
+
 type Piece={style:EngineStyle;region:Region};
 type Context={
   box:Box;state:Piece;available:Space;parents:readonly Ancestor[];inherited:EngineStyle|undefined;emit:boolean;

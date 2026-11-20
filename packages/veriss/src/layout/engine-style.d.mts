@@ -1,15 +1,11 @@
 import type { Region } from './region.mjs';
-import type { ComputedStyle, CSSRule, InheritedStyle, CSSCondition, CSSBox } from './css.mjs';
+import type { ComputedStyle, CSSRule, CSSCondition } from './css.mjs';
 import type { ParsedCondition } from './conditions.mjs';
 import type { createQuerySolver, LoadedSource } from './engine-queries.mjs';
 import type { EngineOptions } from './input.mjs';
-import type { NormalizedBox, ImageSize } from '../tree.mjs';
+import type { ImageSize } from '../tree.mjs';
 import type { LayoutSummary, LayoutRange, LayoutRegion, LayoutWarning, LayoutAffine, LayoutTextFontFacts } from '../layout-contracts.d.ts';
-type StyleBox = NormalizedBox & CSSBox & {
-    pseudo?: string;
-    children: StyleBox[];
-    inline?: StyleBox[];
-};
+import type { SolverBox as StyleBox, SolverStyle, SolverAncestor as StyleAncestor } from './engine-solver-types.mjs';
 type Condition = ParsedCondition | CSSCondition;
 type QueryFact = {
     condition: Condition;
@@ -70,13 +66,9 @@ export interface EngineStyle extends ComputedStyle {
         source: string;
     }>;
 }
-type StyleAncestor = Parameters<ReturnType<typeof createQuerySolver>['context']>[1][number] & {
-    box: StyleBox;
-    style: EngineStyle;
-};
 type StylePiece = {
     region: Region;
-    style: EngineStyle;
+    style: SolverStyle;
 };
 interface StyleContext {
     rules: readonly CSSRule[];
@@ -99,8 +91,8 @@ interface StyleContext {
         heightRange?: LayoutRange;
         region?: LayoutRegion;
     };
-    cssMistakes: (box: StyleBox, style: EngineStyle, ancestors: readonly StyleAncestor[], inherited: InheritedStyle | undefined, gridItem: boolean, region: Region, state?: ReadonlySet<string>) => void;
+    cssMistakes: (box: StyleBox, style: EngineStyle, ancestors: readonly StyleAncestor[], inherited: SolverStyle | undefined, gridItem: boolean, region: Region, state?: ReadonlySet<string>) => void;
     noteTransform: () => void;
 }
-export declare function createStyleResolver({ rules, preferences, hovered, untransformed, options, spend, bounded, loadedSource, context, textFonts, layoutWarnings, sourceUse, queryFacts, queries, invalidSubstitutions, ranges, cssMistakes, noteTransform }: StyleContext): (box: StyleBox, region: Region, ancestors: readonly StyleAncestor[], inherited: InheritedStyle | undefined, emit: boolean, gridItem?: boolean, state?: ReadonlySet<string>) => StylePiece[];
+export declare function createStyleResolver({ rules, preferences, hovered, untransformed, options, spend, bounded, loadedSource, context, textFonts, layoutWarnings, sourceUse, queryFacts, queries, invalidSubstitutions, ranges, cssMistakes, noteTransform }: StyleContext): (box: StyleBox, region: Region, ancestors: readonly StyleAncestor[], inherited: SolverStyle | undefined, emit: boolean, gridItem?: boolean, state?: ReadonlySet<string>) => StylePiece[];
 export {};

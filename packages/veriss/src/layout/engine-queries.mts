@@ -1,12 +1,12 @@
 // TypeScript source. Run pnpm build:ts to regenerate adjacent ESM and declarations.
 // Image resource selection and media/container-query geometry.
-import { q, sub, cmp } from './linear.mjs';
+import {q,sub} from './linear.mjs';
 import { scalar, width, height, diff } from './region.mjs';
 import type { Affine2, RegionRelation } from './region.mjs';
 import type { ParsedCondition } from './conditions.mjs';
 export type LoadedSource = string | undefined | {candidates: string[]};
 interface QueryTarget {inline: Affine2; block: Affine2 | null; box?: {label:string;path:string}}
-interface QueryAncestor extends QueryTarget {type:string; names: readonly string[]}
+interface QueryAncestor {inline?:Affine2|null;block?:Affine2|null;box?:{label:string;path:string};type?:string;names?:readonly string[]}
 interface CompiledQuery {groups: {slack: Affine2; relation: RegionRelation}[][]; target: string | undefined; path?: string | undefined}
 const inlineFeature = (feature: string) => ['width','inline-size'].includes(feature);
 export const compare = (value: number, relation: RegionRelation) => relation === '>=' ? value >= 0 : relation === '>' ? value > 0 : relation === '<=' ? value <= 0 : relation === '<' ? value < 0 : value === 0;
@@ -33,9 +33,11 @@ export function createQuerySolver(heightKnown: boolean, ratioValue: number | und
     if (condition.kind === 'media') target = { inline: width, block: heightKnown ? height : null };
     else {
       const needsBlock = condition.groups.flat().some(atom => !inlineFeature(atom.feature));
-      target = ancestors.slice().reverse().find(ancestor => (!condition.name || ancestor.names.includes(condition.name)) &&
+      const ancestor = ancestors.slice().reverse().find(ancestor => (!condition.name || ancestor.names?.includes(condition.name)) &&
         (ancestor.type === 'size' || (!needsBlock && ancestor.type === 'inline-size')));
-      if (!target) return { groups: [], target: undefined };
+      if (!ancestor) return {groups:[],target:undefined};
+      if(!ancestor.inline || ancestor.block===undefined)throw new Error('Container query needs known ancestor size');
+      target={inline:ancestor.inline,block:ancestor.block,...(ancestor.box?{box:ancestor.box}:{})};
     }
     const selected = target;
     const groups = condition.groups.map(group => group.map(atom => {

@@ -11,7 +11,7 @@ export function collectLayoutChildren({ region, box, style, ancestors, styles, b
     const visit = (child, inheritedStyle) => {
         states = bounded(states.flatMap(s => styles(child, s.region, ancestors, inheritedStyle, false).flatMap((c) => {
             if (child.tableCell || child.tableCaption)
-                c = { ...c, style: { ...c.style, ...tablePlacement(child, c.style), $sources: c.style.$sources } };
+                c = { ...c, style: tablePlacement(child, c.style) };
             if (child.tablePart && ['table-row-group', 'table-header-group', 'table-footer-group', 'table-row'].includes(c.style.display))
                 c = { ...c, style: { ...c.style, display: 'contents' } };
             if (c.style.display === 'none')

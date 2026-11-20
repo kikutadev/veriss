@@ -327,7 +327,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
         readonly scrollbarProfile?: string;
         readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
-        readonly severity: "error" | "unknown";
+        readonly severity: "error" | "unknown" | "warning";
         readonly message: string;
         readonly box?: string;
         readonly path?: string;
@@ -366,6 +366,25 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly column?: number;
         };
         readonly hint?: string;
+        readonly rule?: string;
+        readonly ancestor?: string;
+        readonly ancestorPath?: string;
+        readonly property?: string;
+        readonly items?: readonly string[];
+        readonly regionConstraints?: readonly {
+            readonly coefficient: string;
+            readonly constant: string;
+            readonly heightCoefficient?: string;
+            readonly strict: boolean;
+        }[];
+        readonly state?: string;
+        readonly alsoUnder?: readonly string[];
+        readonly preference?: string;
+        readonly edge?: string;
+        readonly cover?: string;
+        readonly scrollOffset?: number;
+        readonly focusedLayout?: boolean;
+        readonly tier?: string;
         readonly related?: readonly {
             readonly message: string;
             readonly css: {
@@ -387,8 +406,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly viewportExact: string;
             readonly viewportHeight?: number;
             readonly viewportHeightExact?: string;
-            readonly available: number;
-            readonly required: number;
+            readonly available?: number;
+            readonly required?: number;
         };
         readonly text?: {
             readonly maxLength: number;
@@ -646,7 +665,7 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
         readonly scrollbarProfile?: string;
         readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
-        readonly severity: "error" | "unknown";
+        readonly severity: "error" | "unknown" | "warning";
         readonly message: string;
         readonly box?: string;
         readonly path?: string;
@@ -685,6 +704,25 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly column?: number;
         };
         readonly hint?: string;
+        readonly rule?: string;
+        readonly ancestor?: string;
+        readonly ancestorPath?: string;
+        readonly property?: string;
+        readonly items?: readonly string[];
+        readonly regionConstraints?: readonly {
+            readonly coefficient: string;
+            readonly constant: string;
+            readonly heightCoefficient?: string;
+            readonly strict: boolean;
+        }[];
+        readonly state?: string;
+        readonly alsoUnder?: readonly string[];
+        readonly preference?: string;
+        readonly edge?: string;
+        readonly cover?: string;
+        readonly scrollOffset?: number;
+        readonly focusedLayout?: boolean;
+        readonly tier?: string;
         readonly related?: readonly {
             readonly message: string;
             readonly css: {
@@ -706,8 +744,8 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly viewportExact: string;
             readonly viewportHeight?: number;
             readonly viewportHeightExact?: string;
-            readonly available: number;
-            readonly required: number;
+            readonly available?: number;
+            readonly required?: number;
         };
         readonly text?: {
             readonly maxLength: number;
@@ -1319,7 +1357,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
         readonly scrollbarProfile?: string;
         readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
-        readonly severity: "error" | "unknown";
+        readonly severity: "error" | "unknown" | "warning";
         readonly message: string;
         readonly box?: string;
         readonly path?: string;
@@ -1358,6 +1396,25 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly column?: number;
         };
         readonly hint?: string;
+        readonly rule?: string;
+        readonly ancestor?: string;
+        readonly ancestorPath?: string;
+        readonly property?: string;
+        readonly items?: readonly string[];
+        readonly regionConstraints?: readonly {
+            readonly coefficient: string;
+            readonly constant: string;
+            readonly heightCoefficient?: string;
+            readonly strict: boolean;
+        }[];
+        readonly state?: string;
+        readonly alsoUnder?: readonly string[];
+        readonly preference?: string;
+        readonly edge?: string;
+        readonly cover?: string;
+        readonly scrollOffset?: number;
+        readonly focusedLayout?: boolean;
+        readonly tier?: string;
         readonly related?: readonly {
             readonly message: string;
             readonly css: {
@@ -1379,8 +1436,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly viewportExact: string;
             readonly viewportHeight?: number;
             readonly viewportHeightExact?: string;
-            readonly available: number;
-            readonly required: number;
+            readonly available?: number;
+            readonly required?: number;
         };
         readonly text?: {
             readonly maxLength: number;
@@ -1677,7 +1734,7 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
         readonly scrollbarProfile?: string;
         readonly devicePixelRatio?: number | undefined | undefined;
         readonly code: string;
-        readonly severity: "error" | "unknown";
+        readonly severity: "error" | "unknown" | "warning";
         readonly message: string;
         readonly box?: string;
         readonly path?: string;
@@ -1716,6 +1773,25 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly column?: number;
         };
         readonly hint?: string;
+        readonly rule?: string;
+        readonly ancestor?: string;
+        readonly ancestorPath?: string;
+        readonly property?: string;
+        readonly items?: readonly string[];
+        readonly regionConstraints?: readonly {
+            readonly coefficient: string;
+            readonly constant: string;
+            readonly heightCoefficient?: string;
+            readonly strict: boolean;
+        }[];
+        readonly state?: string;
+        readonly alsoUnder?: readonly string[];
+        readonly preference?: string;
+        readonly edge?: string;
+        readonly cover?: string;
+        readonly scrollOffset?: number;
+        readonly focusedLayout?: boolean;
+        readonly tier?: string;
         readonly related?: readonly {
             readonly message: string;
             readonly css: {
@@ -1737,8 +1813,8 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly viewportExact: string;
             readonly viewportHeight?: number;
             readonly viewportHeightExact?: string;
-            readonly available: number;
-            readonly required: number;
+            readonly available?: number;
+            readonly required?: number;
         };
         readonly text?: {
             readonly maxLength: number;

@@ -26,6 +26,6 @@ export declare function collectLayoutChildren({ region, box, style, ancestors, s
     pseudoContracts: readonly PseudoContract[];
     layoutWarnings: LayoutWarning[];
     contentsInert: (box: SolverBox, style: SolverStyle, region: Region) => unknown;
-    tableRowRadius: (box: SolverBox, style: SolverStyle) => unknown;
+    tableRowRadius: (box: SolverBox, style: SolverStyle, state?: ReadonlySet<string>) => unknown;
     aspectInert: (box: SolverBox, style: SolverStyle) => unknown;
 }): ChildState[];

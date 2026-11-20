@@ -11,30 +11,26 @@ import {absoluteOrigin} from './positioned.mjs';
 import {affineOf,linearOf,mapper,scaled} from './engine-transforms.mjs';
 import {isDescendant,intersectRegions} from './engine-positioning.mjs';
 import type {createPositionSolver} from './engine-positioning.mjs';
-import type {createEdgeSolver,EdgeStyle} from './engine-edges.mjs';
+import type {createEdgeSolver} from './engine-edges.mjs';
 import type {createObligationCollector} from './engine-obligations.mjs';
 import type {AnimatedBox} from './engine-state-shifts.mjs';
 import type {createInlineSolver,InlineBox} from './engine-inline.mjs';
 import type {EngineStyle} from './engine-style.mjs';
 import type {EngineOptions} from './input.mjs';
 import {fact,sizeChain,sizeProperties,trackProperties,contractFact,explanation} from './explain.mjs';
-import type {ExplanationStyle} from './explain.mjs';
 import {fittingLength,fittingLines} from './text-font.mjs';
 import {paintFacts} from './accessibility.mjs';
 import type {AccessibilityGeometry,PaintFacts} from './accessibility.mjs';
-import type {Axis,DimensionValue,Dimensions} from './engine-types.mjs';
+import type {Axis,Dimensions} from './engine-types.mjs';
 import type {LayoutSummary,LayoutWarning,LayoutScrollbarProfile,LayoutPosition,LayoutExplanationFact} from '../layout-contracts.d.ts';
 type PositionSolver=ReturnType<typeof createPositionSolver>;
 type Edges=ReturnType<typeof createEdgeSolver>;
 type InlineSolver=ReturnType<typeof createInlineSolver>;
-export type FinishStyle=EngineStyle & EdgeStyle & Parameters<PositionSolver['resolvedOrigin']>[0] & ExplanationStyle & {'box-sizing':'border-box'|'content-box';position:'static'|'relative'|'absolute'};
-export interface FinishBox extends InlineBox {$starts?:{geometry:number;sizes:number};tableCaption?:boolean}
-interface FinishAncestor {box:FinishBox;style:FinishStyle;names?:readonly string[];clipped?:boolean;clipScope?:boolean;subgrid?:boolean}
-interface FinishAvailable {inline:Affine2;block?:Affine2|null;root?:boolean;justifyHandled?:boolean;fitInline?:boolean;fitBlock?:boolean;origin?:Dimensions|null;
-  marginEnd?:{inline:DimensionValue;block:DimensionValue};alignBlock?:Rational;alignInline?:Rational;
-  containingBlock?:Dimensions & {path:string;origin?:Dimensions|null;clips?:{x:boolean;y:boolean}};
-}
-interface SolvedBox {region:Region;inline:Affine2;block:Affine2|null}
+import type {SolverBox,SolverStyle,SolverAvailable,SolverAncestor,SolvedBox} from './engine-solver-types.mjs';
+export type FinishStyle=SolverStyle;
+export type FinishBox=SolverBox;
+type FinishAncestor=SolverAncestor;
+type FinishAvailable=SolverAvailable;
 export interface EngineGeometry extends AccessibilityGeometry {
   outsideMarker?:string|undefined;fixedTracks?:string|undefined;wrapsByWords?:boolean;widthFromAttribute?:number;
   vwInline?:string|undefined;fullWidthMargins?:string[];contentBoxFull?:string[];
@@ -257,6 +253,8 @@ export function createFinalizer({options,block,hovered,scrollbarProfile,getPageS
       if (box.inline?.length) inlineContent(box,style,region,[...parents,{box,style}],row.chain,row);
       const shown = scaled(style, parents.some(p => p.clipScope) ? null : origin, inline, blockSize);
       const rect=shown.origin && shown.block ? {inlineStart:affine(shown.origin.inline),blockStart:affine(shown.origin.block),inlineSize:affine(shown.inline),blockSize:affine(shown.block)} : null;
+      if(style.position!=='static'&&style.position!=='relative'&&style.position!=='absolute')throw new Error('Unresolved position');
+      if(style['box-sizing']!=='border-box'&&style['box-sizing']!=='content-box')throw new Error('Unresolved box sizing');
       const sizeRow:EngineSize = { box: box.label, path: box.path, position:style.position, ...positioned,...(rect ? {rect} : {}), boxSizing: style['box-sizing'], boxSizingSource: style.$sources['box-sizing'],
         paddingInlineSize:affine(diff(inline,scalar(add(px(String(style['border-left'])),px(String(style['border-right'])))))),
         ...(blockSize ? {paddingBlockSize:affine(diff(blockSize,scalar(add(px(String(style['border-top'])),px(String(style['border-bottom']))))))} : {}),

@@ -43,7 +43,7 @@ export interface LayoutOptions {
   /** Trusted exact native gutter geometries of the target environments. */
   scrollbars?: readonly LayoutScrollbarProfile[];
   /** Static counterparts of vlmkit's box-model integrity rules (ADR-0012). */
-  integrity?: boolean | LayoutIntegrityOptions;
+  integrity?: boolean | LayoutIntegrityOptions|undefined;
   css: string;
   cssFile?: string;
   /** Ordered reset sources, before css in the same author cascade. */
@@ -119,15 +119,15 @@ export interface LayoutRange {
 }
 export interface LayoutDiagnostic {
   variant?: number; scrollbarProfile?: string; devicePixelRatio?:number|undefined;
-  code: string; severity: 'error' | 'unknown'; message: string;
+  code: string; severity: 'error' | 'unknown' | 'warning'; message: string;
   box?: string; path?: string; range?: LayoutRange;
   axis?: 'inline' | 'block'; heightRange?: LayoutRange; region?: LayoutRegion;
   css?: { file: string; line: number; column?: number };
-  hint?: string;
+  hint?: string;rule?:string;ancestor?:string;ancestorPath?:string;property?:string;items?:readonly string[];regionConstraints?:readonly LayoutRegion['constraints'][number][];state?:string;alsoUnder?:readonly string[];preference?:string;edge?:string;cover?:string;scrollOffset?:number;focusedLayout?:boolean;tier?:string;
   related?: { message:string; css:{file:string;line:number;column?:number} }[];
   conflict?: {properties:[string,string];longhands:string[]};
   source?: SourceSpan|undefined;
-  witness?: { viewport: number; viewportExact: string; viewportHeight?: number; viewportHeightExact?: string; available: number; required: number };
+  witness?: { viewport: number; viewportExact: string; viewportHeight?: number; viewportHeightExact?: string; available?: number; required?: number };
   /** For a text domain: how many characters fit at the witness (font-derived contracts only). */
   text?: { maxLength: number; fitsUpTo: number; widest: string } | { lines: number; fitsLines: number };
   /** Build/debug provenance of both sides (ADR-0002). Never consulted by the proof. */
@@ -187,7 +187,7 @@ export interface LayoutWarning {
   property?:string|undefined;min?:number;max?:number;media?:string;attributes?:string[];tag?:string;
   inset?:number;value?:string|undefined;family?:string;display?:string;fallback?:string;inheritedFrom?:string;scroller?:string;
   blockSize?:string|undefined;fontSize?:string|undefined;lineHeight?:string|undefined;intervals?:[number,number][];
-  lines?:number;ancestor?:string;items?:string[];side?:'top'|'bottom';boxes?:string[];query?:string;name?:string;reason?:string;
+  state?:string|undefined;browsers?:{aligns:string[];ignores:string[]};loserAt?:string;winnerAt?:string;winner?:string;axes?:string[];sides?:string[];keyframes?:string;needs?:number;area?:string;focused?:string;focusedPath?:string;field?:string;delta?:string;lines?:number;ancestor?:string;items?:string[];side?:'top'|'bottom';boxes?:string[];query?:string;name?:string;reason?:string;
   parent?:string;srcset?:string|undefined;sizes?:string;marker?:string;clippedBy?:string;
   naturalWidth?:number;natural?:string;basis?:'file'|'attributes';stretched?:'wider'|'taller';
   columns?:string|undefined;width?:number|string|undefined;properties?:string[]|undefined;scrollbar?:number;
@@ -215,7 +215,7 @@ export interface LayoutSummary {
   transitionSizes?:LayoutTransitionSize[];
   generatedText?:LayoutGeneratedText[];
   layoutWarnings?:LayoutWarning[];
-  accessibility?:{rules:string[];profile:'all'|'core';contrast:'AA'|'AAA';targetLevel:'AA'|'AAA';targetSize:number;warnings:LayoutWarning[];exempted:LayoutWarning[];notes:readonly unknown[]};
+  accessibility?:{rules:string[];profile:'all'|'core';contrast:'AA'|'AAA';targetLevel:'AA'|'AAA';targetSize:number;warnings:import('./layout/accessibility.mjs').AccessibilityFinding[];exempted:import('./layout/accessibility.mjs').AccessibilityExemption[];notes:readonly unknown[]};
   selectors?:{rows:{selector:string;file:string;line:number;matched:number}[];warnings:(LayoutWarning & {selector:string})[]};
 
   /** Structural identities, including CSS-hidden boxes; never contract assumptions. */
@@ -224,11 +224,11 @@ export interface LayoutSummary {
   structure?: LayoutStructure;
   scrollbars?: {box:string;path:string;inlineSize:number;blockSize:number;viewport:boolean;variant?:number;scrollbarProfile?:string;range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion}[];
   invalidSubstitutions?: LayoutInvalidSubstitution[];
-  integrity?: { rules: string[]; targetSize: number; protrusion: 'all' | 'painted'; warnings: LayoutIntegrityRow[]; exempted: LayoutIntegrityRow[] };
+  integrity?: { rules: string[]; targetSize: number; protrusion: 'all' | 'painted'; warnings: LayoutIntegrityRow[]; exempted: Omit<LayoutIntegrityRow,'severity'|'message'>[] };
   version: 1; ok: boolean; status: 'verified' | 'violated' | 'unknown'; component: string;
   scope: { devicePixelRatios?:readonly number[]; mediaFeatures?: MediaFeatures; axis: 'inline' | 'both'; viewport: LayoutRange & { height?: LayoutRange | null }; hostInset: number; hostBlockInset?: number; closedCSS: true; browserRounding: false; blockSizing: boolean; scrollbarProfiles?:readonly LayoutScrollbarProfile[] };
   assumptions: string[];
-  styleSources: { kind: 'reset' | 'app'; file: string }[];
+  styleSources: { kind: 'reset' | 'app' | undefined; file: string }[];
   diagnostics: LayoutDiagnostic[];
   policies: (LayoutScenarioIdentity & { box: string; path: string; axis: 'inline' | 'block'; overflow: 'fit' | 'scroll' | 'clip' | 'visible'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion })[];
   checks: (LayoutScenarioIdentity & { box: string; path: string; code: string; axis: 'inline' | 'block'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; available: LayoutAffine; required: LayoutAffine; enforced: boolean })[];

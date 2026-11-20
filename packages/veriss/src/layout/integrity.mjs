@@ -16,8 +16,8 @@
 // the browser, where clipped content cannot reach the page edge.
 import { q, exact, number } from './linear.mjs';
 import { scalar, asAffine, width, sum, diff, times, evaluate, sample, clip, partition } from './region.mjs';
-function placedGeometry(row) { return Boolean(row.origin && row.block); }
-function blockGeometry(row) { return Boolean(row.block); }
+function placedGeometry(row) { return Boolean(row.origin && row.block && row.inline); }
+function blockGeometry(row) { return Boolean(row.block && row.inline); }
 export function intersect(a, b) {
     let region = a;
     for (const constraint of b.constraints) {
@@ -39,11 +39,12 @@ const alignments = { start: 0, left: 0, justify: 0, center: 1 / 2, end: 1, right
  * for a domain, strings wider than the box start-align within [start, bound].
  */
 function textExtents(row) {
-    const contract = row.box.contract, factor = alignments[row.textAlign];
+    const content = row.content;
+    const contract = row.box.contract, factor = alignments[row.textAlign ?? ''];
     // Wrapped lines (kind 'lines') are bounded by the border box.
-    if (!contract?.textMetrics || contract.textMetrics.kind === 'lines' || !contract.font || factor === undefined)
+    if (!contract?.textMetrics || contract.textMetrics.kind === 'lines' || !contract.font || factor === undefined || !content)
         return [{ region: row.region, extent: box(row) }];
-    const start = sum(row.origin.inline, asAffine(row.content.left)), top = sum(row.origin.block, asAffine(row.content.top));
+    const start = sum(row.origin.inline, asAffine(content.left)), top = sum(row.origin.block, asAffine(content.top));
     const width = scalar(contract.minInlineSize), block = [[top, sum(top, scalar(contract.font.lineHeight))]];
     const place = (left) => {
         const extent = { inline: [[left, sum(left, width)]], block: [...block], basis: 'text' };
@@ -56,8 +57,8 @@ function textExtents(row) {
     };
     if (factor === 0)
         return [{ region: row.region, extent: place(start) }];
-    const fits = partition(row.region, diff(row.content.inline, width), '>=');
-    return [...fits.yes.map(region => ({ region, extent: place(sum(start, times(diff(row.content.inline, width), q(factor)))) })),
+    const fits = partition(row.region, diff(content.inline, width), '>=');
+    return [...fits.yes.map(region => ({ region, extent: place(sum(start, times(diff(content.inline, width), q(factor)))) })),
         ...fits.no.map(region => ({ region, extent: place(start) }))];
 }
 const isParent = (parent, child) => child.path.startsWith(parent.path + '/') && !child.path.slice(parent.path.length + 1).includes('/');

@@ -248,6 +248,10 @@ export function createFinalizer({ options, block, hovered, scrollbarProfile, get
                 inlineContent(box, style, region, [...parents, { box, style }], row.chain, row);
             const shown = scaled(style, parents.some(p => p.clipScope) ? null : origin, inline, blockSize);
             const rect = shown.origin && shown.block ? { inlineStart: affine(shown.origin.inline), blockStart: affine(shown.origin.block), inlineSize: affine(shown.inline), blockSize: affine(shown.block) } : null;
+            if (style.position !== 'static' && style.position !== 'relative' && style.position !== 'absolute')
+                throw new Error('Unresolved position');
+            if (style['box-sizing'] !== 'border-box' && style['box-sizing'] !== 'content-box')
+                throw new Error('Unresolved box sizing');
             const sizeRow = { box: box.label, path: box.path, position: style.position, ...positioned, ...(rect ? { rect } : {}), boxSizing: style['box-sizing'], boxSizingSource: style.$sources['box-sizing'],
                 paddingInlineSize: affine(diff(inline, scalar(add(px(String(style['border-left'])), px(String(style['border-right'])))))),
                 ...(blockSize ? { paddingBlockSize: affine(diff(blockSize, scalar(add(px(String(style['border-top'])), px(String(style['border-bottom'])))))) } : {}),

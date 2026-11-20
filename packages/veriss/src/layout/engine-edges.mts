@@ -1,8 +1,7 @@
 // TypeScript source. Run pnpm build:ts to regenerate adjacent ESM and declarations.
 // Box edges and finite-region margin/size resolution.
-import { q, div, cmp, add } from './linear.mjs';
+import {q,div,cmp} from './linear.mjs';
 import { scalar, asAffine, sum, diff, evaluate, affine, partition } from './region.mjs';
-import type { Rational } from './linear.mjs';
 import type { Affine2, Region } from './region.mjs';
 import type { LayoutAffine } from '../layout-contracts.d.ts';
 import { px } from './css.mjs';
@@ -15,9 +14,9 @@ const BLOCK_SIDES = ['top','bottom'] as const;
 type GapKey = 'column-gap' | 'row-gap';
 type EdgeKey = GapKey | `margin-${Side}` | `padding-${Side}`;
 export type EdgeStyle = Record<EdgeKey | `border-${Side}` | 'position' | 'block-size' | 'direction' | 'display' | 'max-block-size' | 'overflow-x' | 'overflow-y', string> & {
-  'font-size'?: string; $usedMarginTop?: LayoutAffine; $viewportLengths?: Partial<Record<EdgeKey, LayoutAffine & {source: string}>>; $blockFlow?: boolean;
+  'font-size'?: string|undefined; $usedMarginTop?: LayoutAffine; $viewportLengths?: Partial<Record<EdgeKey, LayoutAffine & {source: string}>>; $blockFlow?: boolean;
 };
-type InlineSizingStyle = Record<'inline-size' | 'min-inline-size' | 'max-inline-size' | 'box-sizing', string> & {'font-size'?: string};
+type InlineSizingStyle = Record<'inline-size' | 'min-inline-size' | 'max-inline-size' | 'box-sizing', string> & {'font-size'?: string|undefined};
 interface MarginBox {label: string; pseudo?: string | boolean; documentRoot?: boolean; children?: readonly unknown[]}
 interface MarginEntry { region: Region; children: {box: MarginBox; style: EdgeStyle}[] }
 export const maximum = (region: Region, a: Affine2, b: Affine2) => {

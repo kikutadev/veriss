@@ -20,10 +20,10 @@ export interface SelectorBox {
     boundaries?: readonly Boundary[];
     inputType?: string;
     placeholderAttr?: boolean;
-    value?: string;
+    value?: string | undefined;
     text?: boolean;
     whitespace?: boolean;
-    textContent?: string;
+    textContent?: string | undefined;
     nativeStates?: Record<string, boolean | string | undefined>;
     contentEditable?: unknown;
     attributes?: Record<string, string | boolean | number | undefined>;
@@ -36,7 +36,7 @@ type AttributePart = {
     kind: 'attribute';
     name: string;
     operator?: string;
-    value?: string;
+    value?: string | undefined;
     insensitive?: boolean;
 };
 type StructuralPart = {
@@ -55,9 +55,11 @@ type HasPart = {
     choices: Selector[];
 };
 export type SelectorPart = {
-    kind: 'tag' | 'class' | 'id' | 'path' | 'lang' | 'dir';
-    value: string;
-} | {
+    [K in 'tag' | 'class' | 'id' | 'path' | 'lang' | 'dir']: {
+        kind: K;
+        value: string;
+    };
+}['tag' | 'class' | 'id' | 'path' | 'lang' | 'dir'] | {
     kind: 'disabled' | 'required' | 'read-write';
     value: boolean;
 } | {

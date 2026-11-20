@@ -22,7 +22,7 @@ test('capacity obligations keep exact continuous-region witnesses and merge only
   assert.equal(d.range?.maxExact,'250');
   assert.equal(d.range?.maxInclusive,false);
   assert.equal(d.witness?.required,250);
-  assert.ok(d.witness && d.witness.available < d.witness.required);
+  assert.ok(d.witness?.available !== undefined && d.witness.required !== undefined && d.witness.available < d.witness.required);
   assert.equal('signature' in d,false);
 });
 
@@ -65,7 +65,7 @@ test('2-D obligations retain correlated regions and clipped-parent context', () 
   const d=diagnostics[0]!;
   assert.ok(d.region?.constraints.length);
   assert.match(d.message,/containing block \.parent/);
-  assert.ok(d.witness && d.witness.required > d.witness.available);
+  assert.ok(d.witness?.available !== undefined && d.witness.required !== undefined && d.witness.required > d.witness.available);
   const failed=clip(r,diff(height,width),true);
   assert.ok(failed);
   assert.ok(failed.vertices.some(v=>exact(v.x)===exact(v.y)));

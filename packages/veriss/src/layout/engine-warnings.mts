@@ -1,6 +1,6 @@
 // Post-layout warnings use established geometry; they do not make layout decisions.
 import {q,cmp,number} from './linear.mjs';
-import type {Rational} from './linear.mjs';
+import type {Rational,RationalInput} from './linear.mjs';
 import {scalar,asAffine,width,height,sum,diff,times,evaluate,clip,partition,sample} from './region.mjs';
 import type {Region,Affine2} from './region.mjs';
 import {intersect} from './integrity.mjs';
@@ -17,11 +17,11 @@ type WarningBox=NormalizedBox & {pseudo?:string|boolean};
 interface WarningSize {box:string;path:string;$shown?:{region:Region;inline:Affine2;block:Affine2|null;origin:Dimensions|null}}
 interface WarningGeometry {
   box:WarningBox;path:string;region:Region;origin:Dimensions|null;clipOrigin?:Dimensions|null;
-  inline:Affine2|null;block:Affine2|null;content?:{left:DimensionValue;top:DimensionValue};contentBlockSize?:Affine2|null;
-  sticky?:{parent:string|null};outsideMarker?:string;overflow:string;overflowValue:string;
+  inline:Affine2|null;block:Affine2|null;content?:{left:Affine2|RationalInput;top:Affine2|RationalInput};contentBlockSize?:Affine2|null;
+  sticky?:{parent:string|null};outsideMarker?:string|undefined;overflow:string;overflowValue:string;
   clipAxes?:{inline:boolean;block:boolean};borders?:Partial<Record<Side,Rational>>;
-  imageRatio?:{width:number;height:number;basis:'file'|'attributes';follows:boolean};paint?:{objectFit?:string};
-  fixedTracks?:string;wrapsByWords?:boolean;widthFromAttribute?:number;fullWidthMargins?:string[];contentBoxFull?:string[];vwInline?:string;
+  imageRatio?:{width:number;height:number;basis:'file'|'attributes';follows:boolean}|undefined;paint?:{objectFit?:string|undefined};
+  fixedTracks?:string|undefined;wrapsByWords?:boolean;widthFromAttribute?:number;fullWidthMargins?:string[];contentBoxFull?:string[];vwInline?:string|undefined;
 }
 const zero=q(0);
 export function checkLayoutWarnings({block,options,scrollbarProfile,geometry,sizes,boxes,diagnostics,layoutWarnings,ranges,context,isZeroAffine}:{
@@ -144,7 +144,7 @@ export function checkLayoutWarnings({block,options,scrollbarProfile,geometry,siz
   for (const row of geometry) {
     if (!row.imageRatio || row.imageRatio.follows || row.paint?.objectFit !== 'fill' || !row.inline || !row.block || !row.content || row.box.pseudo) continue;
     if (layoutWarnings.some(w => w.code === 'W_LAYOUT_IMAGE_DISTORTED' && w.path === row.path)) continue;
-    if ((['left', 'right', 'top', 'bottom'] as const).some(side => cmp(row.borders?.[side] ?? zero, zero) !== 0) || !isZeroAffine(row.content.left) || !isZeroAffine(row.content.top)) continue;
+    if ((['left', 'right', 'top', 'bottom'] as const).some(side => cmp(row.borders?.[side] ?? zero, zero) !== 0) || !isZeroAffine(asAffine(row.content.left)) || !isZeroAffine(asAffine(row.content.top))) continue;
     const { width: w, height: h } = row.imageRatio;
     // inline·h vs block·w: wider when inline·h·50 > block·w·51, taller when inline·h·51 < block·w·50.
     const wide = clip(row.region, diff(times(row.inline, q(String(h * 50))), times(row.block, q(String(w * 51)))), true);

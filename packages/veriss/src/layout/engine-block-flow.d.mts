@@ -23,5 +23,5 @@ export declare function prepareBlockChildren({ children, box, style, parents, an
     styles: ResolveStyle;
     positiveEdge: ReturnType<typeof createEdgeSolver>['positiveEdge'];
     positivePadding: ReturnType<typeof createEdgeSolver>['positivePadding'];
-    alignBrowserDependent: (box: SolverBox, property: string, value: unknown) => void;
+    alignBrowserDependent: (box: SolverBox, property: string, value: string | number | undefined) => void;
 }): void;

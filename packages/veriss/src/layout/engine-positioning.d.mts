@@ -9,13 +9,13 @@ type OriginStyle = Record<'left' | 'right' | 'top' | 'bottom' | 'position' | 'ov
 };
 interface OriginAvailable {
     inline: Affine2;
-    block?: Affine2 | null;
-    origin?: Dimensions | null;
+    block?: Affine2 | null | undefined;
+    origin?: Dimensions | null | undefined;
     root?: boolean;
     alignBlock?: Rational;
     alignInline?: Rational;
     containingBlock?: Dimensions & {
-        origin?: Dimensions | null;
+        origin?: Dimensions | null | undefined;
     };
 }
 interface OriginAncestor {

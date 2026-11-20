@@ -1,24 +1,6 @@
-import type { Affine2, Region } from './region.mjs';
-import type { EngineStyle } from './engine-style.mjs';
-import type { InlineBox } from './engine-inline.mjs';
+import type { Region } from './region.mjs';
+import type { SolverStyle as EngineStyle, SolverBox as Box, SolverAncestor as Ancestor, SolverAvailable as Space } from './engine-solver-types.mjs';
 import type { LayoutWarning, LayoutRange, LayoutRegion } from '../layout-contracts.d.ts';
-type Box = InlineBox & {
-    $foldedInline?: boolean;
-};
-type Ancestor = {
-    box: Box;
-    style: EngineStyle;
-    names?: readonly string[];
-};
-type Space = {
-    root?: boolean;
-    percentBlock?: Affine2 | null;
-    inline: Affine2;
-    block?: Affine2 | null;
-    flexItem?: {
-        main: 'inline' | 'block';
-    };
-};
 type Piece = {
     style: EngineStyle;
     region: Region;

@@ -2,24 +2,15 @@
 // Intrinsic contribution and rendered legend measurement.
 import { q, add, sub, mul, cmp, div, number } from './linear.mjs';
 import type { Rational } from './linear.mjs';
-import { scalar, sum, diff, partition } from './region.mjs';
+import {scalar,diff,partition} from './region.mjs';
 import type { Affine2, Region } from './region.mjs';
 import { px } from './css.mjs';
 import { expandTracks } from './grid.mjs';
 import type { EngineBoxContract } from './input.mjs';
 import type { LayoutRange } from '../layout-contracts.d.ts';
-import type { TableStyle } from './engine-table.mjs';
 
 const zero = q(0);
-export interface IntrinsicBox {
-  tag: string; label: string; path: string; text: boolean; children: IntrinsicBox[];
-  inline?: readonly IntrinsicBox[]; pseudo?: string | boolean; anonymous?: boolean; contract?: EngineBoxContract;
-}
-export type IntrinsicStyle = TableStyle & {
-  'overflow-x': string; 'justify-content': string; $blockFlow?: boolean;
-};
-export interface IntrinsicAncestor {box: IntrinsicBox; style: IntrinsicStyle}
-export type IntrinsicStyles = (box: IntrinsicBox, region: Region, parents: readonly IntrinsicAncestor[], inherited: IntrinsicStyle, emit: boolean, gridItem: boolean) => readonly {region: Region; style: IntrinsicStyle}[];
+import type {SolverBox as IntrinsicBox,SolverStyle as IntrinsicStyle,SolverAncestor as IntrinsicAncestor,ResolveStyle as IntrinsicStyles} from './engine-solver-types.mjs';
 interface ValuePiece {region: Region; value: Affine2}
 const isBlockProfile = (value: EngineBoxContract['intrinsicBlockSize']): value is Exclude<NonNullable<EngineBoxContract['intrinsicBlockSize']>, number> => Array.isArray(value);
 export function createIntrinsicSolver(styles: IntrinsicStyles) {
@@ -29,19 +20,19 @@ export function createIntrinsicSolver(styles: IntrinsicStyles) {
   // for 0), which the fr sizing (with its freezing loop) handles; otherwise Unknown.
   // probe: instead, the min- and max-content widths (border box) of box itself: { min, max } (a flex item's content).
   function frAutoMinimums(box: IntrinsicBox, style: IntrinsicStyle, region: Region, parents: readonly IntrinsicAncestor[], probe?: false): IntrinsicStyle;
-  function frAutoMinimums(box: IntrinsicBox, style: IntrinsicStyle, region: Region, parents: readonly IntrinsicAncestor[], probe: 'min' | true): IntrinsicStyle | {min: Rational; max?: Rational};
+  function frAutoMinimums(box: IntrinsicBox, style: IntrinsicStyle, region: Region, parents: readonly IntrinsicAncestor[], probe: 'min' | true): {min: Rational; max?: Rational};
   function frAutoMinimums(box: IntrinsicBox, style: IntrinsicStyle, region: Region, parents: readonly IntrinsicAncestor[], probe: false | 'min' | true = false): IntrinsicStyle | {min: Rational; max?: Rational} {
     if (!probe && (!['grid', 'inline-grid'].includes(style.display) || style.$blockFlow)) return style;
     const source = String(style['grid-template-columns']);
     // repeat(auto-fill | auto-fit, …) takes no bare fr (invalid there); subgrid has no own tracks.
     if (!probe && (/auto-fill|auto-fit|subgrid/.test(source) || !/fr\b|\bauto\b|min-content|max-content|fit-content/.test(source))) return style;
     const unknown = (why: string): never => { throw Object.assign(new Error(probe ? `${box.label}: its content ${why.replace(/^has /, 'has ')}; its content width is not known (give it a px width or flex-basis)` : `${box.label}: a bare fr column (minmax(auto, fr)) ${why}; its minimum is not known`), { code: probe ? 'U_LAYOUT_FLEX' : 'U_LAYOUT_GRID_FR', box, region }); };
-    let tokens; try { tokens = probe ? ['auto'] : expandTracks(source); } catch { return style; }
+    let tokens; try { tokens = probe ? ['auto'] : expandTracks(source); } catch (error) { if(probe) throw error; return style; }
     const frOf = (token: string) => { const m = token.match(/^(\d+(?:\.\d+)?)fr$/) ?? token.match(/^minmax\(\s*auto\s*,\s*(\d+(?:\.\d+)?)fr\s*\)$/); return m ? m[1] : null; };
     const bare = tokens.map(frOf);
     const kindOf = (token: string) => token === 'auto' ? 'auto' : token === 'min-content' ? 'min' : token === 'max-content' ? 'max' : /^fit-content\(\s*\d+(?:\.\d+)?px\s*\)$/.test(token) ? 'fit' : null;
     const kinds = tokens.map(kindOf);
-    if (!bare.some(Boolean) && !kinds.some(Boolean)) return style;
+    if (!bare.some(Boolean) && !kinds.some(Boolean)) {if(probe) throw new Error('Unresolved flex minimum');return style;}
     const ancestors = [...parents, { box, style }];
     const single = (target: IntrinsicBox, at: readonly IntrinsicAncestor[], inherited: IntrinsicStyle) => { const list = styles(target, region, at, inherited, false, true); const keys = new Set(list.map(x => JSON.stringify(x.style))); if (keys.size !== 1) unknown(`has an item whose styles change across the viewport range (${target.label})`); return list[0]!.style; };
     const length = (value: string, what: string) => { if (value === 'ua') unknown(`has an item with UA ${what}`); if (['0', '0px'].includes(String(value))) return zero; if (!/^\d+(?:\.\d+)?px$/.test(String(value))) unknown(`has an item whose ${what} is ${value}`); return px(value); };
@@ -150,7 +141,7 @@ export function createIntrinsicSolver(styles: IntrinsicStyles) {
   return frAutoMinimums;
 }
 
-export function intrinsicBlock<Box extends {text: boolean; contract?: EngineBoxContract}> (box: Box, content: Affine2, region: Region, unknown: (code: string, message: string, line: undefined, box: Box) => unknown, ranges: (region: Region) => {range: LayoutRange}): ValuePiece[] {
+export function intrinsicBlock<Box extends {text: boolean; contract?: EngineBoxContract|undefined}> (box: Box, content: Affine2, region: Region, unknown: (code: string, message: string, line: undefined, box: Box) => unknown, ranges: (region: Region) => {range: LayoutRange}): ValuePiece[] {
     const value = box.contract?.intrinsicBlockSize;
     if (typeof value === 'number') return [{ region, value: scalar(value) }];
     if (isBlockProfile(value)) {
@@ -177,7 +168,7 @@ export function measureLegend(styles: IntrinsicStyles, box: IntrinsicBox, style:
     const states = styles(legendBox, region, parents, style, false, false);
     if (states.length !== 1) throw Object.assign(new Error('The legend style varies across viewport regions; the rendered legend needs one size'), { code: 'U_LAYOUT_LEGEND' });
     const ls = states[0]!.style;
-    if (ls.display === 'none') return { box: legendBox, hidden: true, effectiveTop: px(style['border-top']) };
+    if (ls.display === 'none') return { box: legendBox, hidden: true as const, effectiveTop: px(style['border-top']) };
     if (ls.display !== 'block' || ls.position !== 'static' || ls.float !== 'none' || (['inline-size', 'block-size'] as const).some(key => !/^\d+(?:\.\d+)?px$/.test(ls[key])) || !['0', '0px'].includes(ls['margin-top']) || !['0', '0px'].includes(ls['margin-bottom']) || ls['margin-left'] === 'auto' || ls['margin-right'] === 'auto')
       throw Object.assign(new Error('A rendered legend needs display: block, an explicit px inline-size and block-size and no block or auto margins (its width is otherwise shrink-to-fit)'), { code: 'U_LAYOUT_LEGEND' });
     const vertical = add(add(px(ls['padding-top']), px(ls['padding-bottom'])), add(px(ls['border-top']), px(ls['border-bottom'])));
@@ -185,7 +176,7 @@ export function measureLegend(styles: IntrinsicStyles, box: IntrinsicBox, style:
     const blockSize = ls['box-sizing'] === 'content-box' ? add(px(ls['block-size']), vertical) : px(ls['block-size']);
     const inlineSize = ls['box-sizing'] === 'content-box' ? add(px(ls['inline-size']), horizontal) : px(ls['inline-size']);
     const top = px(style['border-top']);
-    return { box: legendBox, style: ls, blockSize, inlineSize, vertical, horizontal, effectiveTop: cmp(blockSize, top) > 0 ? blockSize : top,
+    return { box: legendBox, hidden:false as const, style: ls, blockSize, inlineSize, vertical, horizontal, effectiveTop: cmp(blockSize, top) > 0 ? blockSize : top,
       // The legend sits at border-left + padding-left + margin-left; a thicker border is centred on it.
       offset: { inline: add(add(px(style['border-left']), px(style['padding-left'])), px(ls['margin-left'])), block: cmp(top, blockSize) > 0 ? div(sub(top, blockSize), q(2)) : zero } };
   }

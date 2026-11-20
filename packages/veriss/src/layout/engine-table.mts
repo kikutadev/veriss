@@ -6,31 +6,16 @@ import { scalar, sum, diff, times, evaluate, sample, clip } from './region.mjs';
 import type { Affine2, Region } from './region.mjs';
 import { px } from './css.mjs';
 import { tracks as gridTracks } from './grid.mjs';
+import type {SolverBox,SolverStyle,SolverAncestor} from './engine-solver-types.mjs';
 import type { EngineBoxContract } from './input.mjs';
 
 const zero = q(0);
 type Side = 'left' | 'right' | 'top' | 'bottom';
-type TableStyleKey = 'display' | 'position' | 'float' | 'table-layout' | 'border-collapse' | 'border-spacing' |
-  'inline-size' | 'block-size' | 'min-inline-size' | 'max-inline-size' | 'min-block-size' | 'max-block-size' |
-  'box-sizing' | 'vertical-align' | 'caption-side' | 'background-color' | 'background-image' |
-  'grid-template-columns' | 'grid-template-rows' | 'grid-row' | 'grid-column' |
-  'row-gap' | 'column-gap' | 'flex-direction' | 'flex-wrap' | 'flex-basis' | 'align-items' | 'align-self' | 'order' |
-  `padding-${Side}` | `border-${Side}` | `margin-${Side}`;
-export type TableStyle = Record<TableStyleKey, string> & {
-  $sources?: Readonly<Record<string, unknown>>;
-  'grid-auto-rows'?: string; 'grid-auto-flow'?: string; 'align-content'?: string;
-  $fromCell?: boolean; tableColumns?: Rational | null; tableGaps?: Rational;
-  tableShrink?: Rational; tableAutoMinimum?: Rational;
-};
+export type TableStyle=SolverStyle;
 type BlockProfile = NonNullable<EngineBoxContract['intrinsicBlockSize']>;
 type ProfileEntries = Exclude<BlockProfile, number>;
-type TableContract = Omit<EngineBoxContract, 'textMetrics'> & {
-  textMetrics?: NonNullable<EngineBoxContract['textMetrics']> & { baseline?: {ascent: number; descent: number} };
-};
 interface CellArea {column: number; row: number; span: number; down: number}
-export interface TableBox {
-  tag: string; label: string; path: string; text: boolean; children: TableBox[]; inline?: readonly TableBox[]|undefined;
-  colSpan?: number | 'dynamic'; rowSpan?: number | 'dynamic'; contract?: TableContract|undefined;
+export interface TableMetadata {
   tableAt?: CellArea; tableArea?: CellArea; tablePart?: boolean; tableCell?: boolean; tableFlow?: boolean;
   tableRowSpan?: number; tableBaselineTop?: boolean; tableBaselineShift?: Rational;
   tableBaselineGroup?: {row: number; style: TableStyle; text?: Rational};
@@ -40,7 +25,8 @@ export interface TableBox {
 }
 interface ColumnRange {min: Rational; max: Rational; fixed?: Rational}
 interface Span {cell: TableBox; row: TableBox; r: number; n: number; min: Rational}
-interface TableAncestor {box: TableBox; style: TableStyle}
+type TableBox=SolverBox;
+type TableAncestor=SolverAncestor
 interface TableStylePiece {region: Region; style: TableStyle}
 export interface TableProbe {inner: Affine2; thresholds: Rational[]}
 interface TableContext {
@@ -142,7 +128,7 @@ export function tableAsGrid({styles, uaEngine}: TableContext, table: TableBox, s
         const cs = one(styles(cell, region, parents, rowStyle, false, false));
         if (cs['vertical-align'] !== 'baseline') continue;
         const metrics = cell.contract?.textMetrics, L = cell.contract?.font?.lineHeight;
-        if (spanning || !metrics?.baseline || !L) return fail(`${cell.label}: a baseline-aligned text cell needs font-derived text metrics (its first baseline)`);
+        if (spanning || !metrics || !('baseline' in metrics) || !metrics.baseline || !L) return fail(`${cell.label}: a baseline-aligned text cell needs font-derived text metrics (its first baseline)`);
         const leading = L - metrics.baseline.ascent - metrics.baseline.descent;
         if (leading < 0 && leading % 2) fail(`${cell.label}: an odd negative leading rounds the baseline ambiguously`);
         cell.tableBaselineGroup = { row: rows.indexOf(row), style: cs, text: q(String(Math.floor(leading / 2) + metrics.baseline.ascent)) };
@@ -165,7 +151,7 @@ export function tableAsGrid({styles, uaEngine}: TableContext, table: TableBox, s
     // table they bound the column (td { max-width: 20px } narrows a column of wrapping text). A table's min/max height is
     // spread over its rows (measured:
     // .t { min-height: 100px } makes 20px cells 100px). Neither is modeled.
-    const sizeBound = (st: TableStyle, keys: readonly TableStyleKey[]) => keys.find(key => st.$sources?.[key] && !['auto', 'none', '0', '0px'].includes(String(st[key])));
+    const sizeBound = (st: TableStyle, keys: readonly string[]) => keys.find(key => st.$sources?.[key] && !['auto', 'none', '0', '0px'].includes(String(st[key])));
     const tableBound = sizeBound(style, ['min-block-size', 'max-block-size']);
     if (tableBound) fail(`${table.label}: ${tableBound} on a table spreads over its rows, which is not modeled; size the cells instead`);
     for (const row of rows) for (const rs of styles(row, region, parents, style, false, false)) for (const cell of row.children) for (const c of styles(cell, rs.region, parents, rs.style, false, false)) {
