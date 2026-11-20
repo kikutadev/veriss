@@ -122,3 +122,5 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - pnpm build:ts / check:ts / test / git diff --check 成功。全867件 (root 29, verifier 742, adapter-core 66, Vue 6, React 12, Svelte 12)、失敗・skip 0。
 - e98f09a の既存 worktree と、現版の analyzeHTML を同一入力67件で比較。JSON 化したレポート全体が67/67一致 (verified 17, violated 14, unknown 36)。grid/flex・media/container query・カルーセル・hover/focus・アニメーション・a11y・未対応CSSを含む。今回の抽出を含む差分の回帰確認であり、ブラウザー照合や全入力に対する同値性証明ではない。
 - 最終 gate (3ブラウザーE2E/既存eval)、Git依存導入、性能比較は今回未実施。main と remote は変更せず、全体移行は未完了。残る engine の solve/styles とレポート構築、未移行テスト/補助スクリプトを継続対象とする。
+
+第四段階の方針: solve の外側に残る事後検査・レポート形成を、実際の幾何証拠を受け取る型付きモジュールへ分離する。診断順・未決定時の扱いを維持し、境界の型契約と回帰テストを増やす。残りのテストの移行も実装と整合する範囲で進める。
