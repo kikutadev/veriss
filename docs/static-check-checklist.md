@@ -404,6 +404,7 @@
 - [x] **F127. html や body だけの `box-sizing: border-box`**(`W_CSS_BOX_SIZING_NOT_INHERITED`): `box-sizing` は継承されないので、ほかの要素は content-box のまま(Chromium・Firefox・WebKit で実測: 幅 100px と padding 10px で 120px)。ほかの要素に `box-sizing` を書く規則がなく、大きさと padding か border を書いた規則があるときだけ報告する
 - [x] **F128. 縦の `margin` の %**(`W_CSS_MARGIN_PERCENT_WIDTH`、解析は % の margin で Unknown のまま): 包含ブロックの幅に対する割合で、高さではない(Chromium・Firefox・WebKit で実測: 400×100 で 10% は 40px)。縦の `padding` の % は縦横比の定番の書き方なので報告しない
 - [x] **F129. リセット CSS で中央に来なくなる `<dialog>`**(`W_CSS_DIALOG_NOT_CENTRED`): dialog は UA の `margin: auto`(モーダルでは inset 0 も)で中央に置かれる。`* { margin: 0 }` のようなリセットが届くと左上に出る(Chromium・Firefox・WebKit で実測、`open` でも `showModal()` でも)。dialog の要素名・class・id を書いた規則は意図した配置なので報告しない。閉じた dialog も、スクリプトで開くので対象
+- [x] **F130. `::-webkit-scrollbar` と標準の `scrollbar-width` / `scrollbar-color`**(`W_CSS_SCROLLBAR_WEBKIT_IGNORED`、`W_CSS_SCROLLBAR_FIREFOX_SHOWN`、解析は `::-webkit-scrollbar` で Unknown のまま): 標準のプロパティを書いた要素では Chromium と WebKit が `::-webkit-scrollbar` を無視し(Chromium は `--hide-scrollbars` を外した従来型のスクロールバーで、WebKit はそのまま実測)、Firefox は `::-webkit-scrollbar` を受け付けない(`CSS.supports` で実測)。前者は効かない規則として、`::-webkit-scrollbar` だけで隠したものは Firefox で出たままとして報告する。`scrollbar-width: none` と並べて隠す定番の組み合わせは報告しない
   ので、`@media (min-width: var(--bp))` は無効な query になり、その規則は決して当たらない(3 つのブラウザーで 800px でも当たらない)。
   解析も当たらない規則として扱う。query を並べたもの(`print, (…var…)`)は、ほかの query が当たりうるので今までどおり。
 - 試して当てはまらなかったもの: `progress`・`input[type=range]` の `appearance: none` は、3 つのブラウザーとも何かを描く

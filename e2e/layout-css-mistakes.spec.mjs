@@ -1514,3 +1514,25 @@ test('F129: * { margin: 0 } puts an open or modal dialog at the top-left; dialog
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED'), `${css} ${modal}`).toBe(!centred);
   }
 });
+
+test('F130: Chrome and Safari ignore ::-webkit-scrollbar beside scrollbar-width or scrollbar-color; Firefox does not take it', async ({page, browserName}) => {
+  const html = css => `<!doctype html><style>*{margin:0}.a{width:200px;height:100px;overflow:scroll}${css}</style><div class="a"><div style="height:300px"></div></div>`;
+  const gutter = p => p.evaluate(() => { const a = document.querySelector('.a'); return a.offsetWidth - a.clientWidth; });
+  if (browserName === 'chromium') {
+    // Classic scrollbars (Playwright hides them by default), so the bar has a width to measure.
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] }), p = await browser.newPage();
+    try {
+      for (const [css, width] of [['.a::-webkit-scrollbar{width:4px}', 4], ['.a{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}', 10], ['.a{scrollbar-color:red blue}.a::-webkit-scrollbar{width:4px}', 15], ['', 15]]) {
+        await p.setContent(html(css));
+        expect(await gutter(p), css).toBe(width);
+      }
+    } finally { await browser.close(); }
+  }
+  if (browserName === 'webkit') for (const [css, width] of [['.a::-webkit-scrollbar{width:4px}', 4], ['.a{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}', 0]]) { await page.setContent(html(css)); expect(await gutter(page), css).toBe(width); }
+  expect(await page.evaluate(() => CSS.supports('selector(::-webkit-scrollbar)'))).toBe(browserName !== 'firefox');
+  const lint = css => (analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;overflow:auto}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}}).layoutWarnings ?? []).map(w => w.code).filter(c => /SCROLLBAR/.test(c));
+  expect(lint('.a{scrollbar-color:red blue}.a::-webkit-scrollbar{width:4px}')).toEqual(['W_CSS_SCROLLBAR_WEBKIT_IGNORED']);
+  expect(lint('.a::-webkit-scrollbar{display:none}')).toEqual(['W_CSS_SCROLLBAR_FIREFOX_SHOWN']);
+  expect(lint('.a{scrollbar-width:none}.a::-webkit-scrollbar{display:none}')).toEqual([]);
+});

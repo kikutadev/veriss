@@ -2,6 +2,12 @@
 // { code, ...data }; this catalog turns each into the warning a user reads. The stage decides what is wrong, the rule
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 const catalog = {
+  W_CSS_SCROLLBAR_WEBKIT_IGNORED: note => ({ code: 'W_CSS_SCROLLBAR_WEBKIT_IGNORED', severity: 'warning', selector: note.base,
+    css: [{ property: '::-webkit-scrollbar', file: note.webkit.file, line: note.webkit.line, selector: note.webkit.selector }, ...note.standard.map(s => ({ property: s.property, file: s.file, line: s.line, selector: note.base }))],
+    message: `${note.base}: ${note.standard.map(s => `${s.property}: ${s.value}`).join(', ')} is set, so Chrome and Safari ignore ${note.webkit.selector} (they use the standard properties when either is set), and Firefox never takes it: those rules do nothing. Style the scrollbar with scrollbar-width / scrollbar-color only` }),
+  W_CSS_SCROLLBAR_FIREFOX_SHOWN: note => ({ code: 'W_CSS_SCROLLBAR_FIREFOX_SHOWN', severity: 'warning', selector: note.base, browsers: { hidden: ['chromium', 'webkit'], shown: ['firefox'] },
+    css: [{ property: '::-webkit-scrollbar', file: note.webkit.file, line: note.webkit.line, selector: note.webkit.selector }],
+    message: `${note.webkit.selector} hides the scrollbar in Chrome and Safari, but Firefox does not take ::-webkit-scrollbar, so there it is still shown. Add ${note.base} { scrollbar-width: none }` }),
   W_CSS_MARGIN_PERCENT_WIDTH: note => ({ code: 'W_CSS_MARGIN_PERCENT_WIDTH', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { ${note.property}: ${note.value} }: a vertical margin of ${note.percent} is a share of the containing block's width, not its height, so the gap grows with the width of the page. Use a length (or vh / cqh) for a vertical gap` }),
   W_CSS_BOX_SIZING_NOT_INHERITED: note => ({ code: 'W_CSS_BOX_SIZING_NOT_INHERITED', severity: 'warning', selector: note.selector, property: 'box-sizing', css: [{ property: 'box-sizing', file: note.file, line: note.line, selector: note.selector }],

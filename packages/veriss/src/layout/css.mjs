@@ -1086,6 +1086,31 @@ export function parseLayoutCSS(sheets, diagnostic) {
       if (v && !/^(?:16px|100%|1em|1rem|medium|12pt|inherit|initial|unset|revert|revert-layer|var\(.*)$/i.test(v)) rootFont = { value: v, selector: rule.selector, file: sheet.file, line: d.source.start.line };
     }); });
   }
+  // F130: ::-webkit-scrollbar and the standard scrollbar-width / scrollbar-color. Chromium and WebKit ignore
+  // ::-webkit-scrollbar on an element that sets either standard property (measured: scrollbar-width: thin beside
+  // ::-webkit-scrollbar { width: 4px } is 10px wide in Chromium with classic scrollbars, 0 instead of 4 in WebKit;
+  // scrollbar-color too in Chromium), and Firefox does not take ::-webkit-scrollbar at all (measured:
+  // CSS.supports('selector(::-webkit-scrollbar)') is false), so hiding the bar there needs scrollbar-width: none.
+  // Matched by the selector text before the pseudo-element.
+  { const webkit = new Map(), standard = new Map();
+    for (const sheet of sheets) {
+      let root; try { root = postcss.parse(sheet.css, { from: sheet.file }); } catch { continue; }
+      root.walkRules(rule => { for (const sel of postcss.list.comma(rule.selector)) {
+        const m = /^(.*?)::-webkit-scrollbar(?:-[a-z-]+)?(?::[a-z-]+)*$/i.exec(sel.trim());
+        const decls = (rule.nodes ?? []).filter(d => d.type === 'decl');
+        if (m) { const base = m[1].trim() || '*'; if (!webkit.has(base)) webkit.set(base, { selector: sel.trim(), file: sheet.file, line: rule.source.start.line, hides: false }); const w = webkit.get(base);
+          if (/^::-webkit-scrollbar$/i.test(sel.trim().slice(m[1].length).trim()) && decls.some(d => (/^display$/i.test(d.prop) && /^none$/i.test(d.value.trim())) || (/^(?:width|height)$/i.test(d.prop) && /^0(?:px)?$/i.test(d.value.trim())))) w.hides = true; }
+        else for (const d of decls) if (/^scrollbar-(?:width|color)$/i.test(d.prop) && !/^(?:auto|initial|unset|inherit|revert|revert-layer)$/i.test(d.value.trim())) {
+          const std = standard.get(sel.trim()) ?? {}; std[d.prop.toLowerCase()] = { value: d.value.trim(), file: sheet.file, line: d.source.start.line }; standard.set(sel.trim(), std); }
+      } });
+    }
+    for (const [base, w] of webkit) {
+      const std = standard.get(base);
+      // scrollbar-width: none hides it in Chrome whatever ::-webkit-scrollbar says (the usual hide-everywhere pair).
+      if (std && /^none$/i.test(std['scrollbar-width']?.value ?? '')) continue;
+      if (std) note('W_CSS_SCROLLBAR_WEBKIT_IGNORED', { base, webkit: w, standard: Object.entries(std).map(([property, v]) => ({ property, ...v })) });
+      else if (w.hides) note('W_CSS_SCROLLBAR_FIREFOX_SHOWN', { base, webkit: w });
+    } }
   // F127: box-sizing is not inherited: border-box on html / :root / body alone leaves every other element content-box
   // (measured in Chromium, Firefox and WebKit). Reported unless some rule also sets it on the other elements (the
   // *, *::before, *::after { box-sizing: inherit } pattern, or any rule for other elements).

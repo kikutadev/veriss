@@ -25,10 +25,10 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 7. transform・重なり・描画 | 6 / 6 | 済 |
 | 8. フォーム部品・置換要素 | 8 / 8 | 済 |
 | 9. セレクタ × DOM(状態・構造) | 8 / 8 | 済 |
-| 10. ブラウザで結果が違うもの | 4 / 5 | ほぼ済 |
+| 10. ブラウザで結果が違うもの | 5 / 5 | 済 |
 | 11. 単位と計算値の落とし穴(書いた値と計算値が違う) | 4 / 4 | 済 |
 | 12. HTML 要素ごとの既定の振る舞いとリセット CSS | 4 / 4 | 済 |
-| 合計 | 85 / 87(98%) | |
+| 合計 | 86 / 87(99%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -137,7 +137,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 - [x] block レイアウトの `justify-self` / `justify-items`(F105)
 - [x] `<br>` の `margin`(カテゴリ 8 と同じ、F120)
-- [ ] `::-webkit-scrollbar` と `scrollbar-width` / `scrollbar-color`(重ねて描くスクロールバーのヘッドレスでは測れない。測り方を決める)
+- [x] `::-webkit-scrollbar` と `scrollbar-width` / `scrollbar-color`(F130。測り方: Chromium は `--hide-scrollbars` を外して従来型のスクロールバーにし、`offsetWidth - clientWidth` で幅を読む。WebKit は `::-webkit-scrollbar` の幅がそのまま測れる。Firefox は重ねて描くスクロールバーを止められないので `CSS.supports` で受け付けるかを読む)
 - [x] `-webkit-` だけの書き方(`-webkit-line-clamp` 以外): 大きさのキーワード(F122)。`-webkit-box-reflect` などの描画だけのものは測れていない
 - [x] フォーム部品の既定の大きさ(UA プロファイル `ua-profile.mjs` が Chromium・Firefox・WebKit ごとに持ち、cross-browser lint が差を報告する)
 
@@ -217,6 +217,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F130. `::-webkit-scrollbar` と標準の `scrollbar-width` / `scrollbar-color`
 - F129. リセット CSS で中央に来なくなる `<dialog>`
 - F128. 縦の `margin` の % は幅に対する割合
 - F127. html / body だけの `box-sizing` は継承されない

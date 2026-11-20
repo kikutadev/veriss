@@ -1394,3 +1394,13 @@ test('F129: a margin reset that reaches a dialog takes away its centring (open a
   assert.match(hit('body *{margin:0}')[0].message, /Add dialog \{ margin: auto \}/);
   for (const css of ['*{margin:0}dialog{margin:auto}', 'dialog{margin:10px auto}', '.modal{margin:0}', '#m{margin:0}', '']) assert.equal(hit(css).filter(w => w.box === '#m').length, 0, css);
 });
+
+test('F130: ::-webkit-scrollbar is ignored by Chrome beside scrollbar-width / -color, and not taken by Firefox', () => {
+  const hit = (css, code) => codes(run(`.a{overflow:auto}${css}`), code);
+  assert.match(hit('.a{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}', 'W_CSS_SCROLLBAR_WEBKIT_IGNORED')[0]?.message ?? '', /Chrome and Safari ignore .*those rules do nothing/);
+  assert.equal(hit('.a{scrollbar-color:red blue}.a::-webkit-scrollbar-thumb{background:red}', 'W_CSS_SCROLLBAR_WEBKIT_IGNORED').length, 1);
+  assert.match(hit('.a::-webkit-scrollbar{display:none}', 'W_CSS_SCROLLBAR_FIREFOX_SHOWN')[0]?.message ?? '', /\.a \{ scrollbar-width: none \}/);
+  assert.equal(hit('.a::-webkit-scrollbar{width:0}', 'W_CSS_SCROLLBAR_FIREFOX_SHOWN').length, 1);
+  for (const css of ['.a{scrollbar-width:none}.a::-webkit-scrollbar{display:none}', '.a::-webkit-scrollbar{width:6px}', '.a{scrollbar-width:thin}', '.b{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}'])
+    assert.equal([...hit(css, 'W_CSS_SCROLLBAR_WEBKIT_IGNORED'), ...hit(css, 'W_CSS_SCROLLBAR_FIREFOX_SHOWN')].length, 0, css);
+});
