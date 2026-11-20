@@ -144,3 +144,5 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - pnpm build:ts / check:ts / test / git diff --check 成功。全867件 (root 29, verifier 742, adapter-core 66, Vue 6, React 12, Svelte 12)、失敗・skip 0。
 - e98f09a のクリーンな worktree と analyzeHTML を同一入力82件で比較し、JSON 化した全レポートが82/82一致 (verified 49, violated 15, unknown 18)。Grid/Flex/block、RTL、位置指定、変換、条件付きCSS、疑似要素、アクセシビリティと Unknown のフォールバックを含む。全入力での同値性やブラウザーとの照合を証明するものではない。
 - 最終 gate、性能比較、Git 依存導入検証は未実施。main への統合・リモート push は行っていない。
+
+第六段階の方針: 残る solve の grid/block-flow 計算の責務を分け、内部の割当・祖先・子状態の型を統一する。strict な再帰境界まで接続することを目標に、既存判定を比較して Unknown を緩めない。全体の完了条件は変更しない。
