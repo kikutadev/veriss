@@ -208,8 +208,12 @@ JSON は model（状態・遷移・環境・契約）、points（実測点）、
 モデルとの座標照合は丸めの差を許容する。実測された契約の判定は IEEE-754 の座標値を
 厳密な有理数に変換し、述語に必要な座標だけを比較する。未証明の軸を補完せず、
 ブラウザーの観測結果と連続領域の数理証明を区別する。
-ポートフォリオ5ページ（3ブラウザー、横方向の主領域）の設定は
-`tools/ui-build-examples/portfolio-pages/` に置く。各ファイルで同じコマンドを実行できる。
+ポートフォリオ5ページの設定は `tools/ui-build-examples/portfolio-pages/`、
+別用途の PC Mini Tools / Spex / Cinema UI の設定は `tools/ui-build-examples/` の各 JSON。
+同じ runner を使用し、対象の selector や検証すべき意図はアプリ入力にのみ記述する。
+個別 CSS をレビューして与えた局所モデルは、自動射影による証明と区別する。
+アイランドの入力ハッシュ付き遷移評価は portfolio-pages 内の個別評価例であり、
+ライブラリの実装・一般の runner にサイト固有の分岐を設けない。
 
 ### 述語 AST と合成
 

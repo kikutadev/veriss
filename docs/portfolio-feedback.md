@@ -284,7 +284,7 @@ ABOUT/WORKS/ARTICLES 各7幅、HOME (#selected-work 直接遷移) 5幅、H=844�
 外部通信遮断、safe-area 0、overlay、DPR1。HOME のフルヒーロー遷移、内部リンク全配置、
 縦方向、viewport 変更中、複数の非同期進捗、CSSからの補間/縮約自動導出は未証明。
 既存レビュー済み入力と現在のローカルビルドの実測は別の証拠。
-再実行: `node tools/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist`、
+再実行: `node tools/ui-build-examples/portfolio-pages/eval-island-transition.mjs ../portfolio/qa/evidence/veriss-trial ../portfolio/dist`、
 HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラウザー supervisor 下で行う。
 新規3ブラウザー E2E 3件（各27フレーム）、関連単体13件成功。
 各実測 supervisor 残留0。サイト本体・配信コードは変更なし。

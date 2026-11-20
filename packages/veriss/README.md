@@ -226,7 +226,16 @@ root-relative inline/block starts and border sizes everywhere in that domain.
 Missing coordinate coverage, scroll/clip or subgrid frames, unequal environments,
 unsupported CSS and solver failures produce `unknown`. A fixed outer box only
 certifies that selected box. This endpoint relation does not prove intermediate
-frames, text/paint stability or a browser CLS value. See the
+frames, text/paint stability or a browser CLS value.
+
+For transitions with a known shared affine interpolation, `/transitions`
+also exports `verifyInterpolatedPredicate`. It checks a conjunction of affine
+comparisons against the endpoint geometry and proves it throughout bounded
+progress, conditional on the caller establishing that the referenced geometry
+really follows that interpolation. Typical uses include preserving a gap
+between a resizing sidebar and a moving workspace, or keeping a drawer in
+the viewport. It does not infer a CSS animation model, accept overshooting
+easings, or prove unrelated visual and interaction properties. See the
 [complete guide and runnable examples](https://github.com/mizchi/isle/blob/HEAD/docs/layout-transitions.md).
 
 The root and `/html` entry points do not initialize Z3. `/z3`, `/contracts` and `/transitions`
