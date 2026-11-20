@@ -6,7 +6,7 @@
 // Unknown (never verified): child components, <slot>, v-html, <component :is>, a dynamic :class or :style that is
 // not a literal shape, <style module>, and more states than maxStates. Scoped styles are unscoped (:deep(x),
 // :slotted(x) and :global(x) become x): analysed alone, a component's scoped selectors match its own elements.
-import { parse } from 'vue/compiler-sfc';
+import { parse, compileScript, compileTemplate } from 'vue/compiler-sfc';
 import { parseExpression, parse as parseScript } from '@babel/parser';
 import { product, merge, choose, conditionKey, analyzeStates, scopeEscapes, boundary, literalUnionProps, propsMembers, literalChoicesAgree } from '@mizchi/veriss-adapter-core';
 
@@ -193,4 +193,55 @@ export function expandVue(source, { maxStates = 64, eachCounts = [0, 1, 2], sour
 /** Analyse every template state of a Vue SFC (options: veriss options, pageCSS, page, maxStates, eachCounts). */
 export function analyzeVue(source, { maxStates, eachCounts, sourceLines, ...options } = {}) {
   return analyzeStates(expandVue(source, { maxStates, eachCounts, sourceLines }), options);
+}
+
+import {requireFinite as need,finiteName,finiteBool,finiteCondition,finiteUpdate,finiteTag,finiteAttribute,finiteAttempt,buildFiniteState} from '@mizchi/veriss-adapter-core';
+export function deriveVueState(source){
+ return finiteAttempt(()=>{
+  const {descriptor:d,errors}=parse(source);
+  need(!errors.length&&d.scriptSetup&&!d.script&&d.template&&!d.customBlocks.length&&!d.template.lang&&!d.template.src&&!d.scriptSetup.src&&d.styles.every(s=>!s.src&&!s.module&&!s.lang),'Expected closed script setup and native template');
+  const script=compileScript(d,{id:'finite-ui'});
+  const compiled=compileTemplate({source:d.template.content,filename:'Component.vue',id:'finite-ui',compilerOptions:{bindingMetadata:script.bindings}});
+  need(!compiled.errors.length,'Vue template does not compile');
+  const body=parseScript(d.scriptSetup.content,{sourceType:'module',plugins:['typescript']}).program.body;
+  const imp=body[0];
+  need(imp?.type==='ImportDeclaration'&&imp.source.value==='vue'&&imp.specifiers.length===1&&imp.specifiers[0].type==='ImportSpecifier'&&imp.specifiers[0].imported.name==='ref'&&imp.specifiers[0].local.name==='ref','Expected ref import');
+  const vars=new Map(),handlers=new Map(),ids=new Set();
+  for(const stmt of body.slice(1)){
+   need(stmt.type==='VariableDeclaration'&&stmt.kind==='const','Only ref declarations are supported');
+   for(const decl of stmt.declarations){
+    const n=decl.id.name,c=decl.init;
+    need(decl.id.type==='Identifier'&&finiteName(n)&&n!=='ref'&&!vars.has(n)&&c?.type==='CallExpression'&&c.callee.type==='Identifier'&&c.callee.name==='ref'&&c.arguments.length===1&&finiteBool(c.arguments[0]),'Only boolean refs are supported');
+    vars.set(n,c.arguments[0].value);
+   }
+  }
+  function render(n,ancestors=[]){
+   if([TEXT,COMMENT].includes(n.type))return;
+   need(n.type===ELEMENT&&n.tagType===0,'Unsupported Vue template node');
+   finiteTag(n.tag,ancestors);let id,event;const attrs=new Set();
+   for(const p of n.props){
+    need(!attrs.has(p.type===ATTRIBUTE?p.name:p.name+':'+(p.arg?.content??'')),'Duplicate template attribute');
+    attrs.add(p.type===ATTRIBUTE?p.name:p.name+':'+(p.arg?.content??''));
+    if(p.type===ATTRIBUTE){finiteAttribute(p.name,p.value?.content);if(p.name==='id')id=p.value.content;continue}
+    need(p.type===DIRECTIVE&&!p.modifiers?.length,'Unsupported Vue directive');
+    if(['if','else-if'].includes(p.name)){finiteCondition(parseExpression(p.exp.content),vars);continue}
+    if(p.name==='else')continue;
+    if(p.name==='on'&&p.arg?.isStatic&&p.arg.content==='click'){
+     const a=parseExpression(p.exp.content);
+     need(a.type==='AssignmentExpression'&&a.operator==='='&&a.left.type==='Identifier'&&vars.has(a.left.name),'Unsupported click assignment');
+     event={variable:a.left.name,expression:finiteUpdate(a.right,vars)};continue;
+    }
+    if(p.name==='bind'&&p.arg?.isStatic&&p.arg.content==='class'){
+     const c=parseExpression(p.exp.content);need(c.type==='ConditionalExpression'&&c.consequent.type==='StringLiteral'&&c.alternate.type==='StringLiteral','Only literal class branches');
+     finiteCondition(c.test,vars);continue;
+    }
+    throw Error('Unsupported Vue directive '+p.name);
+   }
+   if(id){need(!ids.has(id),'Duplicate id');ids.add(id)}
+   if(event){need(n.tag==='button'&&id,'Click handler requires button id');handlers.set(id,event)}
+   n.children.forEach(c=>render(c,[...ancestors,n.tag]));
+  }
+  d.template.ast.children.forEach(n=>render(n));
+  return buildFiniteState(expandVue(source),vars,handlers,{framework:'vue',scopedCSS:d.styles.some(s=>s.scoped&&s.content.trim())});
+ });
 }

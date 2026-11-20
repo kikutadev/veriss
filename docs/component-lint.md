@@ -248,3 +248,47 @@ React/Vue/Svelte の自動状態列挙にこの新 profile の DSL を直接組�
 node tools/css-lint.mjs --contracts --independent-first --fail-on-unknown ui.json
 node tools/ui-check.mjs --independent-first ui.json
 ```
+
+## 有限状態の実装からの導出
+
+`deriveReactState` / `deriveVueState` / `deriveSvelteState` が、有限の boolean state、
+初期値、button の静的 ID 付き click 更新、boolean の条件レンダーを抽出する。
+実際の adapter parser と template state 展開器を再利用し、任意コードを実行せず BFS を行う。
+最大6変数/64状態/256遷移。到達する値に一意な DOM 変種があることを確認する。
+button が存在しない状態ではそのイベントを導出しない。保持する値は同じでも変種に present な
+event は自己遷移になる。イベント名は `click:<id>`。初期値から s0, s1…を割り当てる。
+
+対応断片: React の明示 `useState(false)` 等と `onClick={()=>setOpen(!open)}`、
+Vue の script setup `ref(false)` と `@click="open = !open"`、
+Svelte の `$state(false)` と `onclick={()=>open=!open}` または `on:click`。
+literal boolean assignment と boolean またはその否定による更新・枝を扱う。
+外部 props、effects、任意関数、非同期、binding、動的属性、子コンポーネント、未対応構文や
+不完全な列挙は Unknown。CSS/DOM の幾何は既存の証明器による別判定。
+CSS visibility、actionability、フォーカス、click の到達可能性ではなく、ボタンに dispatch された
+単一 event を settled render ごとにモデル化している。
+`verifyFiniteUI(analysis,{profiles,contracts,targets,css,...})` は standalone #app div mount
+(本文 HTML と caller-supplied の閉じた CSS) での契約を検証。
+scoped Vue / Svelte component style の意味論は未移植なので、状態グラフは導出できても
+そのままの geometry verification は Unknown。外部ページ/任意の親文脈には自動適用しない。
+
+CLI は通常の relational manifest の代わりに以下を扱う。model の graph や geometry を
+手で指定して上書きすることはできない。`finiteAnalysis` が JSON report に付く。
+
+```json
+{
+  "model": {
+    "version": 1,
+    "profiles": [{"id":"web","viewport":{"min":320,"max":1280,"height":{"min":400,"max":900}}}],
+    "contracts": [{"id":"size","kind":"min-size","target":"toggle","width":44,"height":44}]
+  },
+  "finiteComponent": {"source":"Panel.jsx","css":"page.css","targets":["toggle"]}
+}
+```
+
+```sh
+node tools/ui-check.mjs --cache-dir .veriss-cache ui.json
+node tools/css-lint.mjs --contracts --cache-dir .veriss-cache --fail-on-unknown ui.json
+```
+
+キャッシュの初回生成後、別 Node プロセスでも再利用する。cache が開けない/破損したときは
+通常の検証へ戻る。実装固有の仕様契約は使用者が指定する (正常な現在値から仕様を捏造しない)。

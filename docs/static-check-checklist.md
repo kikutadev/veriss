@@ -441,4 +441,15 @@
   (`e2e/layout-partial-geometry.spec.mjs`)、未キャッシュ時との比較は
   `packages/adapter-core/test/incremental-geometry.test.mjs`。
 
-- [x] **H6. 軸独立の幾何証拠**: 通常 block flow の高さ・兄弟内容を除外して横位置/幅を自動証明し、未証明の縦座標を補わない。html/body の単純 :has() を存在・非存在の対照で検証し、元の詳細度を保つ。幅320–1920px、高さ390/900pxの境界点と root presence の幅380/520px境界を3ブラウザーで照合 (`e2e/layout-partial-geometry.spec.mjs`)。不足軸・負寸法・被覆・重複矛盾・サブピクセル実測・float依存拒否を `relational-contract.test.mjs` と `partial-geometry.test.mjs` で確認。
+- [x] **H6. 局所保証の移植**: 独立する幅100%・高さ48pxの control を幅50vw、
+  原点(20,30)へ affine 変換。3ブラウザーで各3幅、75vwの反例も照合。
+  割当範囲外、原点違い、欠落、変換後の不一致は合成しない
+  (`e2e/layout-partial-geometry.spec.mjs`, `relational-composition.test.mjs`)。
+- [x] **H7. 有限状態由来の契約**: 実際の React/Vue/Svelte の各 compiler/runtime と
+  click 4回×3 viewport×3 browser を比較。初期状態、遷移、表示分岐、ボタンの安定性。
+  任意の更新・scoped CSS・到達不能な状態を成功扱いしない
+  (`e2e/layout-finite-ui.spec.mjs`, `tests/finite-ui.test.mjs`)。
+- [x] **H8. 永続 cache**: 別プロセス/環境版変更/改変/新CSS/Unknown/反例の
+  判定と通常経路を照合 (`tests/persistent-cache.test.mjs`)。
+
+- [x] **H9. 軸独立の幾何証拠**: 通常 block flow の高さ・兄弟内容を除外して横位置/幅を自動証明し、未証明の縦座標を補わない。html/body の単純 :has() を存在・非存在の対照で検証し、元の詳細度を保つ。幅320–1920px、高さ390/900pxの境界点と root presence の幅380/520px境界を3ブラウザーで照合 (`e2e/layout-partial-geometry.spec.mjs`)。不足軸・負寸法・被覆・重複矛盾・サブピクセル実測・float依存拒否を `relational-contract.test.mjs` と `partial-geometry.test.mjs` で確認。

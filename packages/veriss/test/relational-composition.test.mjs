@@ -97,3 +97,30 @@ test('composition distinguishes states, profiles, and strict logical implication
   await assert.rejects(s.compose(parent,[{...imports[0],bind:{}}],api),/target binding/);
  }finally{await killThreads(api.em)}
 });
+
+test('affine allocation and origin transfer are checked against current parent geometry',async()=>{
+ const api=await init();
+ try{
+  const s=createRelationalProofSession();
+  const cp={id:'child',viewport:{min:160,max:640,height:{min:100,max:600}}};
+  const childEnv=createEnvironmentIR([cp]);
+  const child=obligation([{id:'fit',kind:'within-viewport',target:'control'}],[box('control',48,{profile:'child',rows:[{rect:{inlineStart:a('0'),blockStart:a('0'),inlineSize:a('0','1'),blockSize:a('48')}}]})],childEnv);
+  const parent=(w='1/2',offset='20')=>obligation([{id:'fits',kind:'within-viewport',target:'left'}],[box('left',48,{rows:[{rect:{inlineStart:a(offset),blockStart:a('30'),inlineSize:a('0',w),blockSize:a('48')}}]})]);
+  // A half-width child at (20,30), with local height 300, fits the parent.
+  // The goal is narrower than the child viewport only after checking its
+  // mapped allocation. A pure implication needs explicit allocation bounds.
+  const transfer={profile:'child',state:'ready',width:a('0','1/2'),height:a('300'),inlineStart:a('20'),blockStart:a('30')};
+  const goal={id:'child-local',kind:'predicate',predicate:{op:'compare',relation:'le',left:ref('left','inlineEnd'),right:{op:'add',items:['20',{op:'scale',factor:'1/2',item:{environment:'width'}}]}}};
+  const p=obligation([goal],parent().implementation.evidence.entries);
+  const imports=[{obligation:child,contract:'fit',bind:{control:'left'},transfer}];
+  const verified=await s.compose(p,imports,api);
+  assert.equal(verified.status,'verified');assert.equal(verified.contracts[0].cases[0].method,'composition');
+  assert.deepEqual(verified.contracts[0].cases[0].dependencies[0].transfer,transfer);
+  const changed=obligation([goal],parent('3/4').implementation.evidence.entries);
+  assert.equal((await s.compose(changed,imports,api)).status,'violated');
+  const outside=await s.compose(p,[{...imports[0],transfer:{...transfer,height:a('700')}}],api);
+  assert.equal(outside.status,'verified');assert.notEqual(outside.contracts[0].cases[0].method,'composition');
+  const wrong=await s.compose(p,[{...imports[0],transfer:{...transfer,inlineStart:a('25')}}],api);
+  assert.notEqual(wrong.contracts[0].cases[0].method,'composition');
+ }finally{await killThreads(api.em)}
+});

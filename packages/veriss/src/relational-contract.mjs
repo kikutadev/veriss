@@ -190,6 +190,56 @@ function mapPredicate(value,bind){
  if(Object.hasOwn(value,'target'))return {...value,target:bind(value.target,value.endpoint??'before')};
  return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,mapPredicate(v,bind)]));
 }
+// An affine change of input dimensions and translation of the coordinate
+// origin. The map is checked against the current evidence, never trusted as
+// an assertion of layout equivalence.
+function readTransfer(input){
+ ensure(own(input,['profile','state','width','height','inlineStart','blockStart'])&&id(input.profile)&&id(input.state),'Invalid allocation transfer');
+ for(const k of ['width','height','inlineStart','blockStart']){
+  ensure(own(input[k],['coefficient','heightCoefficient','constant']),'Invalid affine allocation');
+  affine(input[k]);
+ }
+ return immutable(input);
+}
+function transferGeometry(transfer,child,parent){
+ const {id:ci,viewport:cv,...ce}=child,{id:pi,viewport:pv,...pe}=parent;
+ if(JSON.stringify(ce)!==JSON.stringify(pe))return null;
+ const w=affine(transfer.width),h=affine(transfer.height),x=affine(transfer.inlineStart),y=affine(transfer.blockStart),domain=domainOf(parent);
+ for(const [a,r] of [[w,cv],[h,cv.height]])
+  if(clip(domain,diff(scalar(r.min),a),true)||clip(domain,diff(a,scalar(r.max)),true))return null;
+ const substitute=a=>sum(scalar(a.b),sum(times(w,a.x),times(h,a.y)));
+ const mappedEvidence=e=>({...e,rows:e.rows?.map(r=>({
+  rect:Object.fromEntries(axes.map(k=>[k,serializeAffine(sum(substitute(affine(r.rect[k])),k==='inlineStart'?x:k==='blockStart'?y:scalar(0)))])),
+  constraints:(r.constraints??[]).map(c=>({...serializeAffine(substitute(affine(c))),strict:c.strict}))
+ }))});
+ const operand=a=>({op:'add',items:[exact(a.b),{op:'scale',factor:exact(a.x),item:{environment:'width'}},{op:'scale',factor:exact(a.y),item:{environment:'height'}}]});
+ const safe=child.safeArea??{};
+ const env={width:w,height:h,safeLeft:scalar(safe.left??0),safeTop:scalar(safe.top??0),safeRight:diff(w,scalar(safe.right??0)),safeBottom:diff(h,scalar(safe.bottom??0))};
+ function rewrite(v,bind){
+  if(!v||typeof v!=='object')return v;
+  if(Array.isArray(v))return v.map(o=>rewrite(o,bind));
+  if(Object.hasOwn(v,'environment'))return operand(env[v.environment]);
+  if(Object.hasOwn(v,'target')){
+   const ref={...v,target:bind[v.target]};
+   const origin=['inlineStart','inlineEnd'].includes(v.field)?x:['blockStart','blockEnd'].includes(v.field)?y:null;
+   return origin?{op:'add',items:[ref,operand(neg(origin))]}:ref;
+  }
+  return Object.fromEntries(Object.entries(v).map(([k,o])=>[k,rewrite(o,bind)]));
+ }
+ return {mappedEvidence,rewrite,domain};
+}
+function sameTransferredGeometry(mapping,source,destination,budget){
+ if(!source||!destination)return false;
+ try{
+  const a=prepare(mapping.mappedEvidence(source),mapping.domain,budget),b=prepare(destination,mapping.domain,budget);
+  for(const r of a)for(const t of b){
+   if(--budget.left<0)throw Error('transfer budget exceeded');
+   const common=cond(r.region,t.cs);
+   if(common&&equal(r.rect,t.rect).some(p=>cond(common,p)))return false;
+  }
+  return true;
+ }catch{return false}
+}
 const caseKey=(contract,profile,transition)=>JSON.stringify([contract,profile,transition]);
 function arithmeticKey(c,p,predicate,refs,used){
  const names=new Map(refs.map(([endpoint,target],i)=>[JSON.stringify([endpoint,target]),String(i)]));
@@ -358,22 +408,32 @@ export function verifyRelationalObligation(obligation,options){
  * Exact case dependencies permit reuse even when a different target ID is
  * bound to identical geometry. The original proof work charge is retained.
  */
-export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_000}={}){
+export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_000,trustedStorage}={}){
  ensure(Number.isSafeInteger(maxEntries)&&maxEntries>0&&maxEntries<=16384&&Number.isSafeInteger(maxKeyBytes)&&maxKeyBytes>0&&maxKeyBytes<=64_000_000,'Invalid proof cache limits');
  const entries=new Map(),solverIds=new WeakMap();let size=0,hits=0,misses=0,evictions=0,nextSolver=0;
  const remove=k=>{size-=k.length*2;entries.delete(k)};
  const cache={
   get(k,remaining){
+   if(!entries.has(k)&&k.startsWith('[')&&k.length*2<=maxKeyBytes&&trustedStorage){
+    try{
+     const cost=trustedStorage.get(k);
+     if(Number.isSafeInteger(cost)&&cost>=0&&cost<=30000)remember(k,cost);
+    }catch{/* no persistent reuse */}
+   }
    if(!entries.has(k)||entries.get(k)>remaining){misses++;return undefined}
    const cost=entries.get(k);entries.delete(k);entries.set(k,cost);hits++;return cost;
   },
   set(k,cost){
+   remember(k,cost);
+   if(k.startsWith('[')&&k.length*2<=maxKeyBytes)try{trustedStorage?.set(k,cost)}catch{/* no persistent reuse */}
+  }
+ };
+ function remember(k,cost){
    const bytes=k.length*2;if(bytes>maxKeyBytes)return;
    if(entries.has(k))remove(k);
    while(entries.size>=maxEntries||size+bytes>maxKeyBytes){remove(entries.keys().next().value);evictions++}
    entries.set(k,cost);size+=bytes;
-  }
- };
+ }
  // Premises and goals are recompiled at their public IR boundaries. No
  // externally submitted proof, cache key or implication result is trusted.
  const verify=(obligation,options)=>verifyCanonical(canonicalObligation(obligation),options,cache);
@@ -385,7 +445,7 @@ export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_
   const index=facts=>new Map(facts.entries.map(e=>[factKey(e.state,e.profile,e.target),e]));
   const parentFacts=index(evidence),seenSources=new Map();
   const children=imports.map(item=>{
-   ensure(own(item,['obligation','contract','bind'])&&id(item.contract)&&item.bind&&typeof item.bind==='object'&&!Array.isArray(item.bind)&&Object.entries(item.bind).every(([a,b])=>id(a)&&id(b)),'Invalid composition import');
+   ensure(own(item,['obligation','contract','bind','transfer'])&&id(item.contract)&&item.bind&&typeof item.bind==='object'&&!Array.isArray(item.bind)&&Object.entries(item.bind).every(([a,b])=>id(a)&&id(b)),'Invalid composition import');
    if(!seenSources.has(item.obligation)){
     const source=canonicalObligation(item.obligation);
     seenSources.set(item.obligation,{source,report:verifyCanonical(source,{},cache),facts:index(source.implementation.evidence)});
@@ -398,9 +458,9 @@ export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_
    const refs=ruleRefs(claim,predicate);
    ensure(refs.every(([endpoint,t])=>endpoint==='before'&&Object.hasOwn(item.bind,t))&&Object.keys(item.bind).length===new Set(refs.map(r=>r[1])).size,'Incomplete or extraneous target binding');
    const proof=report.contracts.find(c=>c.id===claim.id);
-   return {source,claim,predicate,refs,proof,facts,bind:Object.fromEntries(Object.entries(item.bind))};
+   return {source,claim,predicate,refs,proof,facts,bind:Object.fromEntries(Object.entries(item.bind)),transfer:item.transfer===undefined?undefined:readTransfer(item.transfer)};
   });
-  const derived=new Map(),implications=new Map();let solverCalls=0;
+  const derived=new Map(),implications=new Map(),transferBudget={left:100000};let solverCalls=0;
   const solver=api?.Context;
   if(typeof solver==='function'&&!solverIds.has(solver))solverIds.set(solver,++nextSolver);
   // Composition is an optimization: a failed implication never constitutes
@@ -413,19 +473,22 @@ export function createRelationalProofSession({maxEntries=1024,maxKeyBytes=4_000_
     const p=environment.profiles.find(p=>p.id===inst.profile),s=inst.transition.from;
     const premises=[],dependencies=[],assumptions=[],sources=[],covered=new Set();
     for(const child of children){
-     const cp=child.source.implementation.environment.profiles.find(v=>v.id===p.id);
-     if(!cp||JSON.stringify(cp)!==JSON.stringify(p))continue;
-     const result=child.proof.cases.find(v=>v.state===s&&v.profile===p.id&&!v.event&&v.status==='verified'&&v.coverage?.status==='verified');
+     const childState=child.transfer?.state??s,childProfile=child.transfer?.profile??p.id;
+     const cp=child.source.implementation.environment.profiles.find(v=>v.id===childProfile);
+     if(!cp||!child.transfer&&JSON.stringify(cp)!==JSON.stringify(p))continue;
+     const mapping=child.transfer?transferGeometry(child.transfer,cp,p):null;
+     if(child.transfer&&!mapping)continue;
+     const result=child.proof.cases.find(v=>v.state===childState&&v.profile===childProfile&&!v.event&&v.status==='verified'&&v.coverage?.status==='verified');
      if(!result)continue;
      const mapped=child.refs.map(([,t])=>[t,child.bind[t]]);
      if(!mapped.every(([from,to])=>{
-      const a=child.facts.get(factKey(s,p.id,from)),b=parentFacts.get(factKey(s,p.id,to));
-      return a&&b&&JSON.stringify(evidenceValue(a))===JSON.stringify(evidenceValue(b));
+      const a=child.facts.get(factKey(childState,childProfile,from)),b=parentFacts.get(factKey(s,p.id,to));
+      return mapping?sameTransferredGeometry(mapping,a,b,transferBudget):a&&b&&JSON.stringify(evidenceValue(a))===JSON.stringify(evidenceValue(b));
      }))continue;
      mapped.forEach(([,to])=>covered.add(to));
-     premises.push(mapPredicate(child.predicate,t=>child.bind[t]));
+     premises.push(mapping?mapping.rewrite(child.predicate,child.bind):mapPredicate(child.predicate,t=>child.bind[t]));
      assumptions.push(...result.assumptions);sources.push(...result.sources);
-     dependencies.push({component:child.source.contract.component,contract:child.claim.id,bind:child.bind});
+     dependencies.push({component:child.source.contract.component,contract:child.claim.id,bind:child.bind,...(child.transfer?{transfer:child.transfer}:{})});
     }
     if(!premises.length||!refs.every(([,t])=>covered.has(t)))continue;
     if(refs.some(([,t])=>parentFacts.get(factKey(s,p.id,t))?.axes!==undefined))continue;

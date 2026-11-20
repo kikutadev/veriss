@@ -32,24 +32,34 @@ function exactKey(input){
   try{return JSON.stringify(copy(input))}catch{return null}
 }
 
-export function createGeometrySession({maxEntries=128,maxBytes=16_000_000,preferIndependent=false}={}){
+export function createGeometrySession({maxEntries=128,maxBytes=16_000_000,preferIndependent=false,trustedStorage}={}){
   if(!Number.isSafeInteger(maxEntries)||maxEntries<1||maxEntries>4096||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>128_000_000||typeof preferIndependent!=='boolean')throw new TypeError('Invalid geometry session options');
   const entries=new Map(),counts={full:{hits:0,misses:0,bypassed:0},projected:{hits:0,misses:0,bypassed:0}};
   let bytes=0,evictions=0;
   const remove=k=>{bytes-=entries.get(k).bytes;entries.delete(k)};
+  function remember(key,layout){
+    if(!layout.geometryComplete)return;
+    let weight;
+    try{weight=2*(key.length+JSON.stringify(layout).length)}catch{return}
+    if(weight>maxBytes)return;
+    if(entries.has(key))remove(key);
+    while(entries.size>=maxEntries||bytes+weight>maxBytes){remove(entries.keys().next().value);evictions++}
+    entries.set(key,{layout,bytes:weight});bytes+=weight;
+  }
+  const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value)}return value};
   function cached(stage,input,analyze){
     const key=exactKey([stage,input]),stats=counts[stage];
     if(key===null||key.length*2>maxBytes){stats.bypassed++;return analyze()}
+    if(!entries.has(key)&&trustedStorage)try{
+      const stored=trustedStorage.get(key);
+      if(stored?.version===1&&stored.kind==='layout'&&stored.geometryComplete)remember(key,freeze(stored));
+    }catch{/* no persistent reuse */}
     const hit=entries.get(key);
     if(hit){stats.hits++;entries.delete(key);entries.set(key,hit);return hit.layout}
     stats.misses++;
     const layout=analyze();
-    if(!layout.geometryComplete)return layout;
-    let weight;
-    try{weight=2*(key.length+JSON.stringify(layout).length)}catch{return layout}
-    if(weight>maxBytes)return layout;
-    while(entries.size>=maxEntries||bytes+weight>maxBytes){remove(entries.keys().next().value);evictions++}
-    entries.set(key,{layout,bytes:weight});bytes+=weight;
+    remember(key,layout);
+    if(entries.has(key))try{trustedStorage?.set(key,layout)}catch{/* no persistent reuse */}
     return layout;
   }
   return Object.freeze({

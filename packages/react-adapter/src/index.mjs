@@ -341,3 +341,55 @@ export function analyzeReact(source, { component, maxStates, eachCounts, sourceL
   // An external stylesheet is the page's, not the component's: with a component scope it goes before the component CSS.
   return expanded.scope && css ? analyzeStates(expanded, { ...options, pageCSS: `${options.pageCSS ?? ''}\n${css}` }) : analyzeStates({ ...expanded, css: css + expanded.css }, options);
 }
+
+// Closed settled-click subset; the existing JSX enumerator still renders
+// each DOM variant. Refuse instead of treating arbitrary hooks as finite.
+import {requireFinite as need,finiteName,finiteBool,finiteCondition,finiteUpdate,finiteTag,finiteAttribute,finiteAttempt,buildFiniteState} from '@mizchi/veriss-adapter-core';
+export function deriveReactState(source){
+ return finiteAttempt(()=>{
+  const ast=parse(source,{sourceType:'module',plugins:['jsx','typescript']}).program;
+  const vars=new Map(),setters=new Map(),handlers=new Map(),ids=new Set();
+  const [imp,exp]=ast.body;
+  need(ast.body.length===2&&imp.type==='ImportDeclaration'&&imp.source.value==='react'&&imp.specifiers.length===1&&imp.specifiers[0].type==='ImportSpecifier'&&imp.specifiers[0].imported.name==='useState'&&imp.specifiers[0].local.name==='useState'&&exp.type==='ExportDefaultDeclaration','Expected only React useState import and default component');
+  const fn=exp.declaration;need(fn.type==='FunctionDeclaration'&&!fn.async&&!fn.generator&&!fn.params.length,'Expected standalone function component');
+  const body=fn.body.body,ret=body.at(-1);need(ret?.type==='ReturnStatement','Missing final JSX return');
+  for(const stmt of body.slice(0,-1)){
+   need(stmt.type==='VariableDeclaration'&&stmt.kind==='const','Only hook declarations may precede render');
+   for(const d of stmt.declarations){
+    const pair=d.id?.elements??[],call=d.init;
+    need(d.id.type==='ArrayPattern'&&pair.length===2&&pair.every(n=>n?.type==='Identifier'&&finiteName(n.name))&&call?.type==='CallExpression'&&call.callee.type==='Identifier'&&call.callee.name==='useState'&&call.arguments.length===1&&finiteBool(call.arguments[0]),'Only boolean useState declarations are supported');
+    const [v,setter]=pair.map(n=>n.name);need(v!==setter&&!vars.has(v)&&!vars.has(setter)&&!setters.has(v)&&!setters.has(setter)&&![v,setter].includes('useState'),'Conflicting state binding');
+    vars.set(v,call.arguments[0].value);setters.set(setter,v);
+   }
+  }
+  function render(n,ancestors=[]){
+   if(['JSXText','JSXEmptyExpression','NullLiteral','BooleanLiteral','StringLiteral','NumericLiteral'].includes(n?.type))return;
+   if(n?.type==='JSXExpressionContainer')return render(n.expression,ancestors);
+   if(n?.type==='JSXFragment'){n.children.forEach(c=>render(c,ancestors));return}
+   if(n?.type==='LogicalExpression'&&n.operator==='&&'){finiteCondition(n.left,vars);return render(n.right,ancestors)}
+   if(n?.type==='ConditionalExpression'){finiteCondition(n.test,vars);render(n.consequent,ancestors);render(n.alternate,ancestors);return}
+   need(n?.type==='JSXElement'&&n.openingElement.name.type==='JSXIdentifier','Unsupported JSX expression');
+   const tag=n.openingElement.name.name;finiteTag(tag,ancestors);
+   let id,event;const attrs=new Set();
+   for(const attr of n.openingElement.attributes){
+    need(attr.type==='JSXAttribute'&&attr.name.type==='JSXIdentifier','Unsupported JSX attribute');
+    const name=attr.name.name,value=attr.value;need(!attrs.has(name),'Duplicate attribute');attrs.add(name);
+    if(name==='onClick'){
+     const f=value?.expression,c=f?.body;
+     need(f?.type==='ArrowFunctionExpression'&&!f.async&&!f.params.length&&c?.type==='CallExpression'&&c.callee.type==='Identifier'&&setters.has(c.callee.name)&&c.arguments.length===1,'Unsupported click update');
+     event={variable:setters.get(c.callee.name),expression:finiteUpdate(c.arguments[0],vars)};continue;
+    }
+    if(name==='className'&&value?.expression?.type==='ConditionalExpression'){
+     const c=value.expression;finiteCondition(c.test,vars);need(c.consequent.type==='StringLiteral'&&c.alternate.type==='StringLiteral','Only literal class branches');continue;
+    }
+    need(value?.type==='StringLiteral','Only literal JSX attributes');
+    finiteAttribute(name,value.value);if(name==='id')id=value.value;
+   }
+   if(id){need(!ids.has(id),'Duplicate id');ids.add(id)}
+   if(event){need(tag==='button'&&id,'Click handler requires button id');handlers.set(id,event)}
+   n.children.forEach(c=>render(c,[...ancestors,tag]));
+  }
+  render(ret.argument);
+  return buildFiniteState(expandReact(source),vars,handlers,{framework:'react'});
+ });
+}

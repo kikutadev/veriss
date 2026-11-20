@@ -296,6 +296,7 @@ state 64、遷移256、profile16、契約128、ObligationIR case 32768、evidenc
 元の region work charge を保持し、budget 不足の場合は通常の検査へ戻るため、
 キャッシュの有無で既存の budget 境界を緩めない。
 Verified のみを保存し、Unknown/Violated・観測の結果・外から渡した Proof/report は保存しない。
+オプションの trustedStorage は検証器所有の認証済みストレージを同じ信頼境界内で利用するもので、外部から証明結果を輸入する API ではない。
 観測と到達 state/profile は毎回検査する。
 既定は1024件・キー4MB相当 (UTF-16 code units × 2) の LRU、`stats()` で hit/miss/eviction、
 `clear()` で破棄。snapshot lint と複数 manifest の lint は1実行内でこの session を共有する。
@@ -320,8 +321,8 @@ Z3 API (Context の同一性) を含むキーの Verified だけを保存する�
 
 これは明示的に同じ環境・幾何を共有する局所証明の合成であり、
 Troika の任意の親文脈に対する independently-true の全機能ではない。
-局所座標の平行移動や親の割当幅を子の変数へ代入する一般的な summary の輸入、
-任意の依存を横断する CSS の差分化、source provenance の完全な自動依存解析、永続キャッシュは対象外。
+任意の親文脈への根拠なしの summary 輸入、任意の依存を横断する CSS の差分化、
+source provenance の完全な自動依存解析は対象外。後述の affine allocation による移植は可能。
 既存の自動部分幾何の抽出は引き続き利用できる。
 
 ### 幾何抽出セッション
@@ -354,4 +355,48 @@ entries, bytes, evictions、`clear()` は全破棄。
 
 `checkUIManifest(file,{geometrySession,session})` に両 session を渡すと、
 複数 manifest や複数回の読み込みでも実際の現行ファイルを対象に幾何と証明の両方を再利用する。
-CLI は1実行の中で session を共有する。プロセスをまたぐキャッシュは未実装。
+CLI は1実行の中で session を共有する。Node CLI は下記のローカル永続 cache も選択可能。
+
+### 異なる親割当と座標系への条件付き移植
+
+`session.compose` の import にオプションの `transfer: AllocationTransfer` を渡す。
+child の state/profile を指定し、親の width, height の affine 式で局所 width, height と
+原点 inlineStart, blockStart を指定する。各式は LayoutAffine の exact rational 形式。
+例: 親幅の半分を割り当て、局所高さ300、原点(20,30)。
+
+```js
+{
+  obligation: child, contract: 'fit', bind: {control:'left'},
+  transfer: {
+    state:'ready', profile:'child',
+    width:{coefficient:'1/2',constant:'0'},
+    height:{coefficient:'0',constant:'300'},
+    inlineStart:{coefficient:'0',constant:'20'},
+    blockStart:{coefficient:'0',constant:'30'}
+  }
+}
+```
+
+親の全 viewport 範囲でこの変換が子の証明済み閉区間に入ることを exact region 演算で検査。
+size/ID 以外の環境 profile は完全一致が必要。子の全矩形と領域条件へ width/height を代入し、
+start 座標へ原点を足す。変換後の矩形と親の現行 EvidenceIR の被覆・非負性・一貫性・等価性を
+区分同士の交差で確認する。子の predicates にも同じ変換を適用 (start/end は原点を引く)。
+この前提の成立と、親述語への含意検査でのみ `method:"composition"` を付ける。
+適用できない場合は通常の検証へ戻す。1回の合成で移植比較 budget 100000。
+現行の親の幾何証拠は必要であり、任意 CSS からの割当/原点の自動導出や
+子の証明だけで親の実装を証明する機能ではない。回転、scale、非線形の写像、時間遷移は対象外。
+
+### ローカル永続キャッシュ (Node CLI)
+
+`--cache-dir <private-directory>` で明示的に選択する。同一プロセス内の session と併用し、
+immutable LayoutIR と既存領域演算の Verified case work charge のみ再利用する。
+SMT の含意結果は従来どおりプロセス内限定。Unknown や観測結果を永続化しない。
+毎回原文/縮約後の入力・解析環境・述語・証拠の厳密一致を検査する。
+Node/runtime、lockfile、実際の core/adapter ソースと解析依存の内容 fingerprint で
+版を分離。ローカル OS ユーザー専用ディレクトリ (0700) と鍵 (0600) を作り、
+HMAC で認証されたキャッシュのみ読み込み、破損/版不一致は miss とする。
+一時ファイルから rename して原子的に置き換える。最大4096件、約16MiB分の entry、
+ファイル32MiB上限。並列書込は最後の書込が残り、miss が増える場合がある。
+この仕組みは同じ OS ユーザーと実行時の依存が信頼できることを前提とする。
+配布可能な独立検証証明書や、不信な同一ユーザーによるコード/鍵改変に対する防御ではない。
+既定では無効。削除して再生成可能。session.clear() はメモリだけを破棄する。

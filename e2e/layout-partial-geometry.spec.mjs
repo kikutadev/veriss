@@ -199,3 +199,42 @@ test('root descendant presence keeps selector priority in an inline projection',
    }
  }
 });
+
+test('child proof transfers to a different allocation and affine origin only with exact parent evidence',async({page,browserName})=>{
+ const {createRequire}=await import('node:module');
+ const {init,killThreads}=createRequire(new URL('../packages/veriss/package.json',import.meta.url))('z3-solver');
+ const {createContractIR,createStateIR,createEnvironmentIR,createEvidenceIR,createObligationIR,createRelationalProofSession}=await import('../packages/veriss/src/layout-contract.mjs');
+ const childProfile={id:'child',ua:browserName,viewport:{min:160,max:640,height:{min:300,max:300}}};
+ const parentProfile={id:'parent',ua:browserName,viewport:{min:320,max:1280,height:{min:400,max:900}}};
+ const state=createStateIR({initial:'ready',states:['ready'],transitions:[]});
+ const html='<!doctype html><html lang="en"><head><title>Panel</title></head><body><div id="control"></div></body></html>';
+ const reset='*{box-sizing:border-box;margin:0;padding:0}';
+ const childCSS=reset+'#control{position:fixed;top:0;left:0;width:100%;height:48px}';
+ const parentCSS=reset+'#control{position:fixed;top:30px;left:20px;width:50vw;height:48px}';
+ const make=(profile,css,contracts)=>createObligationIR(createContractIR({component:'Panel',profile:'relational/1',contracts}),{state,environment:createEnvironmentIR([profile]),evidence:createEvidenceIR(domGeometry({state:'ready',profile,html,css,targets:['control']}))});
+ const child=make(childProfile,childCSS,[{id:'fit',kind:'within-viewport',target:'control'}]);
+ const goal={id:'allocated',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'control',field:'inlineEnd'},right:{op:'add',items:['20',{op:'scale',factor:'1/2',item:{environment:'width'}}]}}};
+ const aff=(constant,coefficient='0')=>({constant,coefficient});
+ const transfer={state:'ready',profile:'child',width:aff('0','1/2'),height:aff('300'),inlineStart:aff('20'),blockStart:aff('30')};
+ const session=createRelationalProofSession(),api=await init();
+ try{
+  const imports=[{obligation:child,contract:'fit',bind:{control:'control'},transfer}];
+  const proof=await session.compose(make(parentProfile,parentCSS,[goal]),imports,api);
+  expect(proof.status,JSON.stringify(proof)).toBe('verified');expect(proof.contracts[0].cases[0].method).toBe('composition');
+  const bad=parentCSS+'#control{width:75vw}';
+  expect((await session.compose(make(parentProfile,bad,[goal]),imports,api)).status).toBe('violated');
+  for(const width of [320,650,1280]){
+   await page.setViewportSize({width:width/2,height:300});
+   await page.setContent(html.replace('</head>','<style>'+childCSS+'</style></head>'));
+   const local=await page.locator('#control').boundingBox();
+   for(const style of [parentCSS,bad]){
+    await page.setViewportSize({width,height:600});
+    await page.setContent(html.replace('</head>','<style>'+style+'</style></head>'));
+    const actual=await page.locator('#control').boundingBox();
+    expect(actual.x).toBeCloseTo(local.x+20,1);expect(actual.y).toBeCloseTo(local.y+30,1);
+    expect(actual.height).toBeCloseTo(local.height,1);
+    expect(actual.width).toBeCloseTo(style===bad?local.width*1.5:local.width,1);
+   }
+  }
+ }finally{await killThreads(api.em)}
+});
