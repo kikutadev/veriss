@@ -77,6 +77,7 @@ export interface LayoutRange {
   minExact: string; maxExact: string;
 }
 export interface LayoutDiagnostic {
+  hovered?: string; hoveredPath?: string;
   variant?: number; scrollbarProfile?: string;
   code: string; severity: 'error' | 'unknown'; message: string;
   box?: string; path?: string; range?: LayoutRange;
@@ -148,7 +149,7 @@ export interface LayoutSummary {
   styleSources: { kind: 'reset' | 'app'; file: string }[];
   diagnostics: LayoutDiagnostic[];
   policies: (LayoutScenarioIdentity & { box: string; path: string; axis: 'inline' | 'block'; overflow: 'fit' | 'scroll' | 'clip' | 'visible'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion })[];
-  checks: (LayoutScenarioIdentity & { box: string; path: string; code: string; axis: 'inline' | 'block'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; available: LayoutAffine; required: LayoutAffine; enforced: boolean })[];
+  checks: (LayoutScenarioIdentity & { hoveredPath?: string; box: string; path: string; code: string; axis: 'inline' | 'block'; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; available: LayoutAffine; required: LayoutAffine; enforced: boolean })[];
   sizes: (LayoutScenarioIdentity & LayoutPosition & { box: string; path: string; range: LayoutRange; heightRange?: LayoutRange; region?: LayoutRegion; allocatedInlineSize:LayoutAffine;allocatedBlockSize?:LayoutAffine;inlineSize: LayoutAffine; blockSize?: LayoutAffine;contentInlineSize:LayoutAffine;contentBlockSize?:LayoutAffine;paddingInlineSize?:LayoutAffine;paddingBlockSize?:LayoutAffine; boxSizing: 'border-box' | 'content-box'; boxSizingSource?: { file: string; line: number; selector: string; layer?: string; specified: string } })[];
   queries: (LayoutScenarioIdentity & { box: string; path: string; range: LayoutRange; heightRange?:LayoutRange;region?:LayoutRegion;name?: string; target?: string; targetPath?: string; matched: boolean })[];
   /** Resolved shared tracks, local line numbering, effective gap and edge insets. Build-only. */

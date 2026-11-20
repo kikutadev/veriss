@@ -1,3 +1,4 @@
+import { stateVariableDependencies, variableValue } from './variables.mjs';
 import { q, add, sub, mul, cmp, div, exact, number } from './linear.mjs';
 import { scalar, asAffine, width, height, sum, diff, times, evaluate, affine, sample, rectangle, clip, partition, projection, serialize } from './region.mjs';
 import { validateOptions } from './input.mjs';
@@ -214,7 +215,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // A hovered re-layout (hover-at:<path>) still needs its own untransformed re-layout, so it keeps a pristine copy.
   const hovered = preferences.find(p => p.startsWith('hover-at:'))?.slice(9);
   const carouselIn = box => /^carousel$/i.test(String(box.aria?.['aria-roledescription'] ?? '').trim()) || (box.children ?? []).some(carouselIn);
-  const pristine = (options.accessibility || options.integrity || /:hover|@(?:-webkit-)?keyframes|@starting-style/i.test(String(options.css ?? '')) || inlineSheets.length || carouselIn(root)) && preferences.every(p => p.startsWith('hover-at:')) ? structuredClone(root) : null;
+  const pristine = (options.accessibility || options.integrity || /:hover|@(?:-webkit-)?keyframes|@starting-style/i.test(String(options.css ?? '')) || options.reset?.some(s=>/:hover/i.test(s.css)) || inlineSheets.length || carouselIn(root)) && preferences.every(p => p.startsWith('hover-at:')) ? structuredClone(root) : null;
   // The untransformed re-layout (CSS transforms removed): the layout boxes, which is what a layout shift compares.
   const untransformed = preferences.includes('untransformed');
   let sawTransform = false;
@@ -261,7 +262,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     anonymous.forEach((child, k) => { if (runs[k]) { child.contract = runs[k]; child.contractSelector = `${box.contractSelector} text ${k}`; } });
   }
   const styleSources = [...(options.reset ?? []).map((sheet, index) => ({ ...sheet, kind: 'reset', file: sheet.file ?? `<reset:${index}>` })), { css: options.css, kind: 'app', file: options.cssFile ?? '<css>' },...inlineSheets];
-  const { rules, layers, notes = [], keyframes: keyframeNames = new Set(), dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, registered = new Map(), defaultNamespace = [], startingRules = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
+  const { rules, layers, notes = [], keyframes: keyframeNames = new Set(), dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, registered = new Map(), defaultNamespace = [], startingRules = [], animatedCustom = [], animatedReads = [] } = parseLayoutCSS(styleSources, (code, message, line, file, detail) => {
     if(detail) diagnostics.push({code,message,...detail});
     else unknown(code,message,line,undefined,file);
   },{scripting:options.scripting,mediaFeatures:options.mediaFeatures});
@@ -365,6 +366,47 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const attached = parseLayoutCSS([{ css: `*{${box.inlineStyle}}`, file: `${box.label} style attribute` }], (code, message, line, file, detail) => { if (detail) diagnostics.push({ code, message, ...detail }); else unknown(code, message, line, box, file); }).rules;
     for (const rule of attached) { rule.selectors = [{ source: `${box.label} [style]`, parts: [{ kind: 'path', value: box.path }], specificity: [0, 0, 0] }]; rule.attached = true; rules.push(rule); }
   }
+  // Dynamic variable assignments may reach arbitrary descendants through
+  // inheritance and alias/fallback chains, including inline style consumers.
+  // Reuse the existing finite hover re-layout for length-only consumers.
+  // Other state/animation consumers have no complete geometry model.
+  try {
+    const startingReads=startingRules.flatMap(r=>r.declarations.filter(d=>!d.property.startsWith('--')&&/var\(/i.test(d.value)).map(d=>({pending:{property:`@starting-style ${d.property}`,expression:variableValue(d.value)}})));
+    const inlineBoxes=[];
+    const collectInline=(box,inside=false)=>{
+      if(inside)inlineBoxes.push(box);
+      for(const child of box.inline??[]){child[PARENT]=box;collectInline(child,true);}
+      for(const child of box.children??[]){child[PARENT]=box;collectInline(child,inside);}
+    };
+    collectInline(root);
+    // Inline text rectangles are not part of the general box solver. Inspect
+    // their authored styles as dependencies, without inventing rectangles.
+    const unmodeledSelector=sel=>sel.parts.some(p=>p.kind==='placeholder-shown'||p.kind==='link'&&p.name==='link'||p.choices?.some(unmodeledSelector))||sel.chain?.some(c=>unmodeledSelector(c.compound));
+    const dynamicRule=rule=>rule.preferences?.length||rule.selectors.some(s=>s.state||unmodeledSelector(s));
+    const inlineMatch=rule=>inlineBoxes.some(box=>rule.selectors.some(sel=>matches(sel,box,new Set([...(sel.state?[sel.state]:[]),...(sel.pseudoElement?[`::${sel.pseudoElement}`]:[])]))));
+    const inlineRules=[];
+    if(rules.some(r=>dynamicRule(r)&&r.declarations.some(d=>d.expression))||animatedCustom.length||startingRules.length){
+      for(const box of inlineBoxes)if(box.inlineStyle!==undefined){
+        if(box.inlineStyle==='dynamic'){unknown('U_LAYOUT_STATE_VARIABLE','Dynamic inline text style can read state-dependent custom properties',undefined,box);continue;}
+        const parsed=parseLayoutCSS([{css:`*{${box.inlineStyle}}`,file:`${box.label} style attribute`}],(code,message,line,file)=>unknown(code,message,line,box,file));
+        inlineRules.push(...parsed.rules.map(r=>({...r,unmodeledVariableConsumer:true})));
+      }
+      for(const rule of rules)if(rule.declarations.some(d=>d.pending)&&inlineMatch(rule))
+        inlineRules.push({...rule,unmodeledVariableConsumer:true});
+    }
+    const {reads,onlyLengths}=stateVariableDependencies([...rules,...inlineRules,{declarations:[...animatedReads,...startingReads]}]);
+    for(const rule of rules) {
+      if(!dynamicRule(rule))continue;
+      for(const d of rule.declarations.filter(d=>d.expression&&reads.has(d.property))){
+        if(!rule.preferences?.length&&rule.selectors.every(s=>s.state==='hover'&&!s.pseudoElement&&!unmodeledSelector(s))&&onlyLengths(d.property)&&!rule.stateGeometry&&!inlineMatch(rule)){
+          rule.stateLayout=true;rule.hoverLayout=true;rule.variableHover=true;
+        }else unknown('U_LAYOUT_STATE_VARIABLE',`${d.property} in a state-dependent rule can affect ${[...reads.get(d.property)].join(', ')}; this state dependency is not modeled`,d.line,undefined,d.file);
+      }
+    }
+    for(const d of animatedCustom)if(reads.has(d.property))unknown('U_LAYOUT_STATE_VARIABLE',`${d.property} in @keyframes ${d.name} can affect ${[...reads.get(d.property)].join(', ')}; animated variable geometry is not modeled`,d.line,undefined,d.file);
+    for(const rule of startingRules)for(const d of rule.declarations)if(reads.has(d.property))unknown('U_LAYOUT_STATE_VARIABLE',`${d.property} in @starting-style can affect geometry`,rule.line,undefined,rule.file);
+  } catch(error){unknown(error.code??'U_LAYOUT_STATE_VARIABLE',error.message);}
+  if(!preferences.length&&!options.$animationFrame&&!options.$slideVariant&&rules.some(r=>r.variableHover)&&(!pristine||options.ancestors?.length)) unknown('U_LAYOUT_STATE_VARIABLE','Hovered custom property layout requires the complete possible hovered tree, not omitted ancestors');
   // An animation frame re-layout: the keyframe's layout declarations apply to that one box (animations override the
   // author's normal declarations, like an element-attached rule).
   if (options.$animationFrame) {
@@ -3861,7 +3903,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     // focus findings for that box come from that layout instead of the unfocused one.
     if (pristine && rules.some(rule => rule.stateLayout)) {
       const geometricFocus = new Set(['E_A11Y_FOCUS_OBSCURED', 'E_A11Y_FOCUS_OFFSCREEN', 'E_A11Y_FOCUS_CLIPPED', 'E_A11Y_FOCUS_SCROLLED_UNDER', 'E_A11Y_FOCUS_AREA', 'E_A11Y_FOCUS_CLIPPED_AWAY']);
-      const layoutRules = rules.filter(rule => rule.stateLayout);
+      const layoutRules = rules.filter(rule => rule.stateLayout && !rule.hoverLayout);
       const all = []; (function walk(box, chain) { all.push({ box, chain }); for (const child of box.children ?? []) walk(child, [...chain, box]); })(root, []);
       const reached = ({ box, chain }) => layoutRules.some(rule => rule.selectors.some(selector => (selector.state !== 'focus-within' && matches(selector, box, new Set(['focus', 'focus-visible', 'focus-within']))) || (selector.state === 'focus-within' && [...chain, box].some(a => matches(selector, a, new Set(['focus-within']))))));
       for (const entry of all.filter(entry => focusableBox(entry.box) && reached(entry))) {
@@ -3955,15 +3997,33 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // difference vanishes on a convex region exactly when it vanishes at its vertices, so the check is exact.
   if (pristine && hovered === undefined && !options.$animationFrame && !options.$slideVariant && rules.some(rule => rule.hoverLayout) && !diagnostics.some(d => d.severity === 'unknown')) {
     const hoverRules = rules.filter(rule => rule.hoverLayout);
-    const targets = []; (function walk(box) { if (hoverRules.some(rule => rule.selectors.some(selector => matches(selector, box, new Set(['hover']))))) targets.push(box); for (const child of box.children ?? []) walk(child); })(root);
+    const targets = [];
+    (function walk(box,inline=false) {
+      if (hoverRules.some(rule => rule.selectors.some(selector => matches(selector, box, new Set(['hover']))))) {
+        if(inline)unknown('U_LAYOUT_HOVER_SHIFT',`${box.label}: hovered inline text geometry is not modeled`,undefined,box);
+        else targets.push(box);
+      }
+      for (const child of box.children??[])walk(child,inline);
+      for (const child of box.inline??[])walk(child,true);
+    })(root);
     // Rows correspond by path and condition polygon (its vertices; constraints may repeat redundant bounds).
     const key = row => JSON.stringify([row.path, row.range, row.heightRange, row.region?.vertices]);
     const rect = row => row.layoutRect !== undefined ? row.layoutRect : row.rect;
     const r = v => { const [n, d = '1'] = String(v ?? '0').split('/'); return div(q(n), q(d)); };
     const at = (a, w, h) => add(add(r(a.constant), mul(r(a.coefficient), w)), mul(r(a.heightCoefficient), h));
-    for (const target of targets.slice(0, 64)) {
+    if (targets.length>64) unknown('U_LAYOUT_HOVER_SHIFT','Hover state coverage exceeds 64 targets');
+    for (const target of targets.length<=64?targets:[]) {
       const hover = analyzeBoxTree(pristine, options, scrollbarProfile, budget, inlineSheets, [], [`hover-at:${target.path}`]);
       if (hover.status === 'unknown') { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: its hovered layout is not decided (${hover.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: target.label, path: target.path }); continue; }
+      // Geometry checks of both normal and hovered layouts must reach the
+      // solver. Otherwise a growing last item could overflow without moving
+      // any other box's start position. Tag findings with the state target.
+      if(checks.length+hover.checks.length>32768){unknown('U_LAYOUT_HOVER_SHIFT','Hover fit obligation limit exceeded',undefined,target);break;}
+      for(const c of hover.checks)checks.push({...c,hoveredPath:target.path});
+      for(const d of hover.diagnostics)if(d.severity==='error')diagnostics.push({...d,hovered:target.label,hoveredPath:target.path,message:`${d.message} (hovering ${target.label})`});
+      const restPaths=new Set(sizes.map(row=>row.path)),hoverPaths=new Set(hover.sizes.map(row=>row.path));
+      if(restPaths.size!==hoverPaths.size||[...restPaths].some(path=>!hoverPaths.has(path)))
+        unknown('U_LAYOUT_HOVER_SHIFT',`${target.label}: hovered box coverage differs from base layout`,undefined,target);
       // Each base row against each hovered row of the same box, on the intersection of their condition regions.
       const undecided = [...sizes, ...hover.sizes].find(row => !rect(row) || !row.$shown?.region);
       if (undecided) { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: the hovered layout of ${undecided.box} cannot be compared (it has no layout rectangle)`, box: target.label, path: target.path }); continue; }
@@ -4358,6 +4418,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     assumptions: [...(mediaFeatureEntries(options.mediaFeatures).map(([k,v])=>'CSS media environment is explicitly fixed: '+k+': '+v+'.')), ...(options.scripting==='enabled' ? ['The supplied DOM is a static snapshot in a scripting-enabled browser; script-driven mutations and disabled scripting are not checked.'] : []), 'The supplied CSS is the complete author cascade and the selected root has no external query-container ancestors; host provides the declared containing sizes without unmodeled scrollbar gutters.',
       'Each minInlineSize/minBlockSize is a trusted sufficient content-size bound; intrinsicBlockSize is a trusted exact auto-height profile for the permitted content/fonts.',
       'Only horizontal-tb/ltr in-flow and explicitly sized local absolute geometry is checked; ink overflow and browser pixel rounding are outside the contract.',
+      ...(rules.some(rule=>rule.hoverLayout) ? ['Reported rectangles describe the resting DOM; supported hovered layouts are checked at settled endpoints for fit and layout shifts, not arbitrary intermediate frames or combined user states.'] : []),
       ...(rules.some(rule=>rule.declarations.some(d=>d.expression || d.pending)) ? ['Custom properties are unregistered; unknown external inheritance and cycles through fallback references prevent verification when used by geometry.'] : [])],
     styleSources: styleSources.map(({ kind, file }) => ({ kind, file })), diagnostics, policies, checks, sizes, queries, subgrids,
     elements:boxes.map(({path,tag,id,classes,owner,targets,targetIdentity})=>({path,tag,...(id ? {id} : {}),classes,owner,...(targets?.length ? {targets} : {}),...(targetIdentity ? {targetIdentity} : {})})),
