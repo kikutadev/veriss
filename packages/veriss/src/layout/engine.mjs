@@ -1,3 +1,5 @@
+import {createPositionSolver, subgridError, isDescendant, intersectRegions} from './engine-positioning.mjs';
+import { createQuerySolver, compare } from './engine-queries.mjs';
 import { createFlexLayout } from './engine-flex.mjs';
 import { createEdgeSolver, maximum, clamp, ratioOf, minimumOf, preferredInlinePieces } from './engine-edges.mjs';
 import { q, add, sub, mul, cmp, div, exact, number } from './linear.mjs';
@@ -33,8 +35,6 @@ const trackStart = (values,gap,index) => sum(total(values.slice(0,index)),times(
 // Visually hidden (the "sr-only" pattern): clipped to nothing, or a box of at most 1px that hides its overflow. Its
 // content is meant not to be seen, so it is not judged for fit or clipping.
 const visuallyHiddenStyle = style => style['clip-path'] === 'empty' || style.clip === 'empty' || (['hidden', 'clip'].includes(style['overflow-x']) && /^\d+(?:\.\d+)?px$/.test(String(style['block-size'])) && Number(String(style['block-size']).slice(0, -2)) <= 1);
-const inlineFeature = feature => ['width', 'inline-size'].includes(feature);
-const compare = (value, relation) => relation === '>=' ? value >= 0 : relation === '>' ? value > 0 : relation === '<=' ? value <= 0 : relation === '<' ? value < 0 : value === 0;
 import { createIntrinsicSolver, intrinsicBlock, measureLegend } from './engine-intrinsic.mjs';
 import { tableAsGrid as tableAsGridImpl, tablePlacement } from './engine-table.mjs';
 import { affineOf, linearOf, mapper, scaled, translated as translatedWithRoot, relativelyOffset, offset } from './engine-transforms.mjs';
@@ -75,7 +75,6 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   const unknown = (code, message, line, box, file = options.cssFile ?? '<css>') => diagnostics.push({ code, severity: 'unknown', message, ...(line ? { css: { file, line } } : {}), ...(box ? { box: box.label, path: box.path, source: box.source } : {}) });
   const ranges = region => ({ range: projection(region, 'x'), ...(block ? { heightRange: projection(region, 'y'), region: serialize(region) } : {}) });
   const issue = (code, message, box, region, axis) => diagnostics.push({ code, severity: 'error', message, box: box.label, path: box.path, source: box.source, ...(axis ? { axis } : {}), ...ranges(region) });
-  const subgridError = (message, box, region, axis) => Object.assign(new Error(message), { code: 'U_LAYOUT_SUBGRID', box, region, axis });
   const boxes = [];
   // Parent links for combinator matching (a symbol: a structuredClone of the tree drops them, so set them here).
   const collect = box => { if (box) { boxes.push(box); for (const child of [...box.children, ...(box.inline ?? [])]) child[PARENT] = box; box.children.forEach(collect); } };
@@ -241,48 +240,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // The file an img or source loads: its one srcset candidate, or (under a device pixel ratio) the smallest density at
   // least that ratio, else the densest. An img's src is its 1x candidate. 'dynamic' when not decided (w descriptors,
   // several candidates without a ratio, a dynamic attribute).
-  function loadedSource(srcset, src) {
-    if (srcset === undefined) return src;
-    if (srcset === 'dynamic') return 'dynamic';
-    const list = [];
-    for (const part of srcset.split(',').map(p => p.trim()).filter(Boolean)) {
-      const m = /^(\S+)(?:\s+(\d+(?:\.\d+)?)x)?$/.exec(part);
-      if (!m || list.some(c => c.density === Number(m[2] ?? 1))) return 'dynamic';
-      list.push({ url: m[1], density: Number(m[2] ?? 1) });
-    }
-    if (typeof src === 'string' && src !== 'dynamic' && !list.some(c => c.density === 1)) list.push({ url: src, density: 1 });
-    if (list.length === 1) return list[0].url;
-    const ratio = options.$devicePixelRatio;
-    if (!list.length) return 'dynamic';
-    if (ratio === undefined) return { candidates: list.map(c => c.url) };
-    const sorted = [...list].sort((a, b) => a.density - b.density);
-    return (sorted.find(c => c.density >= ratio) ?? sorted.at(-1)).url;
-  }
-  function context(condition, ancestors) {
-    let target;
-    if (condition.kind === 'media') target = { inline: width, block: options.viewport.height ? height : null };
-    else {
-      const needsBlock = condition.groups.flat().some(atom => !inlineFeature(atom.feature));
-      target = ancestors.findLast(ancestor => (!condition.name || ancestor.names.includes(condition.name)) &&
-        (ancestor.type === 'size' || (!needsBlock && ancestor.type === 'inline-size')));
-      if (!target) return { groups: [], target: undefined };
-    }
-    const groups = condition.groups.map(group => group.map(atom => {
-      // Device resolution: a constant under the analysed device pixel ratio (the devicePixelRatios option).
-      if (atom.feature === 'resolution') {
-        if (options.$devicePixelRatio === undefined) throw Object.assign(new Error('A resolution media query needs the devicePixelRatios option'), { code: 'U_LAYOUT_QUERY' });
-        return { slack: scalar(sub(q(String(options.$devicePixelRatio)), atom.value)), relation: atom.relation };
-      }
-      if (atom.feature === 'orientation') {
-        if (!target.block) throw new Error('An orientation query needs the viewport height domain');
-        return { slack: atom.orientation === 'portrait' ? diff(target.block, target.inline) : diff(target.inline, target.block), relation: atom.relation };
-      }
-      const size = inlineFeature(atom.feature) ? target.inline : target.block;
-      if (!size) throw new Error('Height condition needs a known container/viewport block size');
-      return { slack: diff(size, scalar(atom.value)), relation: atom.relation };
-    }));
-    return { groups, target: target.box?.label, path: target.box?.path };
-  }
+  const {loadedSource, context} = createQuerySolver(Boolean(options.viewport.height), options.$devicePixelRatio);
   // Checklist F: CSS mistakes on one box's computed style (called from the styles of the layout pass, and from a style
   // walk where the layout did not run, so they are reported whether or not the layout is decided).
   // F9: a ::before or ::after styled but with no content is never generated.
@@ -1457,67 +1415,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     return { region, inline, block: blockSize };
   }
 
-  // Root-relative border coordinates. Scroll offsets/gutter placement and shared
-  // subgrid line offsets are deliberately outside the first transition profile.
-  // A px translate moves the box (and, through its origin, its descendants) after layout.
-  const isDescendant = (a, b) => b.startsWith(a + '/');
-  const intersectRegions = (a, b) => Boolean(intersect(a, b));
-  const translated = (style, origin, size) => translatedWithRoot(style, origin, size, rootFontSize);
-  function resolvedOrigin(style,available,inline,blockSize,parents) {
-    return relativelyOffset(style, translated(style, untranslatedOrigin(style,available,inline,blockSize,parents), { inline, block: blockSize }));
-  }
-  function untranslatedOrigin(style,available,inline,blockSize,parents) {
-    // overflow: clip never scrolls, so positions inside it stay exact; hidden/auto/scroll may be scrolled.
-    // (The document root's overflow is the viewport's: its scrolling is the page scroll, already modeled; at scroll 0
-    // positions inside it are exact.)
-    // scroll-zero (an internal re-analysis): positions inside scroll containers at their initial scroll offset 0, exact
-    // there; only the cover findings at that offset are taken from it.
-    const scrollZero = preferences.includes('scroll-zero');
-    if(!block || parents.some(p=>(p.clipped && !scrollZero) || p.subgrid) || (!scrollZero && !available.root && ['overflow-x','overflow-y'].some(key=>!['visible','clip'].includes(style[key]))) ||
-      ['grid-template-columns','grid-template-rows'].some(key=>style[key]==='subgrid')) return null;
-    if(style.position!=='absolute') {
-      // Cross-axis alignment of a flex item that is not stretched.
-      let origin = available.origin ?? null;
-      if (origin && available.alignBlock !== undefined) origin = blockSize ? { inline: origin.inline, block: sum(origin.block, times(diff(available.block, blockSize), available.alignBlock)) } : null;
-      if (origin && available.alignInline !== undefined) origin = { inline: sum(origin.inline, times(diff(available.inline, inline), available.alignInline)), block: origin.block };
-      return origin;
-    }
-    const containing=available.containingBlock;
-    if(!containing?.origin || !blockSize) return null;
-    const local=absoluteOrigin(style,containing,{inline,block:blockSize});
-    return offset(containing.origin,local.inline,local.block);
-  }
-
-  function subgridGeometry(style, box, available, region, emit) {
-    const axes = {};
-    let geometryRegions = [region];
-    for (const [axis, property, sides, gapProperty] of [
-      ['inline', 'grid-template-columns', ['left', 'right'], 'column-gap'],
-      ['block', 'grid-template-rows', ['top', 'bottom'], 'row-gap'],
-    ]) {
-      if (style.display !== 'grid' || !/^subgrid\b/.test(style[property])) continue;
-      if (style[property] !== 'subgrid') throw subgridError('Subgrid line names and repeat syntax are not modeled', box, region, axis);
-      if (style['container-type'] !== 'normal') throw subgridError('Subgrid size-query containment differs across target browsers; put the size query container on a parent', box, region, axis);
-      const parent = available.tracks?.[axis];
-      if (!parent) throw subgridError('Subgrid requires resolved parent tracks; external parents and intrinsic row contributions are not modeled', box, region, axis);
-      if (style[`${axis}-size`] !== 'auto') throw subgridError('Checked subgrids require auto size in their shared axis', box, region, axis);
-      if (style[`min-${axis}-size`] !== 'auto' && cmp(px(style[`min-${axis}-size`]), zero) !== 0) throw subgridError('Minimum size on a shared subgrid axis is outside the checked subset', box, region, axis);
-      const insets = sides.map(side => add(px(style[`padding-${side}`]), px(style[`border-${side}`])));
-      const gap = resolvedGap(style, gapProperty, parent);
-      if (gap.x !== undefined || parent.gap.x !== undefined) throw subgridError('Viewport-varying subgrid gaps are not modeled', box, region, axis);
-      const values = inheritTracks(parent, gap, ...insets);
-      axes[axis] = { ...parent, gap, values, insets };
-      for (const value of values) geometryRegions = bounded(geometryRegions.flatMap(region => {
-        const parts = partition(region, value, '>=');
-        for (const failed of parts.no) diagnostics.push({ code: 'U_LAYOUT_SUBGRID', severity: 'unknown', message: 'Subgrid gap/insets produce a negative effective track; CSS collapse is not modeled', box: box.label, path: box.path, source: box.source, axis, ...ranges(failed) });
-        return parts.yes;
-      }));
-    }
-    if (emit) for (const geometryRegion of geometryRegions) for (const [axis, inheritedAxis] of Object.entries(axes)) subgrids.push({ box: box.label, path: box.path, axis,
-      parent: inheritedAxis.box.label, parentPath: inheritedAxis.box.path, startLine: inheritedAxis.startLine, span: inheritedAxis.values.length,
-      gap: exact(inheritedAxis.gap), insets: inheritedAxis.insets.map(exact), tracks: inheritedAxis.values.map(affine), ...ranges(geometryRegion) });
-    return { axes, regions: geometryRegions };
-  }
+  const {translated, resolvedOrigin, untranslatedOrigin, subgridGeometry} = createPositionSolver({block, preferences, rootFontSize: () => rootFontSize, resolvedGap, bounded, diagnostics, ranges, subgrids});
 
   const tableAsGrid = (table, style, region, parents, emit, available, probe) => tableAsGridImpl({styles, uaEngine}, table, style, region, parents, emit, available, probe);
   // The table's background paints the table box only, not its caption (measured): content of the
