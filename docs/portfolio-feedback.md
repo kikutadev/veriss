@@ -237,3 +237,6 @@ df34f51: paint-only transition と、全 retained chain が通常 block であ�
 - 縦軸は viewport-fixed、明示高・block anchor、通常 block 祖先に限定。仮の横幅を証拠に含めない。
 - 残りの island: nav に inert 属性、ancestor の fixed column-reverse Flex、対象の Grid、横幅の transition、幅の複合式 min(230px,100vw - 24px)、translate(-50%)、backdrop-filter、状態による transform/visibility がある。単純な block 縮約で解決せず、横方向の stretch 依存と固定配置、状態の時間的条件を個別に証明する必要がある。
 - 今回の作品契約は selected-work のセクション外枠の横収容。内部のカード配置全体の証明ではない。全ページ・全状態・hit-test の証明は未達。配信コード変更なし。
+
+同一の前回捕捉済み15 snapshot の再解析でも12→18/21環境ケースを確認。ゲーム3作品の25契約は成立10、違反4、Unknown11で不変。
+全gate: 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 387 E2E passed、supervisor exit=0、657 PID追跡・残留0。gate起動後の変更は文書のみ。
