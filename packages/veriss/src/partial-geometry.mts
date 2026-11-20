@@ -345,10 +345,12 @@ export function projectIndependentGeometry(html:string,css:string,target:string,
           if(name==='media'&&profile.mediaFeatures!==undefined){
             // Resolve only parsed, explicitly fixed screen media. The kept
             // CSS still runs through the core cascade with the same profile.
-            let condition;
+            let condition:unknown;
             try{condition=parseCondition(node.params,'media',profile.mediaFeatures)}catch{/* unresolved: keep conservatively */}
-            if(condition&&condition.groups.length===0){node.remove();continue}
-            if(condition?.groups.some(g=>g?.length===0))activeConditional=false;
+            if(object(condition)&&Array.isArray(condition.groups)){
+              if(condition.groups.length===0){node.remove();continue}
+              if(condition.groups.some((g:unknown)=>Array.isArray(g)&&g.length===0))activeConditional=false;
+            }
           }
           visit(node,conditional||activeConditional,unsafeCondition||name!=='media',depth+1);
           if(!node.nodes.length)node.remove();

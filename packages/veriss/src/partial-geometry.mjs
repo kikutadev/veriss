@@ -421,12 +421,14 @@ export function projectIndependentGeometry(html, css, target, profile, binding, 
                             condition = parseCondition(node.params, 'media', profile.mediaFeatures);
                         }
                         catch { /* unresolved: keep conservatively */ }
-                        if (condition && condition.groups.length === 0) {
-                            node.remove();
-                            continue;
+                        if (object(condition) && Array.isArray(condition.groups)) {
+                            if (condition.groups.length === 0) {
+                                node.remove();
+                                continue;
+                            }
+                            if (condition.groups.some((g) => Array.isArray(g) && g.length === 0))
+                                activeConditional = false;
                         }
-                        if (condition?.groups.some(g => g?.length === 0))
-                            activeConditional = false;
                     }
                     visit(node, conditional || activeConditional, unsafeCondition || name !== 'media', depth + 1);
                     if (!node.nodes.length)
