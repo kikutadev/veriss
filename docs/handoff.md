@@ -154,3 +154,5 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - Validation: build:ts, check:ts, and all 867 unit tests passed (no failures/skips). Compared the complete JSON reports for 129 inputs against e98f09a: all 129 matched (82 verified, 18 violated, 29 unknown). This is regression evidence, not a proof of equivalence for all inputs.
 - Next: unify SolverStyle/FinishStyle, recursive allocation and diagnostic boundaries; migrate the remaining solve/analyzeBoxTree implementation and remove the transitional declaration. Remaining test/spec and ancillary migrations, full browser gate, performance comparison, and Git-pinned consumer installation still need confirmation before declaring the migration complete.
 - Main and remote remain unchanged.
+
+第七段階の方針: engine.mts を正本にし、型検査のエラーからモジュール境界を統合する。CSSの未確定値は検証済み値と区別し、例外と診断の実データを型に反映する。strict を維持し、単体テストと旧実装比較を通した変更だけを保存する。
