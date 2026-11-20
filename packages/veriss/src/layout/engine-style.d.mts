@@ -31,6 +31,11 @@ type SourceUse = {
 };
 export interface EngineStyle extends ComputedStyle {
     $blockFlow?: boolean;
+    $inertMain?: {
+        property: string;
+        value: string;
+    };
+    $anonymousGridText?: boolean;
     $inlineLevel?: true;
     $inlineDisplay?: string | undefined;
     $listItem?: true;

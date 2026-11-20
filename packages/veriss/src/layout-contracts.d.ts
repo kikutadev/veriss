@@ -522,6 +522,13 @@ export interface LayoutWarning {
     media?: string;
     attributes?: string[];
     tag?: string;
+    inset?: number;
+    value?: string | undefined;
+    family?: string;
+    display?: string;
+    fallback?: string;
+    inheritedFrom?: string;
+    scroller?: string;
     blockSize?: string | undefined;
     fontSize?: string | undefined;
     lineHeight?: string | undefined;

@@ -185,6 +185,7 @@ export interface LayoutWarning {
   /** Syntax warnings can cite several author declarations. */
   css?:{file:string;line:number;column?:number}|{file:string;line:number;property:string;selector?:string}[]|undefined;
   property?:string|undefined;min?:number;max?:number;media?:string;attributes?:string[];tag?:string;
+  inset?:number;value?:string|undefined;family?:string;display?:string;fallback?:string;inheritedFrom?:string;scroller?:string;
   blockSize?:string|undefined;fontSize?:string|undefined;lineHeight?:string|undefined;intervals?:[number,number][];
   boxes?:string[];query?:string;name?:string;reason?:string;
   parent?:string;srcset?:string|undefined;sizes?:string;marker?:string;clippedBy?:string;

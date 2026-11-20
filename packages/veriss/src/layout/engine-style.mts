@@ -21,7 +21,7 @@ type PictureSource={condition:ParsedCondition|null;facts:ImageSize;src:LoadedSou
 type SourceUse={box:StyleBox;sources:PictureSource[];chosen:Set<number>;active:Set<number>};
 type ImageFacts={width?:number|'dynamic'|undefined;height?:number|'dynamic'|undefined;src:LoadedSource};
 export interface EngineStyle extends ComputedStyle {
-  $blockFlow?:boolean;$inlineLevel?:true;$inlineDisplay?:string|undefined;$listItem?:true;
+  $blockFlow?:boolean;$inertMain?:{property:string;value:string};$anonymousGridText?:boolean;$inlineLevel?:true;$inlineDisplay?:string|undefined;$listItem?:true;
   $staticPosition?:true;$containerCollapse?:true;$lineClamp?:number;$embedDefaultHeight?:true;
   $iconPaint?:string|undefined;$svgUnsized?:'fills'|'default';$widthFromAttribute?:number;
   $imageUnreserved?:{width:number;height:number;src:string};
