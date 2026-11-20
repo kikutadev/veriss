@@ -124,3 +124,12 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - 最終 gate (3ブラウザーE2E/既存eval)、Git依存導入、性能比較は今回未実施。main と remote は変更せず、全体移行は未完了。残る engine の solve/styles とレポート構築、未移行テスト/補助スクリプトを継続対象とする。
 
 第四段階の方針: solve の外側に残る事後検査・レポート形成を、実際の幾何証拠を受け取る型付きモジュールへ分離する。診断順・未決定時の扱いを維持し、境界の型契約と回帰テストを増やす。残りのテストの移行も実装と整合する範囲で進める。
+
+第四段階の結果 (実装 4f21594):
+- engine-warnings / engine-coverage に事後警告と画像候補・container query の到達性診断、engine-state-shifts に hover / animation 再解析、engine-report に公開レポート構築を分離した。
+- engine-style に条件付き CSS カスケード、HTML 固有サイズ、画像・SVG・フォーム要素と viewport 依存長の解決を分離した。engine-validate に対応範囲の判定、フォント契約と overflow 方針の検査を分離した。未知の計算済みフォント値を文字列として取り扱わず Unknown とする。文字計測の公開型を adapter-core と共有する。
+- engine.mjs は 2713 → 1908 行 (805行減)。元の実装ファイルの完全移行数は69/70のまま。残る JavaScript は主に solve/finish、インライン幾何、markup による補完など。手書きの engine.d.mts はまだ必要であり、JavaScript 側からの呼び出し境界まで strict に検査済みという意味ではない。
+- picture / content-box / grid-margins / selector-usage の既存22テストを .mts 正本へ移行した。現在、追跡されている .test.mjs/.spec.mjs のうち同名 .mts のないものは36ファイル (oracle 等を含む)。
+- pnpm build:ts / check:ts / test / git diff --check 成功。全867件 (root 29, verifier 742, adapter-core 66, Vue 6, React 12, Svelte 12)、失敗・skip 0。
+- e98f09a のクリーンな既存 worktree と analyzeHTML を同一入力69件で比較し、JSON 化した全レポートが69/69一致 (verified 29, violated 9, unknown 31)。grid/flex/block、media/container query、画像・picture、hover/focus、フォント、絶対配置、sticky、アニメーション、未対応CSS等の回帰確認であり、全入力の同値性証明やブラウザー照合ではない。
+- 最終 gate (3ブラウザーE2E/既存eval)、Git依存導入、性能比較は今回未実施。既存 main を変更せず、remote へ push していない。残るエンジン本体・手書き宣言・テスト/補助スクリプトの移行が必要。
