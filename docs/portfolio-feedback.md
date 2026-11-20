@@ -311,3 +311,7 @@ HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラ
 
 ### CSS 幅遷移の自動検証
 既存の有界アフィン不変条件を利用して、閉じた CSS と前後 DOM の幅遷移から補間条件を導出する。まず独立した fixed 幅と、中心/片側アンカーおよび通常 block/明示 stretch の直下子に限定する。既存 cascade と幾何抽出を再利用し、曖昧な遷移、複数の幾何プロパティ、未知の祖先依存、非対応長さの組合せは Unknown。実測による証拠の捏造は禁止。単体・3 UA・全 gate を通して統合する。
+
+### 閉じた CSS 幅遷移の検証結果
+`verifyCSSWidthTransition` は固定配置の幅、同一条件の前後 CSS、通常 block/縦向き Flex の直接子の横伸張を検査し、元の geometry/relational engine を再利用する。幅以外の変動する配置、外部 CSS、非対応な selector や easing、相反する min/max の枝などは Unknown。5 単体テストと Chromium/Firefox/WebKit の 3 E2E を確認。
+レビュー済み portfolio island の CSS から実際の transition 宣言を抽出し、閉じたコンポーネント射影に対して 3/3 UA の自動導出を確認。連続する同じ media 条件に分割されたコンパイル済み CSS にも対応。射影と元ページの同値性は引き続きレビュー前提であり、全ページの自動縮約・全アニメーションの証明ではない。配信コード変更なし。
