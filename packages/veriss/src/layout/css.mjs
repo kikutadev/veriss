@@ -1740,7 +1740,8 @@ function normalizeOverflowAxes(values) {
         values['overflow-y'] = y === 'visible' ? 'auto' : y === 'clip' ? 'hidden' : y;
 }
 function checkedStyle(values, metadata, sources, invalid) {
-    const result = { ...values, ...metadata, $sources: sources, $invalid: invalid };
+    // Values are local to this computation and no longer used as an untyped map.
+    const result = Object.assign(values, metadata, { $sources: sources, $invalid: invalid });
     if (!hasRequiredComputedProperties(result))
         throw new Error('Unresolved required computed CSS property');
     return result;
@@ -1750,7 +1751,6 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
     const metadata = {};
     const profile = uaProfile;
     const values = defaultStyle(box, inherited);
-    const defaults = { ...values };
     // Lists: UA margins and the start padding for markers; li defaults to display: list-item (unsupported).
     // details is a block; summary a list item with an inside disclosure marker (Chromium's UA sheet, measured).
     if (box.tag === 'details' && !box.pseudo)
@@ -1905,8 +1905,9 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
         throw Object.assign(new Error('A dynamic popover attribute decides whether it renders'), { code: 'U_LAYOUT_ELEMENT' });
     if (box.hiddenAttr === 'until-found' || box.hiddenAttr === 'dynamic')
         throw Object.assign(new Error(`hidden=${box.hiddenAttr === 'dynamic' ? '(dynamic)' : 'until-found'} is outside the modeled rendering`), { code: 'U_LAYOUT_ELEMENT' });
-    const ua = { ...values };
-    const initial = { ...defaults, ...textInitial, fill: 'black', stroke: 'none', 'list-style-position': 'outside', 'caret-color': 'auto', hyphens: 'manual', 'object-fit': 'fill', 'scroll-behavior': 'auto', 'overscroll-behavior-x': 'auto', 'overscroll-behavior-y': 'auto', 'scroll-snap-type': 'none', 'scroll-snap-align': 'none', resize: 'none', 'text-wrap-mode': 'white-space', 'text-wrap-style': 'auto', 'text-overflow': 'clip', 'line-clamp': 'none', 'box-orient': 'horizontal', 'touch-action': 'auto', 'table-layout': 'auto', clear: 'none', 'column-count': 'auto', 'column-width': 'auto', 'column-span': 'none', 'border-collapse': 'separate', 'border-spacing': '0', 'caption-side': 'top', 'empty-cells': 'show', 'vertical-align': 'baseline', 'outline-style': 'none', 'outline-width': 'medium', 'outline-color': 'currentcolor', 'outline-offset': '0', 'box-shadow': 'none', 'z-index': 'auto', 'content-visibility': 'visible', 'contain-intrinsic-block-size': 'none', isolation: 'auto', transform: 'none', 'transform-origin': 'origin(0 0.5 0 0.5)', translate: 'none', rotate: 'none', scale: 'none', 'backdrop-filter': 'none', 'will-change': 'auto', 'justify-self': 'auto', 'justify-items': 'normal', 'color-scheme': 'normal', cursor: 'auto', 'list-style-type': 'disc', 'animation-name': 'none', 'animation-duration': '0s', 'animation-iteration-count': '1', 'animation-play-state': 'running', 'animation-direction': 'normal', 'animation-timing-function': 'ease', 'animation-delay': '0s', 'animation-fill-mode': 'none', 'animation-timeline': 'auto', 'transition-property': 'all', 'transition-duration': '0s', 'transition-timing-function': 'ease', 'transition-delay': '0s', color: 'canvastext', 'text-decoration-line': 'none', visibility: 'visible', 'pointer-events': 'auto', display: 'inline', 'white-space': 'normal', 'overflow-wrap': 'normal', 'writing-mode': 'horizontal-tb', direction: 'ltr', 'margin-left': '0', 'margin-right': '0', 'margin-top': '0', 'margin-bottom': '0' };
+    // Allocate the CSS-wide initial values only when a winning declaration needs one.
+    let initial;
+    const initialValues = () => initial ??= { ...defaultStyle(box, inherited), ...textInitial, fill: 'black', stroke: 'none', 'list-style-position': 'outside', 'caret-color': 'auto', hyphens: 'manual', 'object-fit': 'fill', 'scroll-behavior': 'auto', 'overscroll-behavior-x': 'auto', 'overscroll-behavior-y': 'auto', 'scroll-snap-type': 'none', 'scroll-snap-align': 'none', resize: 'none', 'text-wrap-mode': 'white-space', 'text-wrap-style': 'auto', 'text-overflow': 'clip', 'line-clamp': 'none', 'box-orient': 'horizontal', 'touch-action': 'auto', 'table-layout': 'auto', clear: 'none', 'column-count': 'auto', 'column-width': 'auto', 'column-span': 'none', 'border-collapse': 'separate', 'border-spacing': '0', 'caption-side': 'top', 'empty-cells': 'show', 'vertical-align': 'baseline', 'outline-style': 'none', 'outline-width': 'medium', 'outline-color': 'currentcolor', 'outline-offset': '0', 'box-shadow': 'none', 'z-index': 'auto', 'content-visibility': 'visible', 'contain-intrinsic-block-size': 'none', isolation: 'auto', transform: 'none', 'transform-origin': 'origin(0 0.5 0 0.5)', translate: 'none', rotate: 'none', scale: 'none', 'backdrop-filter': 'none', 'will-change': 'auto', 'justify-self': 'auto', 'justify-items': 'normal', 'color-scheme': 'normal', cursor: 'auto', 'list-style-type': 'disc', 'animation-name': 'none', 'animation-duration': '0s', 'animation-iteration-count': '1', 'animation-play-state': 'running', 'animation-direction': 'normal', 'animation-timing-function': 'ease', 'animation-delay': '0s', 'animation-fill-mode': 'none', 'animation-timeline': 'auto', 'transition-property': 'all', 'transition-duration': '0s', 'transition-timing-function': 'ease', 'transition-delay': '0s', color: 'canvastext', 'text-decoration-line': 'none', visibility: 'visible', 'pointer-events': 'auto', display: 'inline', 'white-space': 'normal', 'overflow-wrap': 'normal', 'writing-mode': 'horizontal-tb', direction: 'ltr', 'margin-left': '0', 'margin-right': '0', 'margin-top': '0', 'margin-bottom': '0' };
     const inheritedProperties = new Set(['white-space', 'overflow-wrap', 'writing-mode', 'direction', 'border-collapse', 'border-spacing', 'caption-side', 'empty-cells', ...textProperties, ...inheritedPaint]);
     const cascadeValues = { ...values };
     const priorities = new Map(), sources = {}, custom = new Map(), dormant = {}, overridden = {}, candidates = {};
@@ -2023,17 +2024,18 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
                 throw error;
             }
         }
+        // This key has not been assigned its cascaded value yet: its original UA value is intact.
         if (value === 'revert')
-            value = ua[property];
+            value = values[property];
         if (value === 'unset')
             value = inheritedProperties.has(property) ? 'inherit' : 'initial';
         if (value === 'initial')
-            value = initial[property];
+            value = initialValues()[property];
         if (value === 'inherit') {
             if (Object.hasOwn(inherited, property))
                 value = inheritedValue(inherited, property);
             else if (box.documentRoot)
-                value = initial[property];
+                value = initialValues()[property];
             else
                 throw new Error(`Cannot resolve inherited ${property}; provide the real ancestor chain`);
         }
