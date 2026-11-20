@@ -72,3 +72,16 @@ test('observed states outside a profile graph fail the combined outcome',async()
  assert.equal(report.outcome,'failed');
  assert.equal(report.observationDiagnostics[0].code,'E_UI_OBSERVED_STATE');
 });
+
+test('observations judge required axes independently and preserve exact subpixel failures',async()=>{
+ const c=make([{id:'horizontal',kind:'predicate',predicate:cmp('le',ref('submit','inlineEnd'),{environment:'width'})}]);
+ const o=createObligationIR(c,{state,environment,evidence});
+ const observations=[
+   {state:'empty',profile:'web',width:320,height:600,rects:{submit:{x:0,y:12,width:320,height:1154.550048828125}}},
+   {state:'loaded',profile:'web',width:320,height:600,rects:{submit:{x:0.0000001,y:0,width:320,height:100}}}
+ ];
+ const r=await verifyObligationIR(o,undefined,{observations});
+ assert.equal(r.status,'verified');
+ assert.deepEqual(r.contracts[0].observations.map(o=>o.status),['passed','failed']);
+ assert.equal(r.outcome,'failed');
+});

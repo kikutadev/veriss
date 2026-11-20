@@ -142,23 +142,35 @@ function failure(c,p,predicate,refs,region,rects,budget){
  }
  return occupancyFailure(region,rects[0],rects.slice(1),read(c.max),budget);
 }
+// Browser coordinates are finite IEEE-754 numbers, not authored CSS
+// decimals. Convert the sampled value exactly, without expanding the
+// accepted CSS number grammar or rounding a real sampled violation away.
+function sampledRational(value){
+ if(value===0)return zero;
+ const bits=new DataView(new ArrayBuffer(8));bits.setFloat64(0,value);
+ const raw=bits.getBigUint64(0),exp=Number((raw>>52n)&2047n);
+ const mantissa=(raw&((1n<<52n)-1n))+(exp?1n<<52n:0n);
+ const shift=(exp||1)-1023-52,n=raw>>63n?-mantissa:mantissa;
+ return shift>=0?{n:n<<BigInt(shift),d:1n}:{n,d:1n<<BigInt(-shift)};
+}
 function observedGeometry(c,p,observations,instances,predicate,refs) {
  if(c.kind==='action')return [];
  const out=[];
- const rect=(o,target)=>{
+ const required=requiredFields(predicate,refs);
+ const rect=(o,target,fields)=>{
    if(!o?.rects||!Object.hasOwn(o.rects,target))return null;
    const r=o.rects[target];
-   return Object.fromEntries(axes.map((k,i)=>[k,scalar(q(r[['x','y','width','height'][i]]))]));
+   return Object.fromEntries(fields.map(k=>[k,scalar(sampledRational(r[['x','y','width','height'][axes.indexOf(k)]]))]));
  };
  const candidates=observations.filter(o=>o.profile===p.id&&o.rects);
  for(const t of instances)for(const o of candidates.filter(o=>o.state===t.from)){
    try{
      // A single point observation cannot establish both endpoints of a self transition.
      const afters=candidates.filter(n=>n!==o&&n.state===t.to&&n.width===o.width&&n.height===o.height);
-     const rectangles=refs.map(([endpoint,target])=>rect(endpoint==='after'?(afters.length===1?afters[0]:null):o,target));
+     const rectangles=refs.map(([endpoint,target],i)=>rect(endpoint==='after'?(afters.length===1?afters[0]:null):o,target,required[i]));
      if(rectangles.some(v=>!v)){out.push({status:'unknown',sample:o,reason:'missing sampled target or unambiguous matching endpoint'});continue}
      if(t.to===t.from&&refs.some(r=>r[0]==='after')){out.push({status:'unknown',sample:o,reason:'self-transition needs paired observations'});continue}
-     const x=q(o.width),y=q(o.height),reg=rectangle({min:x,max:x},{min:y,max:y});
+     const x=sampledRational(o.width),y=sampledRational(o.height),reg=rectangle({min:x,max:x},{min:y,max:y});
      const failed=failure(c,p,predicate,refs,reg,rectangles,{left:30000});
      out.push({status:failed?'failed':'passed',sample:o,...(refs.some(r=>r[0]==='after')?{after:afters[0]}:{})});
    }catch(e){out.push({status:'unknown',sample:o,reason:e.message})}
