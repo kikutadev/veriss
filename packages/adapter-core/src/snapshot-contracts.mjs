@@ -42,6 +42,8 @@ export function snapshotContracts(results, { name, viewport, contracts = [], scr
         try {
             let layout = layouts.get(s.id);
             if (!layout) {
+                if (!('version' in s.report))
+                    return [];
                 layout = createLayoutIR(s.report);
                 layouts.set(s.id, layout);
             }

@@ -1,0 +1,10 @@
+import type { EnvironmentProfile, UIModel } from '../packages/veriss/src/layout-contract.mjs';
+export declare function isRecord(value: unknown): value is Record<string, unknown>;
+export declare function record(value: unknown, label: string): Record<string, unknown>;
+export declare function array(value: unknown, label: string): unknown[];
+export declare function string(value: unknown, label: string): string;
+export declare function strings(value: unknown, label: string): string[];
+export declare function stringRecord(value: unknown, label: string): Record<string, string>;
+export declare function objectRecord(value: unknown, label: string): Record<string, object>;
+export declare function profiles(value: unknown): EnvironmentProfile[];
+export declare function uiModel(value: unknown): UIModel;

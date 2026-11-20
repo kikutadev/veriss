@@ -53,7 +53,7 @@ export function snapshotContracts(results:AnalyzedState[],{name,viewport,contrac
   function evidence(s:SnapshotState,entries:Record<string,Entry[]|undefined>):GeometryEvidence[] {
     try{
       let layout=layouts.get(s.id);
-      if(!layout){layout=createLayoutIR(s.report);layouts.set(s.id,layout)}
+      if(!layout){if(!('version' in s.report))return [];layout=createLayoutIR(s.report);layouts.set(s.id,layout)}
       const targets=Object.keys(entries),paths:Record<string,string>={};
       for(const k of targets){const es=entries[k];if(es?.length===1&&es[0])paths[k]=es[0].path}
       return layoutGeometry({state:s.id,profile,layout,targets:targets.filter(k=>Object.hasOwn(paths,k)),paths});
