@@ -257,3 +257,56 @@ test('viewport padding and gaps compose through nested responsive boxes',async({
     }
   }
 });
+
+test('responsive sibling margins and grid item margins match exact layout regions',async({page})=>{
+  const html='<!doctype html><html lang="en"><body><main><div class="a"></div><div class="b"></div></main></body></html>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}main{padding:1px}main>div{height:40px;min-width:0;min-height:0}.a{margin-bottom:clamp(12px,4vw,48px);margin-left:clamp(8px,2vw,24px)}.b{margin-top:clamp(18px,3vh,36px)}';
+  const options={viewport:{min:320,max:1600,height:{min:320,max:1000}},integrity:true};
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const extra of ['', 'main{display:grid;grid-template-columns:minmax(0,1fr)}','main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:100px}', 'main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:100px}.b{width:900px;margin-right:clamp(10px,3vw,30px)}']){
+    const css=base+extra;
+    const report=analyzeHTML(html,{...options,css});
+    expect(report.status,JSON.stringify(report.diagnostics)).toBe(extra.includes('900px')?'violated':'verified');
+    await page.setContent(html.replace('<body>','<head><style>'+css+'</style></head><body>'));
+    for(const width of [320,400,449,450,451,750,900,1200,1600])for(const height of [320,600,800,1000]){
+      await page.setViewportSize({width,height});
+      const at=a=>rat(a.constant)+rat(a.coefficient)*width+rat(a.heightCoefficient)*height;
+      for(const selector of ['main','.a','.b']){
+        const row=report.sizes.find(s=>(s.box===selector||s.box.startsWith(selector+'@'))&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8));
+        expect(row?.rect,JSON.stringify({extra,width,height,selector})).toBeTruthy();
+        const actual=await page.locator(selector).evaluate(n=>{const r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height]});
+        for(const [i,key] of ['inlineStart','blockStart','inlineSize','blockSize'].entries())expect(Math.abs(at(row.rect[key])-actual[i]),JSON.stringify({extra,width,height,selector,key,expected:at(row.rect[key]),actual:actual[i]})).toBeLessThan(.1);
+      }
+    }
+  }
+});
+
+test('responsive flex margins preserve shrink, grow, wrap, and cross-axis geometry',async({page})=>{
+  const html='<!doctype html><html lang="en"><body><main><div class="a"></div><div class="b"></div></main></body></html>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}main{display:flex}main>div{height:40px;min-width:0;min-height:0}.a{flex:1 1 240px;margin-left:clamp(8px,2vw,24px);margin-top:clamp(12px,4vh,32px)}.b{flex:1 1 180px;margin-right:clamp(10px,3vw,30px)}';
+  const cases=[
+    '',
+    'main{flex-wrap:wrap;column-gap:6px;row-gap:12px}',
+    'main{flex-direction:column;height:220px;align-items:stretch}.a{flex:1 1 80px}.b{flex:2 1 100px}',
+    'main{flex-direction:column}.a{flex:0 0 80px}.b{flex:0 0 100px}',
+    'main{align-items:center;height:120px}.a{max-width:260px}.b{max-width:220px}',
+    'main{justify-content:center}.a{flex:0 0 240px}.b{flex:0 0 180px}'
+  ];
+  const options={viewport:{min:320,max:1600,height:{min:320,max:1000}},integrity:true};
+  const rat=v=>{const [n,d='1']=String(v??0).split('/');return Number(n)/Number(d)};
+  for(const [i,extra] of cases.entries()){
+    const css=base+extra,report=analyzeHTML(html,{...options,css});
+    expect(report.status,JSON.stringify({i,diagnostics:report.diagnostics})).toBe(i===5?'violated':'verified');
+    await page.setContent(html.replace('<body>','<head><style>'+css+'</style></head><body>'));
+    for(const width of [320,400,440,450,451,600,1000,1200,1600])for(const height of [320,600,800,1000]){
+      await page.setViewportSize({width,height});
+      const at=a=>rat(a.constant)+rat(a.coefficient)*width+rat(a.heightCoefficient)*height;
+      for(const selector of ['main','.a','.b']){
+        const row=report.sizes.find(s=>(s.box===selector||s.box.startsWith(selector+'@'))&&s.region.constraints.every(c=>c.strict?at(c)>1e-8:at(c)>=-1e-8));
+        expect(row?.rect,JSON.stringify({i,width,height,selector})).toBeTruthy();
+        const actual=await page.locator(selector).evaluate(n=>{const r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height]});
+        for(const [j,key] of ['inlineStart','blockStart','inlineSize','blockSize'].entries())expect(Math.abs(at(row.rect[key])-actual[j]),JSON.stringify({i,width,height,selector,key,expected:at(row.rect[key]),actual:actual[j]})).toBeLessThan(.1);
+      }
+    }
+  }
+});
