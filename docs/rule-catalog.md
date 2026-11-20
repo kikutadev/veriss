@@ -98,7 +98,8 @@ verified で指摘なしになる。Web 版: https://mizchi.github.io/veriss/
 | `W_CSS_MARKER_IGNORED` / `W_CSS_SELECTION_IGNORED` / `W_CSS_PLACEHOLDER_IGNORED` / `W_CSS_VISITED_IGNORED` | 擬似要素・`:visited` が受け付けないプロパティ(F20・F22・F46・F47) | 検査可 |
 | `W_CSS_BR_STYLED` | `<br>` に書いたスタイル(F120) | 差を報告(margin は Firefox、line-height は WebKit だけ) |
 | `W_CSS_ISOLATION_SELF` | 混ぜる要素自身の `isolation: isolate`(F123) | 検査可(解析は Unknown) |
-| `W_CSS_OVERFLOW_PROMOTED` | 片方の軸の `hidden` で、もう片方の `visible` が `auto` になる(F126) | 検査可 |
+| `W_CSS_OVERFLOW_PROMOTED` | 片方の軸の `hidden` で、もう片方の `visible` が `auto` になる(F126) | 検査可(`clip` の組は Chromium だけ `clip` のままなので差を報告し、解析は Unknown) |
+| `W_CSS_CONTAINER_UNIT_VIEWPORT` | container のない軸の `cqw`・`cqh` は画面の大きさ(`svw`・`svh`)になる(F133) | 検査可(解析は `cq*` の長さで Unknown) |
 | `W_CSS_WRAP_RESTORED` | `nowrap` の後の `text-wrap: balance` が折り返しを戻す(F119) | 検査可 |
 | `W_CSS_BOX_SIZING_NOT_INHERITED` | html・body だけの `box-sizing`(F127) | 検査可 |
 | `W_CSS_MARGIN_PERCENT_WIDTH` | 縦の margin の `%` は幅に対する割合(F128) | 検査可(解析は Unknown) |
@@ -238,7 +239,7 @@ verified で指摘なしになる。Web 版: https://mizchi.github.io/veriss/
 | `W_CSS_SIZE_BROWSER_DEPENDENT` | `stretch`・`-moz-available`・`intrinsic` など一部だけが受け付けるキーワード(F122) | 差を報告 |
 | `W_CSS_SCROLLBAR_WEBKIT_IGNORED` / `W_CSS_SCROLLBAR_FIREFOX_SHOWN` | 標準のスクロールバーのプロパティと `::-webkit-scrollbar`(F130) | 差を報告 |
 | `W_LAYOUT_SELECT_INDENT` | Firefox だけが select の `text-indent` を 2 倍にする(F124) | 差を報告 |
-| `W_CSS_SELECTOR_LIST_VENDOR` / `W_CSS_BR_STYLED` | 上の 1・3 にも出したもの | 差を報告 |
+| `W_CSS_SELECTOR_LIST_VENDOR` / `W_CSS_BR_STYLED` / `W_CSS_OVERFLOW_PROMOTED` | 上の 1・3 にも出したもの(`OVERFLOW_PROMOTED` は `clip` の組だけ) | 差を報告 |
 
 ## 12. コンポーネントの境界
 

@@ -5,8 +5,10 @@ isle から切り出した CSS 検証器(veriss)を、別のマシンで続け�
 ## 今どこにいるか
 
 - `main` に全部入っている(このセッションの作業も)。isle は veriss を git 依存で使う利用者になった(isle の `package.json` の `@mizchi/veriss` が commit を指す)
-- **静的検査のパターン**: [docs/static-check-checklist.md](static-check-checklist.md) に F1〜F132。カテゴリごとの進み具合と残りの観点は [TODO.md](../TODO.md)(88 / 89)
-  - F26 の見逃しを直した(PR #2): 補われた tbody をセレクタの途中で飛ばす `.t > .r > td` も報告する。e2e は Chromium でしか回していない(Firefox・WebKit で確かめるのが次の一歩)
+- **静的検査のパターン**: [docs/static-check-checklist.md](static-check-checklist.md) に F1〜F133。カテゴリごとの進み具合と残りの観点は [TODO.md](../TODO.md)(89 / 90)
+  - F26 の見逃しを直した(PR #2): 補われた tbody をセレクタの途中で飛ばす `.t > .r > td` も報告する(3 ブラウザーで照合済み)
+  - F126 の健全性の修正: `clip` の横のスクロール値で `clip` が `hidden` になるのは Firefox・WebKit だけ(Chromium 156 は `clip`)。解析は Unknown
+  - F133: container のない軸の `cqw` / `cqh` は `svw` / `svh` になる
   - 保留: F91(段組の外の `break-*`。印刷を対象にするか未決)、F95(`li{display:flex}` でマーカーが消える。警告の条件が未決)
   - 見送り(実測したら効いていた): flex の `text-indent`、`perspective`、表のセルの `max-width`
   - 健全性の修正: F89(`calc(100%-10px)` を 100%−10px として計算していた)、F99(引用符のない不正な `font-family` を適用していた)
@@ -52,7 +54,7 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 ## 次にやること
 
-- **F26 の 3 ブラウザー照合**: `tools/gate.sh` を Firefox・WebKit のある環境で回す(PR #2 は Chromium だけで確かめて merge した)
+- **eval の基準**: `evals/results/component-lint/` は古い Chromium で記録されていて、Playwright 1.64.1 の Chromium 156 では文字の組み方の差で `before`・`run-1` が変わる(TODO.md の 0)。gate の「eval が変わらない」は、同じブラウザーで main と比べて確かめる
 - **M6**: `solve` の中に残る「効かない宣言」の判定(`reasons` の一覧)を `rules/css-mistakes.mjs` に移す。layout の段は「親の display」「flow の中か」を事実として出す。レイアウトが Unknown のときに検査をやり直す `walkStyles` をなくす
 - **M7**: `rules/contrast`(色の規則を `src/color/` の上に。祖先の塗りの鎖だけで判定し、後ろに重なる箱の判定だけ layout があるときに足す)
 - **M8**: a11y を DOM の規則と幾何の規則に分ける。integrity と CLS も規則にする

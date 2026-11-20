@@ -677,7 +677,7 @@ function flexShorthand(value) {
 export function parseLayoutCSS(sheets, diagnostic) {
   // Findings of the syntax stage, one shape: { code, ...data } (ADR-0016 M3). The rules/syntax-notes.mjs catalog words them.
   const notes = [], note = (code, data) => { notes.push({ code, ...data }); }, notesOf = code => notes.filter(n => n.code === code);
-  const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [];
+  const dependentDeclarations = [], markerSizing = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], rules = [], layers = [], keyframes = new Set(), keyframeFrames = new Map(), fontFaces = [], registered = new Map(), defaultNamespace = [], startingRules = [], unreadContainers = [];
   const layerIndex = name => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope = null;
   const reportedMediaEm = new Set();
@@ -880,7 +880,12 @@ export function parseLayoutCSS(sheets, diagnostic) {
           if (rest.chain || /:scope\b|&/.test(rest.source)) throw new Error(`${text} inside @scope: a selector with more combinators, or :scope / & further in, is not modeled there`);
           return { ...rest, source: text, specificity: rest.specificity.map((v, i) => v + lead[i]), scope, scopeMode: m && m[2].trim() === '>' ? 'child' : 'descendant' };
         }) : node.selectors.map(selector => compileSelector(selector));
-      } catch (error) { problem('U_LAYOUT_SELECTOR', error.message, node.source.start.line); continue; }
+      } catch (error) {
+        problem('U_LAYOUT_SELECTOR', error.message, node.source.start.line);
+        // A rule the analysis cannot match that may make a query container (F133 then cannot tell there is none).
+        if ((node.nodes ?? []).some(d => d.type === 'decl' && /^container(?:-type)?$/i.test(d.prop) && /\b(?:inline-)?size\b/i.test(d.value))) unreadContainers.push({ selector: node.selector, file: filename, line: node.source.start.line });
+        continue;
+      }
       // Checklist F20: in a :visited rule browsers apply only color properties (CSS Selectors 4 §8.2, privacy): every other
       // declaration is ignored — reported, and dropped as the browser does.
       if (selectors.some(sel => sel.state === 'visited')) {
@@ -980,7 +985,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
       const hoverLayout = !stateGeometry && !checkedMark && selectors.every(selector => selector.state === 'hover' && !selector.pseudoElement);
       const stateLayout = !stateGeometry && !checkedMark && (focusLayout || hoverLayout);
       if (!stateGeometry && !checkedMark && !stateLayout && selectors.some(selector => selector.state) && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase()))) { problem('U_LAYOUT_SELECTOR', `State selector rules may only change paint (color, background, outline, box-shadow, text-decoration); ${node.selector} changes layout`, node.source.start.line); continue; }
-      const declarations = [];
+      const declarations = []; let unmodeled;
       const authored=node.nodes.filter(declaration=>declaration.type==='decl');
       // Rules that declare content at all (also a value not read here, such as attr()): F9 does not call them content-less.
       if (authored.some(d => d.prop.toLowerCase() === 'content')) contentRules.push(selectors);
@@ -1080,9 +1085,13 @@ export function parseLayoutCSS(sheets, diagnostic) {
             const flip = /-inline(?:-start|-end)?$/.test(property) && /(?:^|-)(?:left|right)$/.test(name) ? name.replace(/(left|right)$/, side => side === 'left' ? 'right' : 'left') : undefined;
             declarations.push({ property:name, value, ...(flip ? {flip} : {}), ...(custom ? {expression} : {}), ...(pending ? {pending,specified:declaration.value} : {}), ...(declaration.prop.toLowerCase() === 'text-wrap' ? { wrapShorthand: declaration.value.trim() } : {}), important: declaration.important ? 1 : 0, line: declaration.source.start.line, file: filename });
           }
-        } catch (error) { problem(error.code ?? 'U_LAYOUT_CSS', error.message, declaration.source.start.line); }
+        } catch (error) {
+          problem(error.code ?? 'U_LAYOUT_CSS', error.message, declaration.source.start.line);
+          // Kept for the checks that read the written value (F133: a container query unit the layout does not model).
+          if (/\d(?:cqw|cqi|cqh|cqb)\b/i.test(declaration.value)) (unmodeled ??= []).push({ property: declaration.prop.toLowerCase(), specified: declaration.value.trim(), file: filename, line: declaration.source.start.line, selector: node.selector });
+        }
       }
-      rules.push({ selectors, contexts, declarations, layer, file: filename, line: node.source.start.line, ...(preferences.length ? { preferences } : {}), ...(stateGeometry ? { stateGeometry: true } : {}), ...(stateLayout && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase())) ? { stateLayout: true, ...(hoverLayout ? { hoverLayout: true } : {}) } : {}) });
+      rules.push({ selectors, contexts, declarations, ...(unmodeled ? { unmodeled } : {}), layer, file: filename, line: node.source.start.line, ...(preferences.length ? { preferences } : {}), ...(stateGeometry ? { stateGeometry: true } : {}), ...(stateLayout && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase())) ? { stateLayout: true, ...(hoverLayout ? { hoverLayout: true } : {}) } : {}) });
     }
   };
   // F125: em and rem in a media query are the browser's default font size (16px unless the user changed it), not the
@@ -1166,7 +1175,7 @@ export function parseLayoutCSS(sheets, diagnostic) {
     if (!notesOf('W_CSS_KEYFRAMES_MISSING').some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) note('W_CSS_KEYFRAMES_MISSING', { name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules };
+  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules, unreadContainers };
 }
 
 // The UA default family and the user's default font size are not author

@@ -1484,8 +1484,11 @@ test('F125: a 50rem media query is 800px whatever the root font-size', async ({p
   }
 });
 
-test('F126: overflow-y: visible beside overflow-x: hidden computes to auto, clip beside auto to hidden; clip keeps visible', async ({page}) => {
-  for (const [css, y, reported] of [['overflow-x:hidden;overflow-y:visible', 'auto', true], ['overflow:hidden visible', 'auto', true], ['overflow-x:auto;overflow-y:clip', 'hidden', true],
+test('F126: overflow-y: visible beside overflow-x: hidden computes to auto, clip beside auto to hidden (not in Chromium); clip keeps visible', async ({page, browserName}) => {
+  // clip beside a scrolling axis: hidden in Firefox (157) and WebKit (27.2), clip in Chromium (156).
+  const clipBeside = browserName === 'chromium' ? 'clip' : 'hidden';
+  for (const [css, y, reported] of [['overflow-x:hidden;overflow-y:visible', 'auto', true], ['overflow:hidden visible', 'auto', true], ['overflow-x:auto;overflow-y:clip', clipBeside, true],
+    ['overflow-x:scroll;overflow-y:clip', clipBeside, true],
     ['overflow-x:clip;overflow-y:visible', 'visible', false], ['overflow-x:hidden', 'auto', false]]) {
     await page.setContent(`<!doctype html><style>*{margin:0}.a{height:50px;${css}}.c{height:100px}</style><div class="a"><div class="c"></div></div>`);
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')).overflowY), css).toBe(y);
@@ -1560,5 +1563,21 @@ test('F132: a selector list with a -moz- selector is dropped by Chrome and Safar
     expect((await page.evaluate(() => getComputedStyle(document.querySelector('.a')).color)) === 'rgb(255, 0, 0)', css).toBe(applies);
     const r = analyzeHTML('<html lang="en"><body><div class="a">t</div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SELECTOR_LIST_VENDOR'), css).toBe(reported);
+  }
+});
+
+test('F133: a container query unit with no container for its axis is the small-viewport unit', async ({page}) => {
+  const html = '<div class="g"><div class="p"><div class="a"></div></div></div>';
+  // [container css, the cq declaration, the same with the sv unit, reported]
+  for (const [ctx, cq, sv, reported] of [['', 'width:50cqw', 'width:50svw', true], ['', 'height:30cqh', 'height:30svh', true],
+    ['.p{container-type:inline-size}', 'height:30cqh', 'height:30svh', true], ['.p{container-name:card;width:200px}', 'width:50cqw', 'width:50svw', true],
+    ['', 'width:calc(100% - 10cqw)', 'width:calc(100% - 10svw)', true],
+    ['.p{container-type:inline-size;width:200px}', 'width:50cqw', 'width:50svw', false], ['.g{container-type:inline-size;width:200px}', 'width:50cqw', 'width:50svw', false],
+    ['.p{container:card / inline-size;width:200px}', 'width:50cqw', 'width:50svw', false]]) {
+    const box = async decl => { await page.setContent(`<!doctype html><style>*{margin:0}${ctx}.a{height:10px;${decl}}</style>${html}`); return page.evaluate(() => { const r = document.querySelector('.a').getBoundingClientRect(); return [r.width, r.height]; }); };
+    // Reported exactly where the cq unit measures what the sv unit does (the viewport), not a container.
+    expect(JSON.stringify(await box(cq)) === JSON.stringify(await box(sv)), `${ctx} ${cq}`).toBe(reported);
+    const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}${ctx}.a{${cq}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_CONTAINER_UNIT_VIEWPORT'), `${ctx} ${cq}`).toBe(reported);
   }
 });

@@ -12,13 +12,14 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 現在の予定(2026-11-20 時点、次に再開するとき用)
 
-パターンの一覧(カテゴリ 1〜13)は F95 を除いて済み(88 / 89)。次は次の順で進める。
+パターンの一覧(カテゴリ 1〜13)は F95 を除いて済み(89 / 90)。次は次の順で進める。
 
-0. **F26 の修正(PR #2)の 3 ブラウザー照合**: `.t > .r > td` など、補われた tbody をセレクタの途中で飛ばす場合の e2e は Chromium でしか
-   回していない(作業した環境に Firefox・WebKit がなかった)。`tools/gate.sh` を回して Firefox・WebKit でも通ることを確かめる
+0. **eval の基準を Chromium 156 で記録し直すか決める**: `tools/eval-component-lint.mjs` の結果(`evals/results/component-lint/`)は古い Chromium で
+   記録されている。Playwright 1.64.1 が使う Chromium 156 では文字の組み方が 0.4px ほど違い、`before` と `run-1` が変わる(320〜375px の
+   はみ出しの判定が「確かめられない」になる。見逃しではない)。基準を記録し直すか、eval をブラウザーの版に結びつけるかを決める
 1. **パターンの追加を続ける**(新しい観点を足すときはカテゴリの表と一覧の両方に足す。[検査ルール一覧](docs/rule-catalog.md) の該当する役割の表にも行を足す)。まだ調べていない候補:
    - `:focus-visible` とキーボード / マウスでの見え方の差、`:has()` の重さと無効な引数
-   - `@container` の単位(`cqw` / `cqh`)を container のない要素で使う、`container-type: size` で高さが 0 になる
+   - (済)`@container` の単位(`cqw` / `cqh`)を container のない要素で使う(F133)。`container-type: size` で高さが 0 になるのは既存の配置の検査(`E_LAYOUT_TRACKS`)で捕まる
    - `writing-mode: vertical-*` と物理プロパティ(`width` / `margin-top`)の取り違え
    - `inert` / `popover` と CSS の `display` の組み合わせ
    - `<picture>` / `srcset` と CSS の `width` / `object-fit`
@@ -54,10 +55,10 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 | 8. フォーム部品・置換要素 | 8 / 8 | 済 |
 | 9. セレクタ × DOM(状態・構造) | 8 / 8 | 済 |
 | 10. ブラウザで結果が違うもの | 5 / 5 | 済 |
-| 11. 単位と計算値の落とし穴(書いた値と計算値が違う) | 4 / 4 | 済 |
+| 11. 単位と計算値の落とし穴(書いた値と計算値が違う) | 5 / 5 | 済 |
 | 12. HTML 要素ごとの既定の振る舞いとリセット CSS | 4 / 4 | 済 |
 | 13. 状態のセレクタとカスケードの順 | 2 / 2 | 済 |
-| 合計 | 88 / 89(99%) | |
+| 合計 | 89 / 90(99%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -176,6 +177,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] `overflow-x: hidden` の横の `overflow-y: visible` が `auto` になる(F126)
 - [x] html / body だけの `box-sizing` は継承されない(F127)
 - [x] 縦の `margin` の % は幅に対する割合(F128)
+- [x] container のない軸の `cqw` / `cqh` は small viewport の単位になる(F133)
 
 ### 12. HTML 要素ごとの既定の振る舞いとリセット CSS
 
@@ -230,6 +232,9 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 実装済み(最近)
 
+- F133. container のない軸の container query の単位(`cqw` / `cqh` が `svw` / `svh` になる)
+- F126 の健全性の修正: `clip` の横のスクロール値で `clip` を `hidden` にするのは Firefox と WebKit だけ(Chromium 156 は `clip` のまま)。`browsers` を付けて報告し、解析は Unknown
+- F26 の 3 ブラウザー照合(Firefox・WebKit でも通った)
 - F26 の見逃しの修正: 補われた tbody をセレクタの途中で飛ばす子の結合子(`.t > .r > td`、`table > tr .x`)も報告する(PR #2)
 - [検査ルール一覧](docs/rule-catalog.md): 約 420 のコードを 13 の役割に分け、検査できるもの・Unknown のものを表にし、役割ごとに
   NG / OK の実例の画像を付けた。GitHub Pages(https://mizchi.github.io/veriss/)に出し、README からリンク(PR #1)
