@@ -1,8 +1,9 @@
 # veriss の検査ルール一覧(役割別)
 
 veriss の検査コード(約 420 個)を役割ごとに分け、**何が検査できて、何が検査できない(Unknown)か**を表にしたもの。
-各役割の先頭の画像は、その役割の代表例を Chromium で描き、veriss に同じ HTML と CSS を渡した結果を並べたもの
-(赤い破線 = veriss が指摘した箱)。画像は `node tools/rule-catalog/shoot.mjs` で作り直せる。
+各役割の先頭の画像は、その役割の代表例を **NG(検出される書き方)と OK(直した正常系)の組**で Chromium で描き、
+それぞれに veriss が返した判定を並べたもの(赤い破線 = NG で指摘された箱、緑の破線 = OK の同じ箱)。OK の側はどれも
+verified で指摘なしになる。Web 版: https://mizchi.github.io/veriss/
 
 - コードの頭文字: `E_` = 誤り(多くはブラウザーでの描画や操作の失敗。10 の「仕様のみ」の行は、描画に出ないマークアップの適合性の誤り)、`W_` = 警告(ほぼ確実に書き間違い)、`U_` = Unknown(検査しなかった。成功にはしない)
 - 「判定」の欄: **検査可** = 静的に決まり、3 ブラウザー(Chromium・Firefox・WebKit)で実測して照合済み/**一部** = 条件付きで検査し、
@@ -272,7 +273,9 @@ React・Vue・Svelte の adapter がコンポーネントを状態ごとの箱�
 
 ## 画像の作り方
 
-- `tools/rule-catalog/examples.mjs` に例(HTML、CSS、文字の契約、撮る幅、ホバー・フォーカスの状態)、`tools/rule-catalog/shoot.mjs` が
-  veriss の `analyzeHTML` で判定し、Chromium(deviceScaleFactor 2)で描いてカードにする。画像の中の判定とメッセージは、その場で
-  veriss が返したもの
+- `tools/rule-catalog/examples.mjs` に例の組(共通の HTML と CSS に、NG と OK の差分。文字の契約、撮る幅、ホバー・フォーカスの状態)、
+  `tools/rule-catalog/shoot.mjs` が両方を veriss の `analyzeHTML` で判定し、Chromium(deviceScaleFactor 2)で並べて描いてカードにする。
+  画像の中の判定とメッセージは、その場で veriss が返したもの。`node tools/rule-catalog/run.mjs all` で判定だけを見られる
+- Web 版は `node tools/rule-catalog/build-page.mjs <出力先>` がこの文書と画像から作る。main に push すると
+  `.github/workflows/pages.yml` が GitHub Pages に出す
 - 撮ったのは Chromium だけ。3 ブラウザーの照合は各検査の e2e(`e2e/layout-css-mistakes.spec.mjs`、`e2e/layout-accessibility.spec.mjs` ほか)が受け持つ
