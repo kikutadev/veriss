@@ -5,7 +5,7 @@
 // element's absence is not a shift). The contract is part of the component's definition: on a child component's tag
 // it is E_SCOPE_CONTRACT (that component's own elements are its to declare).
 import { parse, type DefaultTreeAdapterTypes as Tree } from 'parse5';
-import type { LayoutSummary, LayoutRectangle, LayoutAffine, LayoutOptions, LayoutRange } from '../../veriss/src/layout-contracts.d.ts';
+import type { LayoutSummary, LayoutRectangle, LayoutAffine, LayoutOptions, LayoutRange } from '@mizchi/veriss/src/layout-contracts.d.ts';
 
 export type Choice = string | number | boolean | null;
 export type Choices = Record<string, Choice>;

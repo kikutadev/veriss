@@ -1,4 +1,4 @@
-import type { LayoutSummary, LayoutOptions } from '../../veriss/src/layout-contracts.d.ts';
+import type { LayoutSummary, LayoutOptions } from '@mizchi/veriss/src/layout-contracts.d.ts';
 export type Choice = string | number | boolean | null;
 export type Choices = Record<string, Choice>;
 export interface AnalyzedState {

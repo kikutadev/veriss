@@ -1,4 +1,4 @@
-import type { LayoutOptions } from '../../veriss/src/layout-contracts.d.ts';
+import type { LayoutOptions } from '@mizchi/veriss/src/layout-contracts.d.ts';
 import type { EnvironmentProfile } from '@mizchi/veriss/contracts';
 import type { AnalyzedState, Choices, ContractFinding, ContractUnknown } from './noshift.mjs';
 export type SnapshotContract = ({

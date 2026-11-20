@@ -1,7 +1,7 @@
 // Snapshot syntax adapter. Geometry coverage, relation predicates and witnesses
 // are handled by the same public relational ContractIR profile as other UIs.
 import {parse, type DefaultTreeAdapterTypes as Tree} from 'parse5';
-import type {LayoutOptions} from '../../veriss/src/layout-contracts.d.ts';
+import type {LayoutOptions} from '@mizchi/veriss/src/layout-contracts.d.ts';
 import type {EnvironmentProfile, GeometryEvidence, Relation, UIModel, LayoutIR} from '@mizchi/veriss/contracts';
 import type {AnalyzedState, Choices, ContractFinding, ContractUnknown} from './noshift.mjs';
 
