@@ -455,6 +455,19 @@ TypeScript 移行と競合しない opt-in の接続には先に schema の
 照合が必要。全体完了の条件は第0節・第6.1節を変更しない。
 TypeScript 作業ツリーは変更しない。
 
+今回の着手（第六段階）: X1 の閉じた cascade/media fragment。
+既存 canonical HTML/CSS の一つの viewport-root absolute child に class
+を追加し、対象のみを候補にする単純な class/id/type 複合 selector、
+left/top/width/height の宣言、important・specificity・source order、
+min/max width/height の単一 media query を扱う。元 CSS 全文字列を
+照合し、全条件分岐を Lean 内で列挙、各分岐で勝者と幾何を再構成する。
+全 evidence row × source branch の実現可能領域における等値と、
+各 branch の box admissibility を既存 exact certificate で検査。
+未対応 selector/property/media/過大入力は Unknown。成功条件は
+winner/分岐被覆/幾何の定理、実 veriss IR の肯定・改変対照、
+kernel reduction と文書。汎用 parser/cascade や browser 同値性は
+まだ完成扱いしない。TypeScript 作業ツリーの編集はしない。
+
 | 順序 | 作業束 | 入力依存 | 完了成果 |
 |---|---|---|---|
 | 3A | S1–S4、全ケース checker | 現 M | graph + cases + cross-state + path witness の定理と実測レポート再生 |
