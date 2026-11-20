@@ -38,7 +38,9 @@ export interface SelectorWarning {
 export interface LintResult {
     operation?: never;
     states: readonly {
+        choices?: Choices;
         report: {
+            status?: string;
             diagnostics: readonly {
                 code: string;
                 severity: string;
@@ -55,7 +57,7 @@ export interface LintResult {
     };
     browsers?: readonly string[];
     coverage?: {
-        assumptions: readonly string[];
+        assumptions?: readonly string[];
     };
 }
 export interface LintOptions {
