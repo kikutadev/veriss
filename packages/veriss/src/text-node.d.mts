@@ -1,5 +1,14 @@
-import type {TextMetrics, TextShaper} from './text.d.mts';
-export * from './text.d.mts';
-export const textMetricsPath: string;
-export function loadShaper(path?: string): Promise<TextShaper>;
-export function loadTextMetrics(options: { fonts: Record<string, { file?: string; data?: Uint8Array; weight?: number }>; limits?: { characters?: number; maxLength?: number } }): Promise<TextMetrics>;
+import type { TextLimits, TextMetrics, TextShaper } from './text.mjs';
+export type * from './text.mjs';
+export { createTextMetrics, upperBound, layoutAllowance, breakOpportunities, scriptSegments, scriptRuns } from './text.mjs';
+export declare const textMetricsPath: string;
+export declare function loadShaper(path?: string): Promise<TextShaper>;
+/** Load font files (or supplied bytes) and attach SHA-256 provenance. */
+export declare function loadTextMetrics({ fonts, limits }: {
+    fonts: Record<string, {
+        file?: string;
+        data?: Uint8Array;
+        weight?: number;
+    }>;
+    limits?: TextLimits;
+}): Promise<TextMetrics>;
