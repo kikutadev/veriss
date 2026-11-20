@@ -72,6 +72,7 @@
     "tools/**/*.mts",
     "tools/**/*.cts",
     "experiments/**/*.mts",
+    "evals/scenarios/**/*.mts",
     "e2e/**/*.mts",
     "tests/**/*.mts",
     "playwright.layout.config.mts"
