@@ -223,6 +223,7 @@ interface StyleOptions {
     spend?: ((n?: number) => void) | undefined;
     state?: ReadonlySet<string> | undefined;
     rtl?: boolean;
+    valuePhase?: 'layout' | 'cascade-subset';
 }
 declare function defaultStyle(box: CSSBox, inherited: InheritedStyle): {
     'color-scheme': string;
@@ -356,4 +357,4 @@ declare function defaultStyle(box: CSSBox, inherited: InheritedStyle): {
     clip: string;
     'clip-path': string;
 };
-export declare function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (rule: CSSRule) => boolean, inherited?: InheritedStyle, { spend, state, rtl }?: StyleOptions): ComputedStyle;
+export declare function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (rule: CSSRule) => boolean, inherited?: InheritedStyle, { spend, state, rtl, valuePhase }?: StyleOptions): ComputedStyle;

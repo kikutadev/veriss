@@ -1209,7 +1209,7 @@ export interface InheritedStyle {
   [key: string]: unknown;
   $variables?: VariableEnvironment; $lang?: string; $blockFlow?: boolean; display?: string | undefined;
 }
-interface StyleOptions {spend?: ((n?: number) => void) | undefined; state?: ReadonlySet<string> | undefined; rtl?: boolean}
+interface StyleOptions {spend?: ((n?: number) => void) | undefined; state?: ReadonlySet<string> | undefined; rtl?: boolean; valuePhase?: 'layout'|'cascade-subset'}
 function inheritedValue(inherited: InheritedStyle, property: string): string | undefined {
   const value = inherited[property];
   if (value === undefined || typeof value === 'string') return value;
@@ -1257,7 +1257,19 @@ function defaultStyle(box: CSSBox, inherited: InheritedStyle) {
 function hasRequiredComputedProperties<T extends Record<string,unknown>>(style:T):style is T & RequiredComputedProperties {
   return requiredComputedKeys.every(key=>typeof style[key]==='string');
 }
-export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (rule: CSSRule) => boolean, inherited: InheritedStyle = {}, {spend, state, rtl = false}: StyleOptions = {}): ComputedStyle {
+function normalizeOverflowAxes(values:CSSValueMap):void {
+  const nonscroll = (value: string | undefined) => value === 'visible' || value === 'clip';
+  const x = values['overflow-x'], y = values['overflow-y'];
+  if (!nonscroll(y)) values['overflow-x'] = x === 'visible' ? 'auto' : x === 'clip' ? 'hidden' : x;
+  if (!nonscroll(x)) values['overflow-y'] = y === 'visible' ? 'auto' : y === 'clip' ? 'hidden' : y;
+}
+function checkedStyle(values:CSSValueMap,metadata:ComputedMetadata,sources:SourceMap,invalid:InvalidDeclaration[]):ComputedStyle {
+  const result={...values,...metadata,$sources:sources,$invalid:invalid};
+  if(!hasRequiredComputedProperties(result))throw new Error('Unresolved required computed CSS property');
+  return result;
+}
+
+export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (rule: CSSRule) => boolean, inherited: InheritedStyle = {}, {spend, state, rtl = false, valuePhase='layout'}: StyleOptions = {}): ComputedStyle {
   let flipped = false;
   const metadata: ComputedMetadata = {};
   const profile = uaProfile;
@@ -1585,6 +1597,17 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
   metadata.$overridden = overridden;
   metadata.$invalid = invalid;
   metadata.$variables = environment;
+  // The differential oracle compares a shared subset of CSS computed values,
+  // not the effective geometry values below. Keep the computed overflow pair
+  // (including cross-axis coercion) for inheritance in that separate traversal.
+  // This is not a general CSSOM implementation.
+  if(valuePhase==='cascade-subset') {
+    normalizeOverflowAxes(values);
+    if(metadata.$fixed)values.position='fixed';
+    if(metadata.$sticky)values.position='sticky';
+    if(!rtl && flipped && values.direction==='rtl')return computeStyle(rules,box,active,inherited,{spend,state,rtl:true,valuePhase});
+    return checkedStyle(values,metadata,sources,invalid);
+  }
   // F57: overflow, text-overflow and resize apply to block containers (and replaced elements): on a display: inline
   // element they do nothing (measured in Chromium, Firefox and WebKit). Used as their initial values here.
   // (Not an absolutely positioned or floated box, nor a flex or grid item: those are blockified, and overflow applies.)
@@ -1600,10 +1623,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
     const container = containerKeys.filter(key => sources[key] && values[key] !== undefined && !present(idleOf[key]).includes(String(sources[key]?.specified ?? values[key]).trim()));
     for (const key of container) drop(metadata, 'inline-container', key, values[key]);
   }
-  const nonscroll = (value: string | undefined) => value === 'visible' || value === 'clip';
-  const x = values['overflow-x'], y = values['overflow-y'];
-  if (!nonscroll(y)) values['overflow-x'] = x === 'visible' ? 'auto' : x === 'clip' ? 'hidden' : x;
-  if (!nonscroll(x)) values['overflow-y'] = y === 'visible' ? 'auto' : y === 'clip' ? 'hidden' : y;
+  normalizeOverflowAxes(values);
   // F68: input[type=hidden] { display: none !important } (UA): no author display shows it (measured in Chromium, Firefox
   // and WebKit, even with !important).
   if (!box.pseudo && box.tag === 'input' && box.inputType === 'hidden') { if (sources.display && values.display !== 'none') metadata.$hiddenInputDisplay = values.display; values.display = 'none'; }
@@ -1677,8 +1697,6 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
   if (!box.pseudo && (['table', 'inline-table'].includes(values.display ?? "") || (box.tag === 'table' && values.display === 'ua')) && ['overflow-x', 'overflow-y'].every(key => ['auto', 'scroll'].includes(String(values[key]))))
     for (const key of ['overflow-x', 'overflow-y']) { if (sources[key] || sources.overflow) (metadata.$tableOverflow ??= {})[key] = values[key]; values[key] = 'visible'; }
   // A logical side was taken as ltr; in an rtl box cascade again with the sides flipped.
-  if (!rtl && flipped && values.direction === 'rtl') return computeStyle(rules, box, active, inherited, {spend, state, rtl: true});
-  const result={...values,...metadata,$sources:sources,$invalid:invalid};
-  if(!hasRequiredComputedProperties(result))throw new Error('Unresolved required computed CSS property');
-  return result;
+  if (!rtl && flipped && values.direction === 'rtl') return computeStyle(rules, box, active, inherited, {spend, state, rtl: true,valuePhase});
+  return checkedStyle(values,metadata,sources,invalid);
 }

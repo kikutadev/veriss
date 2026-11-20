@@ -78,3 +78,28 @@ for (const [name, css, children, path, property, value] of agreed) {
     assert.deepEqual({status: r.status, verifier: r.verifier, oracle: r.oracle}, {status: 'same', verifier: value, oracle: value});
   });
 }
+
+test('inline overflow retains computed values for comparison, including explicit inheritance', () => {
+  const tree=html([{tag:'span',classes:['outer'],children:[{tag:'span',classes:['inner']}]}]);
+  for(const [declaration,x,y] of [
+    ['overflow:clip','clip','clip'],
+    ['overflow:visible auto','auto','auto'],
+    ['overflow:clip scroll','hidden','scroll'],
+  ] as const) {
+    const result=compareCase(oracle,{css:`.outer,.inner{display:inline}.outer{${declaration}}.inner{overflow:inherit}`,tree,width:800});
+    assert.equal(result.status,'same',JSON.stringify(result.rows.filter(r=>r.status==='different')));
+    for(const path of ['Doc/0/0','Doc/0/0/0']) {
+      assert.equal(row(result,path,'overflow-x').verifier,x);
+      assert.equal(row(result,path,'overflow-y').verifier,y);
+    }
+  }
+});
+
+test('computed inline overflow comparison still detects a broken cascade',()=>{
+  const tree=html([{tag:'span',classes:['outer']}]);
+  const result=compareCase(oracle,{css:'.outer{display:inline;overflow:clip}',tree,width:800},{mutate:rules=>{
+    for(const rule of rules) for(const d of rule.declarations) if(d.property==='overflow-x')d.value='visible';
+    return rules;
+  }});
+  assert.equal(row(result,'Doc/0/0','overflow-x').status,'different');
+});

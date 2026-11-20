@@ -128,7 +128,7 @@ export function compareCase(oracle:Oracle, {css, tree, width, height = 768, name
   let failure:string|undefined;
   const visit = (box:NormalizedBox, inherited:InheritedStyle|undefined):void => {
     let style;
-    try { style = computeStyle(rules, box, active, inherited); }
+    try { style = computeStyle(rules, box, active, inherited,{valuePhase:'cascade-subset'}); }
     catch (error) { failure = `${box.path}: ${error instanceof Error?error.message:String(error)}`; return; }
     const theirs = oracleRows.get(box.path);
     for (const property of comparedProperties) {

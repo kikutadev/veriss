@@ -1731,7 +1731,21 @@ function defaultStyle(box, inherited) {
 function hasRequiredComputedProperties(style) {
     return requiredComputedKeys.every(key => typeof style[key] === 'string');
 }
-export function computeStyle(rules, box, active, inherited = {}, { spend, state, rtl = false } = {}) {
+function normalizeOverflowAxes(values) {
+    const nonscroll = (value) => value === 'visible' || value === 'clip';
+    const x = values['overflow-x'], y = values['overflow-y'];
+    if (!nonscroll(y))
+        values['overflow-x'] = x === 'visible' ? 'auto' : x === 'clip' ? 'hidden' : x;
+    if (!nonscroll(x))
+        values['overflow-y'] = y === 'visible' ? 'auto' : y === 'clip' ? 'hidden' : y;
+}
+function checkedStyle(values, metadata, sources, invalid) {
+    const result = { ...values, ...metadata, $sources: sources, $invalid: invalid };
+    if (!hasRequiredComputedProperties(result))
+        throw new Error('Unresolved required computed CSS property');
+    return result;
+}
+export function computeStyle(rules, box, active, inherited = {}, { spend, state, rtl = false, valuePhase = 'layout' } = {}) {
     let flipped = false;
     const metadata = {};
     const profile = uaProfile;
@@ -2212,6 +2226,20 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
     metadata.$overridden = overridden;
     metadata.$invalid = invalid;
     metadata.$variables = environment;
+    // The differential oracle compares a shared subset of CSS computed values,
+    // not the effective geometry values below. Keep the computed overflow pair
+    // (including cross-axis coercion) for inheritance in that separate traversal.
+    // This is not a general CSSOM implementation.
+    if (valuePhase === 'cascade-subset') {
+        normalizeOverflowAxes(values);
+        if (metadata.$fixed)
+            values.position = 'fixed';
+        if (metadata.$sticky)
+            values.position = 'sticky';
+        if (!rtl && flipped && values.direction === 'rtl')
+            return computeStyle(rules, box, active, inherited, { spend, state, rtl: true, valuePhase });
+        return checkedStyle(values, metadata, sources, invalid);
+    }
     // F57: overflow, text-overflow and resize apply to block containers (and replaced elements): on a display: inline
     // element they do nothing (measured in Chromium, Firefox and WebKit). Used as their initial values here.
     // (Not an absolutely positioned or floated box, nor a flex or grid item: those are blockified, and overflow applies.)
@@ -2233,12 +2261,7 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
         for (const key of container)
             drop(metadata, 'inline-container', key, values[key]);
     }
-    const nonscroll = (value) => value === 'visible' || value === 'clip';
-    const x = values['overflow-x'], y = values['overflow-y'];
-    if (!nonscroll(y))
-        values['overflow-x'] = x === 'visible' ? 'auto' : x === 'clip' ? 'hidden' : x;
-    if (!nonscroll(x))
-        values['overflow-y'] = y === 'visible' ? 'auto' : y === 'clip' ? 'hidden' : y;
+    normalizeOverflowAxes(values);
     // F68: input[type=hidden] { display: none !important } (UA): no author display shows it (measured in Chromium, Firefox
     // and WebKit, even with !important).
     if (!box.pseudo && box.tag === 'input' && box.inputType === 'hidden') {
@@ -2364,9 +2387,6 @@ export function computeStyle(rules, box, active, inherited = {}, { spend, state,
         }
     // A logical side was taken as ltr; in an rtl box cascade again with the sides flipped.
     if (!rtl && flipped && values.direction === 'rtl')
-        return computeStyle(rules, box, active, inherited, { spend, state, rtl: true });
-    const result = { ...values, ...metadata, $sources: sources, $invalid: invalid };
-    if (!hasRequiredComputedProperties(result))
-        throw new Error('Unresolved required computed CSS property');
-    return result;
+        return computeStyle(rules, box, active, inherited, { spend, state, rtl: true, valuePhase });
+    return checkedStyle(values, metadata, sources, invalid);
 }

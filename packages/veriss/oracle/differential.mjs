@@ -139,7 +139,7 @@ export function compareCase(oracle, { css, tree, width, height = 768, name = 'Do
     const visit = (box, inherited) => {
         let style;
         try {
-            style = computeStyle(rules, box, active, inherited);
+            style = computeStyle(rules, box, active, inherited, { valuePhase: 'cascade-subset' });
         }
         catch (error) {
             failure = `${box.path}: ${error instanceof Error ? error.message : String(error)}`;
