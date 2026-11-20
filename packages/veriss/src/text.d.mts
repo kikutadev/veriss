@@ -143,7 +143,7 @@ interface GeneratedText {
 interface GeneratedResult {
     generatedText?: GeneratedText[];
 }
-export type TextOptions = Omit<LayoutOptions, 'boxes'> & {
+export type TextOptions = Partial<Omit<LayoutOptions, 'boxes'>> & {
     boxes?: Record<string, TextBoxInput>;
 };
 export interface TextMetrics {

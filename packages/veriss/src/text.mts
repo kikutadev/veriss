@@ -55,7 +55,7 @@ export interface TextBoxInput extends Omit<LayoutBoxContract,'textRuns'> { text?
 export type ResolvedTextOptions<T> = Omit<T,'boxes'> & {boxes:Record<string,LayoutBoxContract>};
 interface GeneratedText { selector?: string | null; kind: string; text: string }
 interface GeneratedResult { generatedText?: GeneratedText[] }
-export type TextOptions = Omit<LayoutOptions,'boxes'> & {boxes?: Record<string,TextBoxInput>};
+export type TextOptions = Partial<Omit<LayoutOptions,'boxes'>> & {boxes?: Record<string,TextBoxInput>};
 export interface TextMetrics {
   measureText(input: MeasureInput): MeasuredText;
   domainBounds(input: DomainInput): TextDomainBounds;

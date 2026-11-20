@@ -188,3 +188,21 @@ test('withGeneratedText measures ::before/::after text with the leaf content', a
   // Generated text that differs by condition cannot join one contract: Unknown.
   assert.equal(run('.price{width:120px}@media (min-width:600px){.price::after{content:" US$"}}').status, 'unknown');
 });
+
+test('resolveOptions replaces text input with recursive measured contracts without mutating its options', () => {
+  const options={name:'Text',css:'',viewport:{min:320,max:800},boxes:{'.cell':{textRuns:[{text:{font:ro,content:'Hello'}},{minInlineSize:12}]}}};
+  const snapshot=structuredClone(options);
+  const resolved=metrics.resolveOptions(options);
+  assert.deepEqual(options,snapshot);
+  assert.equal(resolved.name,options.name);
+  assert.equal(resolved.viewport,options.viewport);
+  const runs=resolved.boxes['.cell']?.textRuns;
+  assert.ok(runs && runs.length===2);
+  assert.ok(runs[0]?.textMetrics?.kind==='content');
+  assert.ok(!('text' in runs[0]));
+  assert.ok(runs[0].minInlineSize!>0);
+  assert.equal(runs[1]?.minInlineSize,12);
+  // Resolving just the boxes is also permitted; don't require unrelated viewport data.
+  const onlyBoxes=metrics.resolveOptions({boxes:options.boxes});
+  assert.deepEqual(onlyBoxes.boxes,resolved.boxes);
+});
