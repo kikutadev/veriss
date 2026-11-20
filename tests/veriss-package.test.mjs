@@ -1,46 +1,51 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,writeFile,mkdir,readdir,rename,symlink,rm} from 'node:fs/promises';
-import {spawnSync} from 'node:child_process';
-import {tmpdir} from 'node:os';
-import {join,resolve,dirname} from 'node:path';
-import {fileURLToPath} from 'node:url';
-
-const packageRoot=fileURLToPath(new URL('../packages/veriss/',import.meta.url));
-
+import { mkdtemp, readFile, writeFile, mkdir, readdir, rename, symlink, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const packageRoot = fileURLToPath(new URL('../packages/veriss/', import.meta.url));
 test('CSS verifier implementation and types have no imports outside their package source', async () => {
-  const root=join(packageRoot,'src');
-  for(const entry of await readdir(root,{recursive:true})) {
-    if(!/\.(?:mjs|mts|ts)$/.test(entry)) continue;
-    const file=join(root,entry),source=await readFile(file,'utf8');
-    assert.doesNotMatch(source,/ProgramIR|\.isle\b|from ['"].*(?:playwright|compiler)/,entry);
-    for(const match of source.matchAll(/(?:from\s*|import\s*\()\s*['"](\.[^'"]+)['"]/g)) {
-      assert.ok(resolve(dirname(file),match[1]).startsWith(root+'/'),`${entry} imports outside the core: ${match[1]}`);
+    const root = join(packageRoot, 'src');
+    for (const entry of await readdir(root, { recursive: true })) {
+        if (!/\.(?:mjs|mts|ts)$/.test(entry))
+            continue;
+        const file = join(root, entry), source = await readFile(file, 'utf8');
+        assert.doesNotMatch(source, /ProgramIR|\.isle\b|from ['"].*(?:playwright|compiler)/, entry);
+        for (const match of source.matchAll(/(?:from\s*|import\s*\()\s*['"](\.[^'"]+)['"]/g)) {
+            assert.ok(match[1]);
+            assert.ok(resolve(dirname(file), match[1]).startsWith(root + '/'), `${entry} imports outside the core: ${match[1]}`);
+        }
     }
-  }
 });
-
 test('an isolated npm consumer verifies HTML and runs Z3 without installing Isle', async () => {
-  const directory=await mkdtemp(join(tmpdir(),'veriss-consumer-'));
-  try {
-    const packed=spawnSync('pnpm',['pack','--config.ignore-scripts=true','--pack-destination',directory],{cwd:packageRoot,encoding:'utf8'});
-    assert.equal(packed.status,0,packed.stderr || packed.stdout);
-    const archive=(await readdir(directory)).find(file=>file.endsWith('.tgz'));
-    const unpacked=spawnSync('tar',['-xzf',join(directory,archive),'-C',directory],{encoding:'utf8'});
-    assert.equal(unpacked.status,0,unpacked.stderr);
-    const app=join(directory,'app');
-    await mkdir(join(app,'node_modules/@mizchi'),{recursive:true});
-    await rename(join(directory,'package'),join(app,'node_modules/@mizchi/veriss'));
-    const metadata=JSON.parse(await readFile(join(app,'node_modules/@mizchi/veriss/package.json'),'utf8'));
-    for(const entry of Object.values(metadata.exports)) {
-      if(typeof entry==='string') continue; // a deep-import pattern (./src/*), not an entry point
-      assert.ok((await readFile(join(app,'node_modules/@mizchi/veriss',entry.types),'utf8')).length);
-    }
-    for(const name of Object.keys(metadata.dependencies)) {
-      await symlink(join(packageRoot,'node_modules',name),join(app,'node_modules',name),'dir');
-    }
-    await writeFile(join(app,'package.json'),'{"type":"module"}');
-    await writeFile(join(app,'check.mjs'),`import assert from 'node:assert/strict';
+    const directory = await mkdtemp(join(tmpdir(), 'veriss-consumer-'));
+    try {
+        const packed = spawnSync('pnpm', ['pack', '--config.ignore-scripts=true', '--pack-destination', directory], { cwd: packageRoot, encoding: 'utf8' });
+        assert.equal(packed.status, 0, packed.stderr || packed.stdout);
+        const archive = (await readdir(directory)).find(file => file.endsWith('.tgz'));
+        assert.ok(archive);
+        const unpacked = spawnSync('tar', ['-xzf', join(directory, archive), '-C', directory], { encoding: 'utf8' });
+        assert.equal(unpacked.status, 0, unpacked.stderr);
+        const app = join(directory, 'app');
+        await mkdir(join(app, 'node_modules/@mizchi'), { recursive: true });
+        await rename(join(directory, 'package'), join(app, 'node_modules/@mizchi/veriss'));
+        const metadata = JSON.parse(await readFile(join(app, 'node_modules/@mizchi/veriss/package.json'), 'utf8'));
+        assert.ok(metadata && typeof metadata === 'object' && 'exports' in metadata && metadata.exports && typeof metadata.exports === 'object');
+        assert.ok('dependencies' in metadata && metadata.dependencies && typeof metadata.dependencies === 'object');
+        const entries = Object.values(metadata.exports);
+        for (const entry of entries) {
+            if (typeof entry === 'string')
+                continue; // a deep-import pattern (./src/*), not an entry point
+            assert.ok(entry && typeof entry === 'object' && 'types' in entry && typeof entry.types === 'string');
+            assert.ok((await readFile(join(app, 'node_modules/@mizchi/veriss', entry.types), 'utf8')).length);
+        }
+        for (const name of Object.keys(metadata.dependencies)) {
+            await symlink(join(packageRoot, 'node_modules', name), join(app, 'node_modules', name), 'dir');
+        }
+        await writeFile(join(app, 'package.json'), '{"type":"module"}');
+        await writeFile(join(app, 'check.mjs'), `import assert from 'node:assert/strict';
 import {analyzeHTML} from '@mizchi/veriss/html';
 import {verifyLayoutReport} from '@mizchi/veriss/z3/node';
 import {createContractIR,createLayoutIR,createObligationIR,createStateIR,createEnvironmentIR,createEvidenceIR,layoutGeometry,createRelationalProofSession} from '@mizchi/veriss/contracts';
@@ -72,7 +77,10 @@ assert.equal(session.verify(relationalObligation).status,'verified');
 assert.equal(session.stats().hits,1);
 await assert.rejects(import('@isle/prototype/compiler'),{code:'ERR_MODULE_NOT_FOUND'});
 `);
-    const checked=spawnSync(process.execPath,['check.mjs'],{cwd:app,encoding:'utf8',env:{...process.env,PATH:'/usr/bin:/bin'},timeout:30000});
-    assert.equal(checked.status,0,checked.stderr || checked.stdout);
-  } finally {await rm(directory,{recursive:true,force:true});}
+        const checked = spawnSync(process.execPath, ['check.mjs'], { cwd: app, encoding: 'utf8', env: { ...process.env, PATH: '/usr/bin:/bin' }, timeout: 30000 });
+        assert.equal(checked.status, 0, checked.stderr || checked.stdout);
+    }
+    finally {
+        await rm(directory, { recursive: true, force: true });
+    }
 });

@@ -7,6 +7,6 @@ export function drop(values, reason, property, value, detail = {}) { (values.$dr
 /** The dropped declarations of one reason, in the order they were dropped. */
 export const droppedOf = (style, reason) => (style?.$dropped ?? []).filter(d => d.reason === reason);
 /** The same as [property, value] pairs. */
-export const droppedPairs = (style, reason) => droppedOf(style, reason).map(d => [d.property, d.value]);
+export const droppedPairs = (style, reason) => droppedOf(style, reason).map((d) => [d.property, d.value]);
 /** The value of the first dropped declaration of one reason, or undefined. */
 export const droppedValue = (style, reason) => droppedOf(style, reason)[0]?.value;

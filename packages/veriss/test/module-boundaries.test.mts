@@ -1,0 +1,47 @@
+// ADR-0016 M2: the import direction between modules. A module may import only what its row allows; an edge not listed
+// fails the test. The list for the existing modules records today's edges and shrinks as the migration (M3-M8) goes on.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync, readdirSync} from 'node:fs';
+import {join, dirname, relative, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const src = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
+const files = (dir: string): string[] => readdirSync(join(src, dir), {withFileTypes: true}).flatMap(e => e.isDirectory() ? files(join(dir, e.name)) : e.name.endsWith('.mjs') ? [join(dir, e.name)] : []);
+const importsOf = (file: string) => [...readFileSync(join(src, file), 'utf8').matchAll(/(?:^|\n)\s*(?:import|export)\b[^'"]*?from\s*['"](\.[^'"]+)['"]/g)].map(m => { assert.ok(m[1]); return relative(src, resolve(dirname(join(src, file)), m[1])); });
+
+// Pure tools: they import nothing of veriss.
+const pure = ['color/index.mjs', 'layout/dropped.mjs', 'layout/linear.mjs', 'layout/calc-syntax.mjs', 'layout/font-syntax.mjs', 'layout/grid-syntax.mjs', 'layout/keyword-syntax.mjs', 'layout/timing-syntax.mjs', 'layout/background-syntax.mjs', 'layout/smt.mjs', 'layout/easing.mjs', 'layout/simple-selector.mjs'];
+
+test('pure tools import nothing of veriss', () => {
+  for (const file of pure) assert.deepEqual(importsOf(file), [], file);
+});
+
+test('color/ is used by the rules that judge colors and by the syntax stage (to read a color as the browser does)', () => {
+  const users = files('.').filter((file: string) => !file.startsWith('color/') && importsOf(file).some(target => target.startsWith('color/')));
+  assert.deepEqual(users.sort(), ['layout/accessibility.mjs', 'layout/css.mjs']);
+});
+
+test('the syntax validators are imported only by the syntax stage (layout/css.mjs)', () => {
+  for (const validator of ['layout/calc-syntax.mjs', 'layout/font-syntax.mjs', 'layout/grid-syntax.mjs', 'layout/keyword-syntax.mjs', 'layout/timing-syntax.mjs', 'layout/background-syntax.mjs'])
+    assert.deepEqual(files('.').filter(file => importsOf(file).includes(validator)), ['layout/css.mjs'], validator);
+});
+
+test('rules/ reads facts only: it imports no stage (layout/) module', () => {
+  for (const file of files('rules')) assert.deepEqual(importsOf(file).filter(target => target.startsWith('layout/')), [], file);
+});
+
+test('the syntax stage hands its findings over as one list of notes (M3): no warning-only array is destructured by the engine', () => {
+  const engine = readFileSync(join(src, 'layout/engine.mjs'), 'utf8');
+  for (const name of ['mediaVar', 'fontInvalid', 'counterUnused', 'calcSpacing', 'importIgnored', 'duplicateDeclarations']) assert.ok(!new RegExp(`\\b${name}\\b`).test(engine), name);
+});
+
+test('the style stage records dropped declarations in one list (M4): no per-case $...Inert mark is left', () => {
+  for (const file of files('.')) assert.deepEqual(readFileSync(join(src, file), 'utf8').match(/\$[a-zA-Z]+Inert\b/g) ?? [], [], file);
+});
+
+test('the CSS-mistake checks live in rules/css-mistakes.mjs (M5): they import nothing, and the engine no longer defines them', () => {
+  assert.deepEqual(importsOf('rules/css-mistakes.mjs'), []);
+  const engine = readFileSync(join(src, 'layout/engine.mjs'), 'utf8');
+  for (const name of ['cssMistakes', 'firstPseudoInert', 'inlineAutoMargin', 'pseudoWithoutContent', 'tableRowRadius', 'aspectInert', 'contentsInert']) assert.ok(!new RegExp(`function ${name}\\(`).test(engine), name);
+});

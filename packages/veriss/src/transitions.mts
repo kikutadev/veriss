@@ -1,0 +1,171 @@
+import type {LayoutSummary,LayoutRectangle,LayoutAffine,LayoutDiagnostic,LayoutRange} from './layout-contracts.d.ts';
+import type {LayoutIR,LayoutIRBox} from './layout-contract.mjs';
+import type {LayoutModel,LayoutProof,LayoutSolverAPI,LayoutObligation} from './layout-z3.mjs';
+type Frozen<T>=T extends object ? {readonly [K in keyof T]:Frozen<T[K]>} : T;
+
+export type NoShiftReference=string|{id:string;within?:string};
+export interface NoShiftTarget {name:string;before:NoShiftReference;after:NoShiftReference}
+export interface NoShiftInput {name:string;targets:readonly NoShiftTarget[]}
+/** Exact presence and border-rectangle equality at two modeled endpoints. */
+export type NoShiftContract=Frozen<{version:1;kind:'noshift-contract';profile:'noshift/1';name:string;targets:NoShiftTarget[]}>;
+export type TransitionIR=Frozen<{
+  version:1;kind:'transition';before:LayoutIR;after:LayoutIR;
+  complete:boolean;diagnostics:LayoutSummary['diagnostics'];assumptions:string[];
+}>;
+export type RectangleField='inlineStart'|'blockStart'|'inlineSize'|'blockSize';
+export interface TransitionObligationFact extends LayoutObligation {
+  target?:string;beforePath?:string;afterPath?:string;field?:RectangleField;
+}
+export type TransitionObligation=Frozen<{
+  version:1;kind:'transition-obligation';contract:NoShiftContract;transition:TransitionIR;
+  coverage:LayoutModel;model:Omit<LayoutModel,'obligations'> & {obligations:TransitionObligationFact[]};
+}>;
+export interface ExactPixels {value:number;exact:string}
+export interface NoShiftChange {
+  target:string;field:RectangleField;beforePath:string;afterPath:string;
+  before:ExactPixels;after:ExactPixels;delta:ExactPixels;
+}
+export interface NoShiftProof {
+  version:1;status:'verified'|'violated'|'unknown';contract:NoShiftContract;
+  coverage:LayoutProof;proof:LayoutProof;change?:NoShiftChange;
+}
+// Endpoint relations over extracted CSS geometry, independent of UI syntax.
+import {createLayoutIR,copyDiagnostic,solverModel} from './layout-contract.mjs';
+import {verifyLayoutModel} from './layout-z3.mjs';
+import {affine,and,or,interval,region as encodeRegion,rational} from './layout/smt.mjs';
+import {sub,number,exact} from './layout/linear.mjs';
+import {obligationModel} from './layout/model.mjs';
+
+// The SMT encoder currently accepts mutable array types. Copy only the
+// arrays crossing that boundary; keep the exposed IR deeply immutable.
+function region(row:LayoutIRBox):string {
+  return encodeRegion({range:row.range,...(row.heightRange ? {heightRange:row.heightRange} : {}),
+    ...(row.region ? {region:{constraints:[...row.region.constraints]}} : {})});
+}
+const fields:readonly RectangleField[]=['inlineStart','blockStart','inlineSize','blockSize'];
+// The layout box: a transform moves only the painted box, and a layout shift ignores it (the Layout Instability
+// API; measured). A row whose layout box is not decided (layoutRect null) has no geometry.
+const isAffine=(v:unknown):v is LayoutAffine=>object(v,['coefficient','constant','heightCoefficient']) && typeof v.coefficient==='string' && typeof v.constant==='string' && (v.heightCoefficient===undefined || typeof v.heightCoefficient==='string');
+function box(row:LayoutIRBox):Frozen<LayoutRectangle>|undefined {
+  if(!('layoutRect' in row))return row.rect;
+  const value=row.layoutRect;
+  if(value==null)return undefined;
+  if(!object(value,fields)||!isAffine(value.inlineStart)||!isAffine(value.blockStart)||!isAffine(value.inlineSize)||!isAffine(value.blockSize))return undefined;
+  return {inlineStart:value.inlineStart,blockStart:value.blockStart,inlineSize:value.inlineSize,blockSize:value.blockSize};
+}
+const codes={inlineStart:'E_NOSHIFT_INLINE_START',blockStart:'E_NOSHIFT_BLOCK_START',inlineSize:'E_NOSHIFT_INLINE_SIZE',blockSize:'E_NOSHIFT_BLOCK_SIZE'};
+const isArray=(v:unknown):boolean=>Array.isArray(v);
+const object=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>value!==null && typeof value==='object' && !Array.isArray(value) && Object.keys(value).every(key=>keys.includes(key));
+const identifier=(value:unknown):value is string=>typeof value==='string' && /^[A-Za-z_][\w.-]{0,127}$/.test(value);
+const path=(value:unknown):value is string=>typeof value==='string' && value.length>0 && value.length<=4096 && !/[\x00-\x1f]/.test(value);
+function reference(value:unknown):NoShiftReference {
+  if(typeof value==='string' && path(value)) return value;
+  if(object(value,['id','within']) && path(value.id) && value.id.length<=256 && (value.within===undefined || path(value.within))) return {id:value.id,...(value.within!==undefined ? {within:value.within} : {})};
+  throw new TypeError('Invalid noshift target reference');
+}
+const freeze=<T,>(value:T):T=>{if(value && typeof value==='object') {Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+const snapshot=<T,>(value:T):T=>freeze(structuredClone(value));
+const unknown=(code:string,message:string):LayoutDiagnostic=>({code,severity:'unknown',message});
+
+/** Intent only: exact border-rectangle equality for explicitly matched targets. */
+export function createNoShiftContract(input:NoShiftInput):NoShiftContract;
+export function createNoShiftContract(input:unknown):NoShiftContract {
+  if(!object(input,['name','targets']) || !identifier(input.name) || !Array.isArray(input.targets) || !input.targets.length || input.targets.length>256) throw new TypeError('Invalid noshift contract');
+  const names=new Set(),before=new Set(),after=new Set();
+  const targets=Array.from(input.targets,(target:unknown)=>{
+    if(!object(target,['name','before','after']) || !identifier(target.name)) throw new TypeError('Invalid noshift target');
+    const result={name:target.name,before:reference(target.before),after:reference(target.after)};
+    const left=JSON.stringify(result.before),right=JSON.stringify(result.after);
+    if(names.has(target.name) || before.has(left) || after.has(right)) throw new TypeError('Ambiguous noshift target correspondence');
+    names.add(target.name);before.add(left);after.add(right);return result;
+  });
+  return snapshot({version:1,kind:'noshift-contract',profile:'noshift/1',name:input.name,targets});
+}
+
+function environment(scope:LayoutIR['scope']) {
+  const range=(value:Frozen<LayoutRange>|null|undefined)=>value && [value.minExact,value.maxExact,value.minInclusive,value.maxInclusive];
+  return JSON.stringify([scope.axis,range(scope.viewport),range(scope.viewport.height),scope.hostInset,scope.hostBlockInset ?? 0,scope.scrollbarProfiles ?? []]);
+}
+
+/** Extract both states before consulting any target contract. */
+export function createTransitionIR(input:{before:LayoutSummary;after:LayoutSummary}):TransitionIR {
+  if(!object(input,['before','after'])) throw new TypeError('Invalid transition input');
+  const before=createLayoutIR(input.before),after=createLayoutIR(input.after);
+  const diagnostics=[...before.diagnostics,...after.diagnostics];
+  if(input.before.status!=='verified' || input.after.status!=='verified') diagnostics.push(unknown('U_NOSHIFT_LAYOUT','Both endpoint layouts must satisfy their static layout checks'));
+  if(before.cases.length!==1 || after.cases.length!==1) diagnostics.push(unknown('U_NOSHIFT_CASES','Supply one concrete structural/platform case per endpoint; case correspondence is not inferred'));
+  if(environment(before.scope)!==environment(after.scope)) diagnostics.push(unknown('U_NOSHIFT_ENVIRONMENT','Endpoint viewport ranges and host/platform environments must be identical'));
+  const assumptions=[...new Set([...before.assumptions,...after.assumptions,
+    'Both endpoints share the viewport, root border origin, host allocation and unscrolled environment.',
+    'Target correspondence and this endpoint transition are supplied by the adapter; intermediate frames, text/paint and browser CLS are outside noshift/1.'])];
+  return snapshot({version:1,kind:'transition',before,after,complete:before.complete && after.complete && !diagnostics.length,diagnostics,assumptions});
+}
+
+/** Coverage and equality are separate queries; missing geometry never proves equality. */
+export function createTransitionObligation(contract:NoShiftContract,transition:TransitionIR):TransitionObligation {
+  if(!object(contract,['version','kind','profile','name','targets']) || contract.version!==1 || contract.kind!=='noshift-contract' || contract.profile!=='noshift/1') throw new TypeError('Invalid NoShiftContract');
+  contract=createNoShiftContract({name:contract.name,targets:contract.targets});
+  if(!object(transition,['version','kind','before','after','complete','diagnostics','assumptions']) || transition.version!==1 || transition.kind!=='transition' ||
+    typeof transition.complete!=='boolean' || !isArray(transition.diagnostics) || !isArray(transition.assumptions)) throw new TypeError('Invalid TransitionIR');
+  const diagnostics=transition.diagnostics.map(copyDiagnostic),{before,after}=transition;
+  for(const state of [before,after]) {
+    if(state?.kind!=='layout' || !isArray(state.boxes) || !isArray(state.elements) || state.boxes.length+state.elements.length>32768) throw new TypeError('Invalid transition layout facts');
+  }
+  const scope=before.scope;
+  const domain=and([...interval(scope.viewport,'width'),...(scope.viewport.height ? interval(scope.viewport.height,'height') : ['(= height 0)'])]);
+  const coverage:LayoutObligation[]=[],obligations:TransitionObligationFact[]=[];
+  const append=(row:TransitionObligationFact)=>{if(obligations.length>=8192) throw new RangeError('Noshift obligation limit exceeded');obligations.push(row);};
+  for(const target of contract.targets) {
+    const sets:{rows:{row:LayoutIRBox;rect:Frozen<LayoutRectangle>}[];path:string}[]=[];
+    for(const [side,state] of [['before',before],['after',after]] as const) {
+      const ref=target[side];let selected:string,rows:readonly LayoutIRBox[];
+      if(typeof ref==='string') {
+        selected=ref;rows=state.boxes.filter(row=>row.path===selected);
+        if(!state.elements.some(row=>row.path===selected)) diagnostics.push(unknown('U_NOSHIFT_TARGET',`No native box mapping for ${target.name} in ${side}: ${selected}`));
+      } else {
+        const elements=state.elements.filter(row=>!ref.within || row.path===ref.within || row.path.startsWith(ref.within+'/'));
+        if(!elements.length) diagnostics.push(unknown('U_NOSHIFT_TARGET',`No structural inventory for target ${ref.id} in ${side}`));
+        const candidates=elements.filter(row=>row.targets?.includes(ref.id));
+        if(candidates.length>1) diagnostics.push(unknown('U_NOSHIFT_TARGET',`Ambiguous target ID ${ref.id} in ${side}`));
+        if(candidates.some(row=>row.targetIdentity==='unknown')) diagnostics.push(unknown('U_NOSHIFT_IDENTITY',`Target ${ref.id} needs a proven key/lifetime correspondence in ${side}`));
+        selected=candidates.length===1 && candidates[0] ? candidates[0].path : `${ref.within ?? ''}/[target:${ref.id}]`;
+        rows=candidates.length===1 ? state.boxes.filter(row=>row.path===selected) : [];
+      }
+      const measured=rows.flatMap(row=>{const rect=box(row);return rect && fields.every(field=>rect[field]) ? [{row,rect}] : [];});
+      // Validate all compared affine expressions at the strict SMT boundary.
+      for(const row of measured) for(const field of fields) affine(row.rect[field]);
+      const visible=or(rows.map(region));
+      coverage.push({code:'U_NOSHIFT_GEOMETRY',box:target.name,path:selected,domain:visible,failure:`(not ${or(measured.map(({row})=>region(row)))})`});
+      append({code:'E_NOSHIFT_PRESENCE',box:target.name,path:selected,domain:'true',failure:`(not ${visible})`});
+      sets.push({rows:measured,path:selected});
+    }
+    const [first,second]=sets;
+    if(!first || !second)throw new TypeError('Missing endpoint facts');
+    for(const left of first.rows) for(const right of second.rows) for(const field of fields) {
+      append({code:codes[field],box:target.name,path:first.path,axis:field.startsWith('inline') ? 'inline' : 'block',
+        target:target.name,beforePath:first.path,afterPath:second.path,field,
+        domain:and([region(left.row),region(right.row)]),failure:`(not (= ${affine(left.rect[field])} ${affine(right.rect[field])}))`,available:left.rect[field],required:right.rect[field]});
+    }
+  }
+  const base={component:contract.name,scope,complete:transition.complete && !diagnostics.length,diagnostics,assumptions:[...transition.assumptions]};
+  return snapshot({version:1,kind:'transition-obligation',contract,transition,coverage:obligationModel(base,domain,coverage),model:obligationModel(base,domain,obligations)});
+}
+
+export async function verifyTransitionObligation(obligation:TransitionObligation,api:LayoutSolverAPI,options?:{timeoutMs?:number}):Promise<NoShiftProof> {
+  if(obligation?.version!==1 || obligation.kind!=='transition-obligation') throw new TypeError('Invalid transition obligation');
+  const coverage=await verifyLayoutModel(solverModel(obligation.coverage),api,options);
+  if(coverage.status!=='verified') {
+    const proof:LayoutProof={...coverage,status:'unknown',complete:false,diagnostics:[...coverage.diagnostics,
+      ...(coverage.status==='violated' ? [unknown('U_NOSHIFT_GEOMETRY','Visible target geometry does not cover the full endpoint domain')] : [])]};
+    return {version:1,status:'unknown',contract:obligation.contract,coverage,proof};
+  }
+  const proof=await verifyLayoutModel(solverModel(obligation.model),api,options);
+  const witness=proof.witness;
+  const row=witness?.obligationIndex!==undefined ? obligation.model.obligations[witness.obligationIndex] : undefined;
+  const change:NoShiftChange|null=row?.field && row.target!==undefined && row.beforePath!==undefined && row.afterPath!==undefined && witness?.availableExact!==undefined && witness.requiredExact!==undefined && witness.available!==undefined && witness.required!==undefined ? {
+    target:row.target,field:row.field,beforePath:row.beforePath,afterPath:row.afterPath,
+    before:{value:witness.available,exact:witness.availableExact},after:{value:witness.required,exact:witness.requiredExact},
+    delta:{value:number(sub(rational(witness.requiredExact),rational(witness.availableExact))),exact:exact(sub(rational(witness.requiredExact),rational(witness.availableExact)))},
+  } : null;
+  return {version:1,status:proof.status,contract:obligation.contract,coverage,proof,...(change ? {change} : {})};
+}
