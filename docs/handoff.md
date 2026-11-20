@@ -80,3 +80,16 @@ tools/gate.sh                                     # push の前に毎回。20〜
 - 検証: `ef4e2f8` (並行 CSS 改善 `ca45d91` との統合版), `tools/gate.sh` exit 0。6単体テスト群失敗0、component-lint 4回差分なし、3ブラウザー E2E 342件成功、QA supervisor 残留0。
 - 独立した汎用モデルのゲートも exit 0 / Playwright passed を確認した (最初の標準出力ログは一時パスの誤削除で失われたため、統合版の完全なログを正とする)。
 - 状態グラフと局所座標モデルの根拠は利用側が宣言する。観測は別判定であり、実測点だけで連続定義域を証明しない。名前付き述語の合成は可能だが、実装からの全状態導出や証明済み子コンポーネントの無条件合成は対象外。
+
+## fork: TypeScript 全面移行 (typescript-migration)
+
+目的: JavaScript 実装と手書き型宣言の乖離をなくし、検証器の内部表現と証拠境界を型で検査する。基点は 5665aa1。既存改善版の main は変更しない。別ブランチで進める。
+
+完了条件:
+- 自作 JavaScript 実装・adapter・CLI・テストを TypeScript ESM に移す。MoonBit と生成物・言語 fixture は除外。
+- strict、noUncheckedIndexedAccess、exactOptionalPropertyTypes、noImplicitReturns を有効化し、any / ts-nocheck による回避をしない。外部 JSON 等は実行時検証を保持する。
+- 既存 Git 依存で使える ESM のパスと型を保つ。移行済み .mts を正本とし、.mjs と .d.mts は tsc で生成・追跡し、型チェック・生成差分を gate で検査する。最終的に二重の手書き宣言をなくす。
+- 数理演算 → レイアウト/IR → relational/partial geometry → adapters → CLI/テストの順で移す。判定・数値・診断の変更は移行と分離する。
+- 単体全群、既存 eval、3ブラウザー gate、依存導入・性能比較を確認してから移行完了とする。
+
+次: 数理演算の型設計とビルド手順を導入。以降 strict 対象を段階的に広げる。
