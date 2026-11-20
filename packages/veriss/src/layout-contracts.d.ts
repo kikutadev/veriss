@@ -119,6 +119,34 @@ export interface LayoutOptions {
     hostBlockInset?: number;
     boxes?: Record<string, LayoutBoxContract>;
 }
+export type TextMetricPair = readonly [number, number];
+export interface TextInlineBounds {
+    start: TextMetricPair;
+    end: TextMetricPair;
+    top: TextMetricPair;
+    bottom: TextMetricPair;
+}
+export type TextWrappedBound = {
+    atLeastInlineSize: number;
+    below: number | null;
+} & ({
+    split: true;
+} | (TextInlineBounds & {
+    split?: false;
+    line: number;
+    lineWidth?: TextMetricPair;
+    lines?: number;
+    alignBelow?: number;
+}));
+interface TextInlineMetrics {
+    inlineEdges?: Readonly<Record<string, readonly [number, number, number, number]>>;
+    inlineWeights?: Readonly<Record<string, number>>;
+    inlineAtomics?: Readonly<Record<string, TextMetricPair>>;
+    baseline?: {
+        ascent: number;
+        descent: number;
+    };
+}
 export interface LayoutBoxContract {
     /** Trusted sufficient content-width bound for every allowed input/font. */
     minInlineSize?: number;
@@ -144,14 +172,16 @@ export interface LayoutBoxContract {
         letterSpacing?: number;
     };
     /** Provenance of font-derived bounds. A domain bound table indexed by character count. */
-    textMetrics?: {
+    textMetrics?: (TextInlineMetrics & {
         kind: 'content';
         text: string;
         width: number;
         lang?: string;
         font?: object;
         allowance?: string;
-    } | {
+        inline?: Readonly<Record<string, TextInlineBounds>>;
+        lineWidth?: TextMetricPair;
+    }) | {
         kind: 'domain';
         lang?: string;
         characters: string;
@@ -162,7 +192,7 @@ export interface LayoutBoxContract {
         bounds: number[];
         font?: object;
         allowance?: string;
-    } | {
+    } | (TextInlineMetrics & {
         kind: 'lines';
         text: string;
         width: number;
@@ -175,7 +205,12 @@ export interface LayoutBoxContract {
         lang?: string;
         font?: object;
         allowance?: string;
-    };
+        inline?: Readonly<Record<string, readonly TextWrappedBound[]>>;
+        spacedProfile?: {
+            atLeastInlineSize: number;
+            lines: number | null;
+        }[];
+    });
 }
 export interface CheckedLayoutBoxContract extends Omit<LayoutBoxContract, 'overflow' | 'overflowBlock'> {
     overflow?: 'fit' | 'clip' | 'scroll';
