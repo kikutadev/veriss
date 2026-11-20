@@ -1,0 +1,116 @@
+{
+  "model": {
+    "version": 1,
+    "initial": "projects",
+    "states": [
+      "projects"
+    ],
+    "transitions": [],
+    "profiles": [
+      {
+        "id": "chromium-overlay",
+        "ua": "chromium",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      },
+      {
+        "id": "firefox-overlay",
+        "ua": "firefox",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      },
+      {
+        "id": "webkit-overlay",
+        "ua": "webkit",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      }
+    ],
+    "contracts": [
+      {
+        "id": "main-content-horizontal-fit",
+        "kind": "predicate",
+        "states": [
+          "projects"
+        ],
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "main-content",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "main-content",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "points": [
+    [
+      320,
+      568
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      768,
+      1024
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "screens": [
+    {
+      "state": "projects",
+      "wait": "#main-content",
+      "settle": 250,
+      "targets": {
+        "main-content": "#main-content"
+      }
+    }
+  ],
+  "path": "/projects.html"
+}

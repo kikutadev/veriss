@@ -127,6 +127,13 @@ states を評価する。ある要求 profile で該当状態/遷移がないと
 EvidenceIR の各 rows の rect は viewport 原点を基準とする未スクロール CSS px の
 軸平行矩形、各座標は exact rational affine の coefficient × width + heightCoefficient × height + constant。
 rows の constraints は affine >= 0、strict=true の場合 > 0。省略は全 profile。
+両軸の完全な矩形は従来通り。片軸の証拠は `axes:["inline"]` と `rect:{inlineStart,inlineSize}`、
+または `axes:["block"]` と `rect:{blockStart,blockSize}` を明示する。
+各行の軸を統一し、述語が必要とする座標を展開後の AST から求める。End は Start と Size の両方が必要。
+不足する軸、軸と行の不一致、被覆の欠落・寸法の負値・重複領域の矛盾は Unknown。
+全矩形を要求する within-viewport・stable・occupancy 等を片軸で成功にしない。
+合成による証明再利用は片軸の入力に対しては行わず、直接の厳密計算を使う。
+
 対象の存在・一意性、有限領域の完全被覆、重複領域での値の一致、非負寸法を先に検査する。
 証明対象でない別契約の Unknown を成功に変えない一方、独立した証拠による別契約の証明を妨げない。
 契約は実装の外部仮定に混入させない。被覆後に「存在する環境 e で NOT predicate(e)」を検査し、
@@ -149,7 +156,7 @@ input / fontProfile は環境識別子で、未対応の pointer/hover media 分
 
 `domGeometry` は元の DOM/CSS 解析を先に行い、完全な矩形証拠が得られない対象ごとに
 独立した幾何の自動抽出を試みる。`partial:false` で従来の全入力解析のみとする。
-`bindings: {"surface":".viewport-canvas"}` のように、一意の単純な class/id へ名前を束縛できる。
+`bindings: {"surface":".viewport-canvas"}` のように、一意の単純な class/id または対応する HTML tag へ名前を束縛できる。
 束縛を指定した対象は自動抽出経路を使う。手書き local または boxes と自動抽出を混ぜない。
 
 - 元の祖先チェーン、適用しうる規則とカスケード優先順位を維持する。
@@ -163,6 +170,14 @@ input / fontProfile は環境識別子で、未対応の pointer/hover media 分
   残った縮約文書を既存の解析器で計算し、完全な幾何を持つ LayoutIR の矩形と領域のみ relational/1 の証拠にする。
   入れ子の hidden overflow 内の直接の絶対配置は独立矩形の初期スクロール位置に限定し、可視性の保証とはしない。
   明示的な min/max/clamp 幅と auto margin の組合せは固定 px の辺を持つ通常ブロックに対応する。
+  完全な矩形を作れない通常 block flow については、横軸独立の証拠を試みる。
+  overlay scrollbar・明示 width または通常 block 幅・非置換要素・horizontal-tb/ltr を条件とし、
+  float（除外する兄弟/子孫、inline style、keyframe も検査）、aspect ratio、Flex/Grid の祖先、
+  未解決の相対配置・動的条件、外部 CSS を拒否する。
+  明示的に block 軸だけに作用する宣言と子・兄弟の内容を除外して既存エンジンで計算するが、
+  証拠に高さ・縦位置を含めない。一意な html/body に対する単一 class/id の存在を問う :has()
+  は元 DOM の成否を固定し、存在しない class/id とその否定で元と同じ詳細度を保つ。
+  DOM 状態の変化や複雑な :has() は自動証明しない。独立した縦軸の自動縮約は未対応。
   元の全ページ report、他の契約、見た目・hit-test・アクセシビリティの検査結果は変更しない。
 - 証拠は source=local-dom、仮定、被覆付き区分アフィン行または理由付き Unknown。
   この方式は万能な CSS 依存解析でなく、対応外の入力で証明を拒否するための限定プロファイルである。
@@ -180,7 +195,11 @@ JSON は model（状態・遷移・環境・契約）、points（実測点）、
 同一状態の DOM と author cascade が全領域で不変、CSSOM mutation がないことは呼び出し側の前提。
 異なる点で幾何が一致しなければその証拠を Unknown に戻す。action の実測成功を形式証明としない。
 終了コード 0=全要求 verified、1=違反/実測失敗/捕捉エラー、2=Unknown。
-座標比較は丸めの差を許容する観測照合であり、有理数モデルの厳密証明とは区別する。
+モデルとの座標照合は丸めの差を許容する。実測された契約の判定は IEEE-754 の座標値を
+厳密な有理数に変換し、述語に必要な座標だけを比較する。未証明の軸を補完せず、
+ブラウザーの観測結果と連続領域の数理証明を区別する。
+ポートフォリオ5ページ（3ブラウザー、横方向の主領域）の設定は
+`tools/ui-build-examples/portfolio-pages/` に置く。各ファイルで同じコマンドを実行できる。
 
 ### 述語 AST と合成
 
