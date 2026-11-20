@@ -31,6 +31,9 @@ const adapters = {
 };
 
 const browser = await chromium.launch();
+// The oracle's version is written into the results: text shaping differs between Chromium versions (0.4px of a line at
+// 320px between 15x and 156), which moves the breaks at the narrow widths, so results compare only on the same version.
+const browserVersion = `chromium ${browser.version()}`;
 const cases = readdirSync(join(scenario, 'cases')).sort().filter(id => !opt.only || opt.only.split(',').includes(id));
 const rows = [];
 for (const id of cases) {
@@ -143,7 +146,7 @@ for (const id of cases) {
 await browser.close();
 const tally = new Map();
 for (const r of rows) for (const u of r.notChecked ?? []) tally.set(`${u.code}: ${u.reason}`, (tally.get(`${u.code}: ${u.reason}`) ?? 0) + 1);
-const summary = {run: opt.attempt ?? 'before', cases: rows.length, breaks: rows.reduce((n, r) => n + (r.caught?.length ?? 0) + (r.missed?.length ?? 0), 0), caught: rows.reduce((n, r) => n + (r.caught?.length ?? 0), 0), missed: rows.reduce((n, r) => n + (r.missed?.length ?? 0), 0), silentMisses: rows.reduce((n, r) => n + (r.silentMissed?.length ?? 0), 0), analysisFailures: rows.filter(r => r.crashed).map(r => r.id), unconfirmedErrors: rows.reduce((n, r) => n + (r.unconfirmed?.length ?? 0), 0), environment: rows.reduce((n, r) => n + (r.environment?.length ?? 0), 0), clean: rows.filter(r => !r.skipped && !r.errors && !(r.missed?.length) && !(r.caught?.length)).map(r => r.id), skipped: rows.filter(r => r.skipped).map(r => r.id), backlog: [...tally].sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({reason, count})), rows};
+const summary = {run: opt.attempt ?? 'before', browser: browserVersion, cases: rows.length, breaks: rows.reduce((n, r) => n + (r.caught?.length ?? 0) + (r.missed?.length ?? 0), 0), caught: rows.reduce((n, r) => n + (r.caught?.length ?? 0), 0), missed: rows.reduce((n, r) => n + (r.missed?.length ?? 0), 0), silentMisses: rows.reduce((n, r) => n + (r.silentMissed?.length ?? 0), 0), analysisFailures: rows.filter(r => r.crashed).map(r => r.id), unconfirmedErrors: rows.reduce((n, r) => n + (r.unconfirmed?.length ?? 0), 0), environment: rows.reduce((n, r) => n + (r.environment?.length ?? 0), 0), clean: rows.filter(r => !r.skipped && !r.errors && !(r.missed?.length) && !(r.caught?.length)).map(r => r.id), skipped: rows.filter(r => r.skipped).map(r => r.id), backlog: [...tally].sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({reason, count})), rows};
 const out = opt.out ?? join(root, 'evals/results/component-lint', `${summary.run}.json`);
 mkdirSync(dirname(out), {recursive: true});
 writeFileSync(out, JSON.stringify(summary, null, 2) + '\n');

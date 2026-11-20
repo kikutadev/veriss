@@ -1,5 +1,6 @@
 {
   "run": "before",
+  "browser": "chromium 156.0.8078.4",
   "cases": 72,
   "breaks": 101,
   "caught": 101,
@@ -1069,7 +1070,7 @@
         }
       ],
       "caught": [
-        "page-overflow html [1x@320 1x@375 1x@357 2x@320 2x@375 2x@357 dark@320 dark@375 dark@357]"
+        "page-overflow html [1x@320 1x@357 2x@320 2x@357 dark@320 dark@357]"
       ],
       "missed": [],
       "silentMissed": [],

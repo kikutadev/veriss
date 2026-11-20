@@ -54,7 +54,7 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 ## 次にやること
 
-- **eval の基準**: `evals/results/component-lint/` は古い Chromium で記録されていて、Playwright 1.64.1 の Chromium 156 では文字の組み方の差で `before`・`run-1` が変わる(TODO.md の 0)。gate の「eval が変わらない」は、同じブラウザーで main と比べて確かめる
+- **eval の基準**: `evals/results/component-lint/` は Chromium 156(Playwright 1.64.1)で記録した。結果の `browser` が記録した版。別の版では文字の組み方の差で狭い幅の判定が動くので、gate で eval が変わったら、まず `browser` の行(gate が並べて出す)を見る
 - **M6**: `solve` の中に残る「効かない宣言」の判定(`reasons` の一覧)を `rules/css-mistakes.mjs` に移す。layout の段は「親の display」「flow の中か」を事実として出す。レイアウトが Unknown のときに検査をやり直す `walkStyles` をなくす
 - **M7**: `rules/contrast`(色の規則を `src/color/` の上に。祖先の塗りの鎖だけで判定し、後ろに重なる箱の判定だけ layout があるときに足す)
 - **M8**: a11y を DOM の規則と幾何の規則に分ける。integrity と CLS も規則にする

@@ -1,5 +1,6 @@
 {
   "run": "run-3",
+  "browser": "chromium 156.0.8078.4",
   "cases": 72,
   "breaks": 0,
   "caught": 0,
