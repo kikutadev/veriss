@@ -96,3 +96,5 @@ Additional saved evidence:
   if entries are skipped, a report contains no evidence, or the manifest
   omits an entry. It also checks the original report and certificate digests.
   `kernelize.py` accepts multiple certificate files for a single Lean module.
+
+Baseline gate (unchanged production code at 722fbfd): all six unit-test groups, four component-lint evaluations unchanged, 408/408 E2E; supervisor exit 0, 658 tracked PIDs, 0 remaining. Lean research is isolated in experiments/lean.
