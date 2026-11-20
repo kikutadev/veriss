@@ -337,3 +337,5 @@ HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラ
 - Projection Room: 0/3 形式証明、36/36観測成立、捕捉エラー0。fullscreen 疑似クラス、複合寸法式と配置依存。
 - Liquid UI Lab: 1/3 形式証明、36/36観測成立、モデル照合12/12、捕捉エラー0。role 属性照合と絶対配置・複合幅・transform 依存。
 追加9契約27環境ケース中3成立、24 Unknown。実測108/108、監督 runner残留0。旧 5d17082 の partial-geometry に差し替えた保存入力の inline projection でも Projection Room 0/3、Liquid UI Lab 1/3 で不変。属性が存在しない場合の非一致と role の限定照合を試験的に改善しても、次に複合幅の依存へ進み、成立数が増えなかったため、カバレッジだけを狙った別の小修正は採用しない。今後は明示された browser state・軸独立の lengths/positioning を既存意味論と接続する一般化を優先し、サイト専用の寸法条件を足さない。
+
+- 幅遷移・独立幾何統合 gate (19a713f): 6単体群失敗0、component-lint 4評価不変、414 E2E passed、supervisor exit=0、700 PID追跡、残留0。後続差分は文書と追加アプリの監査設定。
