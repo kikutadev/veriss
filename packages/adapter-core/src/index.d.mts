@@ -1,4 +1,4 @@
-import type { LayoutOptions, LayoutBoxContract, LayoutSummary } from '@mizchi/veriss/src/layout-contracts.d.ts';
+import type { LayoutOptions, LayoutBoxContract, LayoutSummary, LayoutTextFont } from '@mizchi/veriss/src/layout-contracts.d.ts';
 import type { TextMetrics } from '@mizchi/veriss/text';
 import type { EnvironmentProfile, Status } from '@mizchi/veriss/src/relational-contract.mjs';
 import type { Finding, SelectorWarning, LintResult } from './lint.mjs';
@@ -65,34 +65,7 @@ export interface AdapterOptions extends Partial<Omit<LayoutOptions, 'css' | 'box
     }>;
     scrollIntent?: 'css';
 }
-interface TextFontFacts {
-    path: string;
-    varied?: false;
-    placeholder?: boolean | undefined;
-    classes?: string[];
-    text?: string;
-    family?: string;
-    size?: string;
-    lineHeight?: string;
-    weight?: string;
-    style?: string;
-    whiteSpace?: string;
-    overflowWrap?: string;
-    letterSpacing?: string;
-    lang?: string;
-    textOverflow?: string;
-    overflowX?: string;
-    label?: string;
-    oneLine?: boolean;
-    maxLength?: string;
-    characters?: string;
-}
-type FontFacts = TextFontFacts | {
-    path: string;
-    varied: true;
-    placeholder?: never;
-    classes?: never;
-};
+type FontFacts = LayoutTextFont;
 interface SelectorRow {
     selector: string;
     file: string;

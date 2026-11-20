@@ -525,7 +525,47 @@ export interface LayoutGeneratedText {
     kind: 'before' | 'after';
     text: string;
 }
+export interface LayoutInlineBound extends LayoutScenarioIdentity {
+    box: string;
+    path: string;
+    range: LayoutRange;
+    heightRange?: LayoutRange;
+    region?: LayoutRegion;
+    regionConstraints?: LayoutRegion['constraints'];
+    outer: LayoutRectangle | null;
+    inner: LayoutRectangle | null;
+}
+export interface LayoutTextFontFacts {
+    path: string;
+    varied?: false;
+    placeholder?: boolean | undefined;
+    classes?: string[];
+    text?: string;
+    family?: string;
+    size?: string;
+    lineHeight?: string;
+    weight?: string;
+    style?: string;
+    whiteSpace?: string;
+    overflowWrap?: string;
+    letterSpacing?: string;
+    lang?: string;
+    textOverflow?: string;
+    overflowX?: string;
+    label?: string;
+    oneLine?: boolean;
+    maxLength?: string;
+    characters?: string;
+}
+export type LayoutTextFont = LayoutTextFontFacts | {
+    path: string;
+    varied: true;
+    placeholder?: never;
+    classes?: never;
+};
 export interface LayoutSummary {
+    inlineBounds?: LayoutInlineBound[];
+    textFonts?: LayoutTextFont[];
     pageScroll?: {
         fits: boolean;
         overflows: boolean;

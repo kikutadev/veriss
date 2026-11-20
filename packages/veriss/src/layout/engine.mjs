@@ -1,3 +1,4 @@
+import {buildLayoutReport} from './engine-report.mjs';
 import {checkQueryCoverage} from './engine-coverage.mjs';
 import {checkHoverShifts,checkAnimationShifts} from './engine-state-shifts.mjs';
 import {checkLayoutWarnings} from './engine-warnings.mjs';
@@ -13,15 +14,13 @@ import { scalar, asAffine, width, height, sum, diff, times, evaluate, affine, sa
 import { validateOptions } from './input.mjs';
 import { parseLayoutCSS, computeStyle, matches, px, setRootFontSize, setSafeArea, containsFixed, setUAProfile, viewportLength, animationsOf, transitionsOf, dependentProperty } from './css.mjs';
 import { resolveUAProfile } from './ua-profile.mjs';
-import { parseCondition, mediaFeatureEntries } from './conditions.mjs';
+import { parseCondition } from './conditions.mjs';
 import { tracks, tracks as gridTracks, place, parseAreas, expandTracks } from './grid.mjs';
 import { compileSelector, PARENT, ignoringSiblings, placeholderField, requiredCapable, optionalDivergent, optionalDivergence, asFormField, readWriteKnown, asEditable, langMatches, directionality } from './selectors.mjs';
-import { selectorUsage } from './selector-usage.mjs';
 import { droppedOf, droppedPairs, droppedValue } from './dropped.mjs';
 import { createCssMistakes } from '../rules/css-mistakes.mjs';
 // User-action and other dynamic pseudo-classes: removed from a selector to ask whether it could match in some state (F83).
 const dynamicStates = /:(?:hover|focus-visible|focus-within|focus|active|target-within|target|checked|indeterminate|visited|link|any-link|open|closed|popover-open|modal|playing|paused|user-invalid|user-valid|invalid|valid|placeholder-shown|autofill|-webkit-autofill|enabled|disabled|read-only|read-write|required|optional|default|in-range|out-of-range|empty|state\([^)]*\))(?![\w-])/gi;
-import { selectorScope } from './selector-scope.mjs';
 import { viewportFont, zoomShortfall } from './zoom-font.mjs';
 import { gapSize, trackArea, trackSlice, inheritTracks } from './subgrid.mjs';
 import { scrollbarFrames } from './scrollbars.mjs';
@@ -2355,19 +2354,5 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       analyze:copy=>analyzeBoxTree(copy, { ...options, $slideVariant: true }, scrollbarProfile, budget, inlineSheets, [], preferences)});
   }
   checkQueryCoverage({diagnostics,layoutWarnings,sourceUse,queryFacts});
-  const status = diagnostics.some(d => d.severity === 'unknown') ? 'unknown' : diagnostics.length ? 'violated' : 'verified';
-  return { version: 1, ok: status === 'verified', status, component,
-    scope: { ...(options.mediaFeatures!==undefined?{mediaFeatures:Object.fromEntries(mediaFeatureEntries(options.mediaFeatures))}:{}), axis: block ? 'both' : 'inline', viewport: { ...projection(initial, 'x'), ...(block ? { height: options.viewport.height ? projection(initial, 'y') : null } : {}) }, hostInset: options.hostInset ?? 0, ...(block ? { hostBlockInset: options.hostBlockInset ?? 0 } : {}), closedCSS: true, browserRounding: false, blockSizing: block },
-    assumptions: [...(mediaFeatureEntries(options.mediaFeatures).map(([k,v])=>'CSS media environment is explicitly fixed: '+k+': '+v+'.')), ...(options.scripting==='enabled' ? ['The supplied DOM is a static snapshot in a scripting-enabled browser; script-driven mutations and disabled scripting are not checked.'] : []), 'The supplied CSS is the complete author cascade and the selected root has no external query-container ancestors; host provides the declared containing sizes without unmodeled scrollbar gutters.',
-      'Each minInlineSize/minBlockSize is a trusted sufficient content-size bound; intrinsicBlockSize is a trusted exact auto-height profile for the permitted content/fonts.',
-      'Only horizontal-tb/ltr in-flow and explicitly sized local absolute geometry is checked; ink overflow and browser pixel rounding are outside the contract.',
-      ...(rules.some(rule=>rule.declarations.some(d=>d.expression || d.pending)) ? ['Custom properties are unregistered; unknown external inheritance and cycles through fallback references prevent verification when used by geometry.'] : [])],
-    styleSources: styleSources.map(({ kind, file }) => ({ kind, file })), diagnostics, policies, checks, sizes, queries, subgrids,
-    elements:boxes.map(({path,tag,id,classes,owner,targets,targetIdentity})=>({path,tag,...(id ? {id} : {}),classes,owner,...(targets?.length ? {targets} : {}),...(targetIdentity ? {targetIdentity} : {})})),
-    ...(boxes.some(box=>box.layoutContracts?.length) ? {layoutBindings:boxes.flatMap(box=>(box.layoutContracts ?? []).map(declaration=>({path:box.path,declaration})))} : {}),
-    ...(geometry.some(row => row.bounds) ? { inlineBounds: geometry.filter(row => row.bounds).flatMap(row => row.bounds.map(piece => ({ box: row.box.label, path: row.path, ...ranges(piece.region), ...(block ? { regionConstraints: serialize(piece.region).constraints } : {}),
-      ...Object.fromEntries(['outer', 'inner'].map(key => [key, piece[key] ? { inlineStart: affine(piece[key].origin.inline), blockStart: affine(piece[key].origin.block), inlineSize: affine(piece[key].inline), blockSize: affine(piece[key].block) } : null])) }))) } : {}),
-    ...(scrollbars.length ? {scrollbars} : {}), ...(invalidSubstitutions.length ? {invalidSubstitutions} : {}), ...(layoutWarnings.length ? { layoutWarnings } : {}), ...(pageScroll ? { pageScroll } : {}), ...(transitionSizes.length ? { transitionSizes } : {}), ...(options.reportTextFonts ? { textFonts: [...textFonts].map(([path, facts]) => facts === 'varied' ? { path, varied: true } : { path, ...facts }) } : {}), ...((options.selectors || options.scope) && !untransformed && hovered === undefined && !options.$animationFrame && !options.$slideVariant ? { selectors: (() => { const usage = options.selectors ? selectorUsage(rules, boxes) : { rows: [], warnings: [] }; return options.scope ? { ...usage, warnings: [...usage.warnings, ...selectorScope(rules, boxes, options.scope).warnings] } : usage; })() } : {}), ...(generatedTexts.length ? { generatedText: generatedTexts } : {}),
-    ...(options.accessibility ? { accessibility: { rules: accessibilityRules.filter(accessibilityProfiles[options.accessibility.profile ?? 'all']), profile: options.accessibility.profile ?? 'all', contrast: options.accessibility.contrast ?? 'AA', targetLevel: options.accessibility.targetLevel ?? 'AA', targetSize: options.accessibility.targetSize ?? (options.accessibility.targetLevel === 'AAA' ? 44 : 24), warnings: accessibilityWarnings, exempted: accessibilityExempted, notes: accessibilityNotes } } : {}),
-    ...(options.integrity ? { integrity: { rules: ['page-overflow-x', 'container-protrusion', 'text-collision', 'target-undersized', 'clipped-content', 'nested-scroll'], targetSize: options.integrity.targetSize ?? 24, protrusion: options.integrity.protrusion ?? 'all', warnings: integrityWarnings, exempted: integrityExempted } } : {}) };
+  return buildLayoutReport({component,block,options,initial,rules,styleSources,boxes,geometry,ranges,diagnostics,policies,checks,sizes,queries,subgrids,scrollbars,invalidSubstitutions,layoutWarnings,pageScroll,transitionSizes,textFonts,untransformed,hovered,generatedTexts,accessibilityWarnings,accessibilityExempted,accessibilityNotes,integrityWarnings,integrityExempted});
 }
