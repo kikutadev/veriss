@@ -52,6 +52,28 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
                 readonly heightCoefficient?: string;
             };
         };
+        readonly layoutRect?: {
+            readonly inlineStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly inlineSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+        } | null;
         readonly position?: "static" | "relative" | "absolute";
         readonly origin?: {
             readonly inline: {
@@ -96,28 +118,6 @@ export declare function localLayout(implementation: LayoutIR, boundaries: readon
             readonly minExact: string;
             readonly maxExact: string;
         } | undefined;
-        readonly layoutRect?: {
-            readonly inlineStart: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-            readonly blockStart: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-            readonly inlineSize: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-            readonly blockSize: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-        } | null;
         readonly region?: {
             readonly vertices: readonly {
                 readonly width: string;
@@ -1101,6 +1101,28 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
                 readonly heightCoefficient?: string;
             };
         };
+        readonly layoutRect?: {
+            readonly inlineStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockStart: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly inlineSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+            readonly blockSize: {
+                readonly coefficient: string;
+                readonly constant: string;
+                readonly heightCoefficient?: string;
+            };
+        } | null;
         readonly position?: "static" | "relative" | "absolute";
         readonly origin?: {
             readonly inline: {
@@ -1145,28 +1167,6 @@ export declare function scopeLayout(implementation: LayoutIR, contract: Contract
             readonly minExact: string;
             readonly maxExact: string;
         } | undefined;
-        readonly layoutRect?: {
-            readonly inlineStart: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-            readonly blockStart: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-            readonly inlineSize: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-            readonly blockSize: {
-                readonly coefficient: string;
-                readonly constant: string;
-                readonly heightCoefficient?: string;
-            };
-        } | null;
         readonly region?: {
             readonly vertices: readonly {
                 readonly width: string;

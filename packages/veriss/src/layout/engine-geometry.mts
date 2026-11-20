@@ -4,7 +4,7 @@ import { q, add, sub, mul, cmp, div, number } from './linear.mjs';
 import type { Rational } from './linear.mjs';
 import { scalar, width, height, sum, diff, times, evaluate, partition } from './region.mjs';
 import type { Affine2, Point, Region } from './region.mjs';
-import type { LayoutAffine, LayoutRectangle } from '../layout-contracts.d.ts';
+import type { LayoutAffine, LayoutRectangle, LayoutRange, LayoutRegion } from '../layout-contracts.d.ts';
 import { px } from './css.mjs';
 import { intersect } from './integrity.mjs';
 
@@ -105,17 +105,36 @@ export function lengthPieces(value: unknown, parent: Affine2 | null | undefined,
     return [...p.yes.map(r => ({ region: r, value: piece.value })), ...p.no.map(r => ({ region: r, value: scalar(zero) }))];
   });
 }
+// A missing untransformed rect is different from an explicit null: the latter
+// means we attempted to resolve it and failed. Never substitute painted geometry.
+export const layoutRectangle = (row: Pick<ShiftRow,'layoutRect'|'rect'>) => row.layoutRect !== undefined ? row.layoutRect : row.rect;
+interface RegionRow extends ShiftRow {range:LayoutRange;heightRange?:LayoutRange;region?:LayoutRegion}
+export function matchLayoutRectangles(rows:readonly RegionRow[], untransformed:readonly RegionRow[], complete:boolean): (LayoutRectangle|null)[] {
+  const key=(row:RegionRow)=>JSON.stringify([row.path,row.range,row.heightRange,row.region?.vertices]);
+  const byKey=new Map<string,RegionRow|null>();
+  if(complete)for(const row of untransformed)byKey.set(key(row),byKey.has(key(row))?null:row);
+  return rows.map(row=>byKey.get(key(row))?.rect??null);
+}
+const rational=(v:string|undefined):Rational=>{const [n,d='1']=String(v??'0').split('/');return div(q(n!),q(d));};
+const exactAt=(a:LayoutAffine,p:Point):Rational=>add(add(rational(a.constant),mul(rational(a.coefficient),p.x)),mul(rational(a.heightCoefficient),p.y));
+
+/** First counterexample in the established axis/vertex order, using exact
+ * arithmetic. The caller decides how missing geometry is reported. */
+export function firstStartMove(before:LayoutRectangle, after:LayoutRectangle, shared:Region) {
+  for(const field of ['inlineStart','blockStart'] as const)for(const v of shared.vertices){
+    const delta=sub(exactAt(after[field],v),exactAt(before[field],v));
+    if(cmp(delta,zero)!==0)return {field,v,delta};
+  }
+  return undefined;
+}
 // Where a box's layout start differs between two layouts of the same page: rows of the same path are compared on
 // the intersection of their condition regions (and `within`), at its vertices (an affine difference vanishes on a
 // convex region exactly when it vanishes there). Returns the first change per path, or null when a compared row has
 // no layout rectangle.
 export function layoutStartMoves<Row extends ShiftRow>(before: readonly Row[], after: readonly Row[], keep: (row: Row) => boolean = () => true, within: readonly Region[] | null = null):
   { undecided: Row; moves?: never } | { undecided?: never; moves: { row: Row; shared: Region; field: 'inlineStart' | 'blockStart'; v: Point; delta: Rational }[] } {
-  const rect = (row: ShiftRow) => row.layoutRect !== undefined ? row.layoutRect : row.rect;
-  const r = (v: string | undefined) => { const [n, d = '1'] = String(v ?? '0').split('/'); return div(q(n!), q(d)); };
-  const at = (a: LayoutAffine, w: Rational, h: Rational) => add(add(r(a.constant), mul(r(a.coefficient), w)), mul(r(a.heightCoefficient), h));
   const rows = before.filter(keep), others = after.filter(keep);
-  const undecided = [...rows, ...others].find(row => !rect(row) || !row.$shown?.region);
+  const undecided = [...rows, ...others].find(row => !layoutRectangle(row) || !row.$shown?.region);
   if (undecided) return { undecided };
   const moves: { row: Row; shared: Region; field: "inlineStart" | "blockStart"; v: Point; delta: Rational }[] = [];
   for (const row of rows) for (const other of others.filter(o => o.path === row.path)) {
@@ -123,7 +142,7 @@ export function layoutStartMoves<Row extends ShiftRow>(before: readonly Row[], a
     for (const limit of within ?? [null]) {
       const both: Region | null = intersect(row.$shown!.region, other.$shown!.region), shared: Region | null = both && (limit ? intersect(both, limit) : both);
       if (!shared) continue;
-      const change = (['inlineStart', 'blockStart'] as const).flatMap(field => shared.vertices.map(v => ({ field, v, delta: sub(at(rect(other)![field], v.x, v.y), at(rect(row)![field], v.x, v.y)) })).filter(c => cmp(c.delta, zero) !== 0).slice(0, 1))[0];
+      const change = firstStartMove(layoutRectangle(row)!, layoutRectangle(other)!, shared);
       if (change) { moves.push({ row, shared, ...change }); break; }
     }
   }
@@ -135,13 +154,12 @@ export function layoutStartMoves<Row extends ShiftRow>(before: readonly Row[], a
 // is counted, a superset of the boxes Chromium counts (those it paints), so both factors only grow: the result bounds
 // the browser's score of that frame from above (initial scroll position).
 export function shiftScoreBound<Row extends ShiftRow>(before: readonly Row[], after: readonly Row[], keep: (row: Row) => boolean, p: Point): number | null {
-  const rect = (row: ShiftRow) => row.layoutRect !== undefined ? row.layoutRect : row.rect;
   const r = (v: string | undefined) => { const [n, d = '1'] = String(v ?? '0').split('/'); return Number(n) / Number(d); };
   const W = number(p.x), H = number(p.y);
   if (!(W > 0 && H > 0)) return null;
   const at = (a: LayoutAffine) => r(a.constant) + r(a.coefficient) * W + r(a.heightCoefficient) * H;
   const inside = (row: ShiftRow) => row.$shown?.region && row.$shown.region.constraints.every(c => cmp(evaluate(c.slack, p), zero) >= 0);
-  const box = (row: ShiftRow) => { const b = rect(row); return b && { x: at(b.inlineStart), y: at(b.blockStart), w: at(b.inlineSize), h: at(b.blockSize) }; };
+  const box = (row: ShiftRow) => { const b = layoutRectangle(row); return b && { x: at(b.inlineStart), y: at(b.blockStart), w: at(b.inlineSize), h: at(b.blockSize) }; };
   const pieces: [number, number, number, number][] = []; let distance = 0;
   for (const row of before.filter(row => keep(row) && inside(row))) {
     const other = after.find(o => o.path === row.path && keep(o) && inside(o));
@@ -165,13 +183,12 @@ export function shiftScoreBound<Row extends ShiftRow>(before: readonly Row[], af
 // unstable area lies in the hull of a moved box's two rectangles, and the frames' largest moves add up to at most the
 // sum of every moved box's whole move. Returns {impact, distance} fractions, or null without layout rectangles.
 export function sweptBound<Row extends ShiftRow>(before: readonly Row[], after: readonly Row[], p: Point): {impact: number; distance: number} | null {
-  const rect = (row: ShiftRow) => row.layoutRect !== undefined ? row.layoutRect : row.rect;
   const r = (v: string | undefined) => { const [n, d = '1'] = String(v ?? '0').split('/'); return Number(n) / Number(d); };
   const W = number(p.x), H = number(p.y);
   if (!(W > 0 && H > 0)) return null;
   const at = (a: LayoutAffine) => r(a.constant) + r(a.coefficient) * W + r(a.heightCoefficient) * H;
   const inside = (row: ShiftRow) => row.$shown?.region && row.$shown.region.constraints.every(c => cmp(evaluate(c.slack, p), zero) >= 0);
-  const box = (row: ShiftRow) => { const b = rect(row); return b && { x: at(b.inlineStart), y: at(b.blockStart), w: at(b.inlineSize), h: at(b.blockSize) }; };
+  const box = (row: ShiftRow) => { const b = layoutRectangle(row); return b && { x: at(b.inlineStart), y: at(b.blockStart), w: at(b.inlineSize), h: at(b.blockSize) }; };
   const pieces: [number, number, number, number][] = []; let moves = 0;
   for (const row of before.filter(inside)) {
     const other = after.find(o => o.path === row.path && inside(o));

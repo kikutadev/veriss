@@ -1,6 +1,6 @@
 import type { Rational } from './linear.mjs';
 import type { Affine2, Point, Region } from './region.mjs';
-import type { LayoutRectangle } from '../layout-contracts.d.ts';
+import type { LayoutRectangle, LayoutRange, LayoutRegion } from '../layout-contracts.d.ts';
 interface FontStyle {
     'font-size'?: string;
 }
@@ -28,6 +28,20 @@ export declare function lengthPieces(value: unknown, parent: Affine2 | null | un
     region: Region | null;
     value: Affine2;
 }[];
+export declare const layoutRectangle: (row: Pick<ShiftRow, "layoutRect" | "rect">) => LayoutRectangle | null | undefined;
+interface RegionRow extends ShiftRow {
+    range: LayoutRange;
+    heightRange?: LayoutRange;
+    region?: LayoutRegion;
+}
+export declare function matchLayoutRectangles(rows: readonly RegionRow[], untransformed: readonly RegionRow[], complete: boolean): (LayoutRectangle | null)[];
+/** First counterexample in the established axis/vertex order, using exact
+ * arithmetic. The caller decides how missing geometry is reported. */
+export declare function firstStartMove(before: LayoutRectangle, after: LayoutRectangle, shared: Region): {
+    field: "inlineStart" | "blockStart";
+    v: Point;
+    delta: Rational;
+} | undefined;
 export declare function layoutStartMoves<Row extends ShiftRow>(before: readonly Row[], after: readonly Row[], keep?: (row: Row) => boolean, within?: readonly Region[] | null): {
     undecided: Row;
     moves?: never;

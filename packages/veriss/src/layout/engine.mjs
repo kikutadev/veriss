@@ -40,7 +40,7 @@ import { createIntrinsicSolver, intrinsicBlock, measureLegend } from './engine-i
 import { tableAsGrid as tableAsGridImpl, tablePlacement } from './engine-table.mjs';
 import { affineOf, linearOf, mapper, scaled, translated as translatedWithRoot, relativelyOffset, offset } from './engine-transforms.mjs';
 import { createTrackSolver, scaleGap, constantLess, maximumConstant } from './engine-tracks.mjs';
-import { unitContext, lengthPieces, length, layoutStartMoves, shiftScoreBound, sweptBound } from './engine-geometry.mjs';
+import { unitContext, lengthPieces, length, layoutStartMoves, shiftScoreBound, sweptBound, layoutRectangle, firstStartMove, matchLayoutRectangles } from './engine-geometry.mjs';
 let uaEngine; // the engine of the ua option's profile (set per analysis, like the UA profile in css.mjs)
 
 // `preferences` (internal) names non-default user preferences, e.g. 'prefers-color-scheme:dark'.
@@ -2357,17 +2357,15 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         for (const d of focused.diagnostics.filter(d => d.path === entry.box.path && geometricFocus.has(d.code))) diagnostics.push({ ...d, message: `${d.message} (in its focused layout)`, focusedLayout: true });
         // Boxes the focused layout moves (a :focus border or padding that changes size): Layout Instability excuses
         // shifts right after a key press, but the content still jumps under the keyboard user. Compared like hover.
-        const rect = row => row.layoutRect !== undefined ? row.layoutRect : row.rect;
-        const r = v => { const [n, d = '1'] = String(v ?? '0').split('/'); return div(q(n), q(d)); };
-        const at = (a, w, h) => add(add(r(a.constant), mul(r(a.coefficient), w)), mul(r(a.heightCoefficient), h));
+
         for (const row of sizes) {
-          if (layoutWarnings.some(w => w.code === 'W_LAYOUT_FOCUS_SHIFT' && w.path === row.path && w.focusedPath === entry.box.path) || !rect(row) || !row.$shown?.region) continue;
-          for (const other of focused.sizes.filter(o => o.path === row.path && rect(o) && o.$shown?.region)) {
+          if (layoutWarnings.some(w => w.code === 'W_LAYOUT_FOCUS_SHIFT' && w.path === row.path && w.focusedPath === entry.box.path) || !layoutRectangle(row) || !row.$shown?.region) continue;
+          for (const other of focused.sizes.filter(o => o.path === row.path && layoutRectangle(o) && o.$shown?.region)) {
             const shared = intersect(row.$shown.region, other.$shown.region);
             if (!shared) continue;
-            const moved = ['inlineStart', 'blockStart'].flatMap(field => shared.vertices.map(v => ({ field, v, delta: sub(at(rect(other)[field], v.x, v.y), at(rect(row)[field], v.x, v.y)) })).filter(c => cmp(c.delta, zero) !== 0).slice(0, 1));
-            if (!moved.length) continue;
-            const { field, v, delta } = moved[0];
+            const moved = firstStartMove(layoutRectangle(row), layoutRectangle(other), shared);
+            if (!moved) continue;
+            const { field, v, delta } = moved;
             layoutWarnings.push({ code: 'W_LAYOUT_FOCUS_SHIFT', severity: 'warning', box: row.box, path: row.path, focused: entry.box.label, focusedPath: entry.box.path, field, delta: exact(delta),
               message: `Focusing ${entry.box.label} moves ${row.box} (${field} by ${number(delta)}px at viewport ${number(v.x)}px${block ? ` × ${number(v.y)}px` : ''}): the content jumps as the keyboard user tabs. Draw the focus with outline or box-shadow, or keep the size (border-color instead of border-width)` });
             break;
@@ -2430,11 +2428,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // re-layout, matched by path and condition region; a row without a match gets layoutRect null (not decided).
   if (pristine && sawTransform && !diagnostics.some(d => d.severity === 'unknown')) {
     const plain = analyzeBoxTree(pristine, options, scrollbarProfile, budget, inlineSheets, [], [...preferences, 'untransformed']);
-    // Rows correspond by path and condition polygon (its vertices; constraints may repeat redundant bounds).
-    const key = row => JSON.stringify([row.path, row.range, row.heightRange, row.region?.vertices]);
-    const byKey = new Map();
-    if (plain.status !== 'unknown') for (const row of plain.sizes) byKey.set(key(row), byKey.has(key(row)) ? null : row);
-    for (const row of sizes) { const match = byKey.get(key(row)); row.layoutRect = match?.rect ?? null; }
+    const matches = matchLayoutRectangles(sizes, plain.sizes, plain.status !== 'unknown');
+    sizes.forEach((row, i) => { row.layoutRect = matches[i]; });
   }
   // Layout shifts from :hover rules that change layout: each box such a rule matches is hovered in a re-layout, and
   // every box's layout start position (inlineStart, blockStart) is compared on the same condition region. An affine
@@ -2442,25 +2437,21 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   if (pristine && hovered === undefined && !options.$animationFrame && !options.$slideVariant && rules.some(rule => rule.hoverLayout) && !diagnostics.some(d => d.severity === 'unknown')) {
     const hoverRules = rules.filter(rule => rule.hoverLayout);
     const targets = []; (function walk(box) { if (hoverRules.some(rule => rule.selectors.some(selector => matches(selector, box, new Set(['hover']))))) targets.push(box); for (const child of box.children ?? []) walk(child); })(root);
-    // Rows correspond by path and condition polygon (its vertices; constraints may repeat redundant bounds).
-    const key = row => JSON.stringify([row.path, row.range, row.heightRange, row.region?.vertices]);
-    const rect = row => row.layoutRect !== undefined ? row.layoutRect : row.rect;
-    const r = v => { const [n, d = '1'] = String(v ?? '0').split('/'); return div(q(n), q(d)); };
-    const at = (a, w, h) => add(add(r(a.constant), mul(r(a.coefficient), w)), mul(r(a.heightCoefficient), h));
+
     for (const target of targets.slice(0, 64)) {
       const hover = analyzeBoxTree(pristine, options, scrollbarProfile, budget, inlineSheets, [], [`hover-at:${target.path}`]);
       if (hover.status === 'unknown') { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: its hovered layout is not decided (${hover.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: target.label, path: target.path }); continue; }
       // Each base row against each hovered row of the same box, on the intersection of their condition regions.
-      const undecided = [...sizes, ...hover.sizes].find(row => !rect(row) || !row.$shown?.region);
+      const undecided = [...sizes, ...hover.sizes].find(row => !layoutRectangle(row) || !row.$shown?.region);
       if (undecided) { diagnostics.push({ code: 'U_LAYOUT_HOVER_SHIFT', severity: 'unknown', message: `${target.label}: the hovered layout of ${undecided.box} cannot be compared (it has no layout rectangle)`, box: target.label, path: target.path }); continue; }
       const reported = new Set();
       for (const row of sizes) for (const other of hover.sizes.filter(o => o.path === row.path)) {
         const shared = intersect(row.$shown.region, other.$shown.region);
         if (!shared || reported.has(row.path)) continue;
-        const moved = ['inlineStart', 'blockStart'].flatMap(field => shared.vertices.map(v => ({ field, v, delta: sub(at(rect(other)[field], v.x, v.y), at(rect(row)[field], v.x, v.y)) })).filter(c => cmp(c.delta, zero) !== 0).slice(0, 1));
-        if (!moved.length) continue;
+        const moved = firstStartMove(layoutRectangle(row), layoutRectangle(other), shared);
+        if (!moved) continue;
         reported.add(row.path);
-        const { field, v, delta } = moved[0];
+        const { field, v, delta } = moved;
         const scoreBound = block ? shiftScoreBound(sizes, hover.sizes, () => true, v) : null;
         diagnostics.push({ code: 'E_LAYOUT_HOVER_SHIFT', severity: 'error', box: row.box, path: row.path, hovered: target.label, hoveredPath: target.path, field, delta: exact(delta), ...(scoreBound !== null ? { scoreBound } : {}),
           message: `Hovering ${target.label} moves ${row.box} (${field} by ${number(delta)}px at viewport ${number(v.x)}px${block ? ` × ${number(v.y)}px` : ''}): a layout shift without an excusing input. Change paint or transform on :hover, or reserve the space`, ...ranges(shared) });
@@ -2472,9 +2463,8 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
   // moves where the animation runs is reported. Frames between keyframes are not enumerated: a shift at a keyframe
   // is a shift every iteration (an infinite animation shifts every frame; docs/cls-evaluation.md).
   if (pristine && hovered === undefined && !options.$animationFrame && !options.$slideVariant && animated.length && !diagnostics.some(d => d.severity === 'unknown')) {
-    const r = v => { const [n, d = '1'] = String(v ?? '0').split('/'); return div(q(n), q(d)); };
-    const at = (a, w, h) => add(add(r(a.constant), mul(r(a.coefficient), w)), mul(r(a.heightCoefficient), h));
-    const rect = row => row.layoutRect !== undefined ? row.layoutRect : row.rect;
+
+
     const seen = new Set();
     for (const entry of animated) {
       const id = `${entry.box.path}|${entry.name}`;
@@ -2530,14 +2520,14 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         const moved = analyzeBoxTree(pristine, { ...options, $animationFrame: { path: entry.box.path, css: frame.layout } }, scrollbarProfile, budget, inlineSheets, [], preferences);
         if (moved.status === 'unknown') { diagnostics.push({ code: 'U_LAYOUT_ANIMATION_SHIFT', severity: 'unknown', message: `${entry.box.label}: the layout at keyframe ${label} is not decided (${moved.diagnostics.find(d => d.severity === 'unknown')?.message ?? 'unknown'})`, box: entry.box.label, path: entry.box.path }); continue; }
         if (moved.status !== 'unknown') states.push({ offset: frame.offset, sizes: moved.sizes }); else complete = false;
-        const undecided = [...sizes, ...moved.sizes].find(row => !rect(row) || !row.$shown?.region);
+        const undecided = [...sizes, ...moved.sizes].find(row => !layoutRectangle(row) || !row.$shown?.region);
         if (undecided) { diagnostics.push({ code: 'U_LAYOUT_ANIMATION_SHIFT', severity: 'unknown', message: `${entry.box.label}: the layout of ${undecided.box} at keyframe ${label} cannot be compared (it has no layout rectangle)`, box: entry.box.label, path: entry.box.path }); continue; }
         for (const row of sizes) for (const other of moved.sizes.filter(o => o.path === row.path)) {
           if (reported.has(row.path)) continue;
           for (const running of where) {
             const both = intersect(row.$shown.region, other.$shown.region), shared = both && intersect(both, running);
             if (!shared) continue;
-            const change = ['inlineStart', 'blockStart'].flatMap(field => shared.vertices.map(v => ({ field, v, delta: sub(at(rect(other)[field], v.x, v.y), at(rect(row)[field], v.x, v.y)) })).filter(c => cmp(c.delta, zero) !== 0).slice(0, 1))[0];
+            const change = firstStartMove(layoutRectangle(row), layoutRectangle(other), shared);
             if (!change) continue;
             reported.add(row.path);
             diagnostics.push({ code: 'E_LAYOUT_ANIMATION_SHIFT', severity: 'error', box: row.box, path: row.path, animated: entry.box.label, animatedPath: entry.box.path, animation: entry.name, offset: frame.offset, field: change.field, delta: exact(change.delta),

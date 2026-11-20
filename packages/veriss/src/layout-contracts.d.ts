@@ -442,6 +442,8 @@ export interface LayoutElement extends LayoutScenarioIdentity {
 export interface LayoutPosition {
     /** Unscrolled border rectangle relative to the analyzed root border origin. */
     rect?: LayoutRectangle;
+    /** Untransformed layout rectangle; null means it could not be established. */
+    layoutRect?: LayoutRectangle | null;
     position?: 'static' | 'relative' | 'absolute';
     /** Local border-box origin in the actual containing block's padding box. */
     origin?: {
