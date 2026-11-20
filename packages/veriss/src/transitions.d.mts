@@ -73,7 +73,7 @@ export interface NoShiftProof {
     change?: NoShiftChange;
 }
 /** Intent only: exact border-rectangle equality for explicitly matched targets. */
-export declare function createNoShiftContract(input: unknown): NoShiftContract;
+export declare function createNoShiftContract(input: NoShiftInput): NoShiftContract;
 /** Extract both states before consulting any target contract. */
 export declare function createTransitionIR(input: {
     before: LayoutSummary;

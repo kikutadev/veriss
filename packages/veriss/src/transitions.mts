@@ -1,4 +1,4 @@
-import type {LayoutSummary,LayoutRectangle,LayoutAffine,LayoutDiagnostic,LayoutRange,LayoutCSSOrigin} from './layout-contracts.d.ts';
+import type {LayoutSummary,LayoutRectangle,LayoutAffine,LayoutDiagnostic,LayoutRange} from './layout-contracts.d.ts';
 import type {LayoutIR,LayoutIRBox} from './layout-contract.mjs';
 import type {LayoutModel,LayoutProof,LayoutSolverAPI,LayoutObligation} from './layout-z3.mjs';
 type Frozen<T>=T extends object ? {readonly [K in keyof T]:Frozen<T[K]>} : T;
@@ -30,7 +30,7 @@ export interface NoShiftProof {
   coverage:LayoutProof;proof:LayoutProof;change?:NoShiftChange;
 }
 // Endpoint relations over extracted CSS geometry, independent of UI syntax.
-import {createLayoutIR} from './layout-contract.mjs';
+import {createLayoutIR,copyDiagnostic,solverModel} from './layout-contract.mjs';
 import {verifyLayoutModel} from './layout-z3.mjs';
 import {affine,and,or,interval,region as encodeRegion,rational} from './layout/smt.mjs';
 import {sub,number,exact} from './layout/linear.mjs';
@@ -41,24 +41,6 @@ import {obligationModel} from './layout/model.mjs';
 function region(row:LayoutIRBox):string {
   return encodeRegion({range:row.range,...(row.heightRange ? {heightRange:row.heightRange} : {}),
     ...(row.region ? {region:{constraints:[...row.region.constraints]}} : {})});
-}
-function copyDiagnostic(d:Frozen<LayoutDiagnostic>):LayoutDiagnostic {
-  const {region,related,conflict,explanation,...rest}=d;
-  const facts=(side:NonNullable<typeof explanation>['available'])=>side.facts.map(f=>{
-    if(!('origin' in f))return {...f};
-    const {overridden,dormant,...base}=f;
-    const origin=({conditions,...css}:Frozen<LayoutCSSOrigin>):LayoutCSSOrigin=>({...css,...(conditions ? {conditions:[...conditions]} : {})});
-    const origins=(entries:NonNullable<typeof overridden>)=>entries.map(({css})=>({css:origin(css)}));
-    const extra={...(overridden ? {overridden:origins(overridden)} : {}),...(dormant ? {dormant:origins(dormant)} : {})};
-    if(base.origin==='author')return {...base,css:origin(base.css),...extra};
-    return {...base,...extra};
-  });
-  return {...rest,...(region ? {region:{vertices:[...region.vertices],constraints:[...region.constraints]}} : {}),
-    ...(related ? {related:[...related]} : {}),...(conflict ? {conflict:{properties:[...conflict.properties],longhands:[...conflict.longhands]}} : {}),
-    ...(explanation ? {explanation:{version:1,available:{facts:facts(explanation.available)},required:{facts:facts(explanation.required)}}} : {})};
-}
-function solverModel(model:Frozen<LayoutModel>):LayoutModel<Pick<LayoutSummary['scope'],'axis'>> {
-  return {...model,assumptions:[...model.assumptions],diagnostics:model.diagnostics.map(copyDiagnostic),obligations:[...model.obligations]};
 }
 const fields:readonly RectangleField[]=['inlineStart','blockStart','inlineSize','blockSize'];
 // The layout box: a transform moves only the painted box, and a layout shift ignores it (the Layout Instability
@@ -72,6 +54,7 @@ function box(row:LayoutIRBox):Frozen<LayoutRectangle>|undefined {
   return {inlineStart:value.inlineStart,blockStart:value.blockStart,inlineSize:value.inlineSize,blockSize:value.blockSize};
 }
 const codes={inlineStart:'E_NOSHIFT_INLINE_START',blockStart:'E_NOSHIFT_BLOCK_START',inlineSize:'E_NOSHIFT_INLINE_SIZE',blockSize:'E_NOSHIFT_BLOCK_SIZE'};
+const isArray=(v:unknown):boolean=>Array.isArray(v);
 const object=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>value!==null && typeof value==='object' && !Array.isArray(value) && Object.keys(value).every(key=>keys.includes(key));
 const identifier=(value:unknown):value is string=>typeof value==='string' && /^[A-Za-z_][\w.-]{0,127}$/.test(value);
 const path=(value:unknown):value is string=>typeof value==='string' && value.length>0 && value.length<=4096 && !/[\x00-\x1f]/.test(value);
@@ -85,10 +68,11 @@ const snapshot=<T,>(value:T):T=>freeze(structuredClone(value));
 const unknown=(code:string,message:string):LayoutDiagnostic=>({code,severity:'unknown',message});
 
 /** Intent only: exact border-rectangle equality for explicitly matched targets. */
+export function createNoShiftContract(input:NoShiftInput):NoShiftContract;
 export function createNoShiftContract(input:unknown):NoShiftContract {
   if(!object(input,['name','targets']) || !identifier(input.name) || !Array.isArray(input.targets) || !input.targets.length || input.targets.length>256) throw new TypeError('Invalid noshift contract');
   const names=new Set(),before=new Set(),after=new Set();
-  const targets=input.targets.map((target:unknown)=>{
+  const targets=Array.from(input.targets,(target:unknown)=>{
     if(!object(target,['name','before','after']) || !identifier(target.name)) throw new TypeError('Invalid noshift target');
     const result={name:target.name,before:reference(target.before),after:reference(target.after)};
     const left=JSON.stringify(result.before),right=JSON.stringify(result.after);
@@ -122,10 +106,10 @@ export function createTransitionObligation(contract:NoShiftContract,transition:T
   if(!object(contract,['version','kind','profile','name','targets']) || contract.version!==1 || contract.kind!=='noshift-contract' || contract.profile!=='noshift/1') throw new TypeError('Invalid NoShiftContract');
   contract=createNoShiftContract({name:contract.name,targets:contract.targets});
   if(!object(transition,['version','kind','before','after','complete','diagnostics','assumptions']) || transition.version!==1 || transition.kind!=='transition' ||
-    typeof transition.complete!=='boolean' || !Array.isArray(transition.diagnostics) || !Array.isArray(transition.assumptions)) throw new TypeError('Invalid TransitionIR');
+    typeof transition.complete!=='boolean' || !isArray(transition.diagnostics) || !isArray(transition.assumptions)) throw new TypeError('Invalid TransitionIR');
   const diagnostics=transition.diagnostics.map(copyDiagnostic),{before,after}=transition;
   for(const state of [before,after]) {
-    if(state?.kind!=='layout' || !Array.isArray(state.boxes) || !Array.isArray(state.elements) || state.boxes.length+state.elements.length>32768) throw new TypeError('Invalid transition layout facts');
+    if(state?.kind!=='layout' || !isArray(state.boxes) || !isArray(state.elements) || state.boxes.length+state.elements.length>32768) throw new TypeError('Invalid transition layout facts');
   }
   const scope=before.scope;
   const domain=and([...interval(scope.viewport,'width'),...(scope.viewport.height ? interval(scope.viewport.height,'height') : ['(= height 0)'])]);
