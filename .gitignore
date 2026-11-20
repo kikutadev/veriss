@@ -16,3 +16,4 @@ packages/veriss/text-metrics/_build/js/release/build/*
 !packages/veriss/text-metrics/_build/js/release/build/font_ffi
 packages/veriss/text-metrics/_build/js/release/build/font_ffi/*
 !packages/veriss/text-metrics/_build/js/release/build/font_ffi/font_ffi.js
+_site/

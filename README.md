@@ -4,6 +4,8 @@ Static verification of responsive CSS over the DOM: layout (every viewport width
 
 Unknown is never turned into success: what the model does not cover is reported as Unknown with its reason.
 
+**What it checks**: [the rule catalog](https://mizchi.github.io/veriss/) (Japanese) groups every check by role, says what can and cannot be checked, and shows each role with a detected (NG) and a corrected (OK) example as veriss judges them.
+
 ## Packages
 
 | Package | Directory | |
@@ -36,6 +38,7 @@ pnpm test:e2e -- --project chromium   # browser checks (also firefox, webkit)
 
 ## Docs
 
+- [Rule catalog](https://mizchi.github.io/veriss/) (`docs/rule-catalog.md`) — the checks by role, with NG / OK examples
 - `docs/static-check-checklist.md` — every CSS×DOM pattern, how it was measured
 - `docs/layout-checking.md` — the layout model and its subset
 - `docs/adr/` — design decisions

@@ -1,0 +1,44 @@
+# Publishes the rule catalog (docs/rule-catalog.md and its images) to GitHub Pages.
+# The page is built from committed files only: no install, no browser (the images are made locally by
+# tools/rule-catalog/shoot.mjs and committed).
+name: pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/rule-catalog.md
+      - docs/rule-catalog/**
+      - tools/rule-catalog/build-page.mjs
+      - tools/rule-catalog/page-template.html
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node tools/rule-catalog/build-page.mjs _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Only the deploy job may write to Pages and request the OIDC token deploy-pages needs.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
