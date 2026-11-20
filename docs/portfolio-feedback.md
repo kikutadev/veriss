@@ -291,3 +291,20 @@ HOME は同コマンドに `--home-only` を付ける。各実行は既存ブラ
 
 ### 汎用性の監査
 サイト固有セレクタ・寸法・入力ハッシュ・運用パスを package の実装へ持ち込まない。対象サイトの実測スクリプトは利用例として隔離し、別のUIの正常/違反/Unknown を共通 API で再現する。転用できない局所モデルはアプリ側の前提付き証拠であって一般解析機能ではない。各ブランチのテストに加えて統合版の gate を確認する。
+
+### 汎用性の監査結果 (2026-11-20)
+上流 51dbd0a からの package source 差分を確認。対象サイト名・アプリ名・固有 selector・寸法/入力ハッシュの特別扱いは見つからなかった。固定100pxの縦軸射影用 surrogate 等は未証明軸の計算補助であり、その軸の証拠を出さない。固有のレビュー済み射影は `tools/ui-build-examples/portfolio-pages/eval-island-transition.mjs` に隔離。汎用 `eval-ui-build.mjs` は JSON の対象・契約・状態のみを受け取る。
+初回 island-state-audit 39ee50b の gate: 6単体群失敗0、component-lint 4評価不変、399 E2E、supervisor exit 0 / 699 PID / 残留0。並行の responsive-margin-model 7775548 を d50cf1f で取り込み、以下の汎用性改善と統合した。
+
+498bb0d: 別用途のサイトを調査して、独立幾何に無関係な outline、font-smoothing、実行する animation-name/shorthand がない場合の animation metadata を除外。focus による寸法変更、実際の animation-name / shorthand、font-relative geometry は引き続き拒否。WebKit profile の静的 dist HTML/CSS 5アプリ14対象で、成立1→6。
+- PC Mini Tools: main/catalog 0/2→2/2、concept は calc(100% - 28px) 依存で Unknown。
+- Spex: main/hero/faq 0/3→3/3。
+- Cinema UI: main 1/1 不変、fullscreen と ticket は Unknown。
+- SheetDojo: 0/3、body overflow propagation。
+- Scene Director: 0/2、Grid/float 依存。
+この初回の静的比較では script/style/link を除外し、ローカルCSSを連結。アプリ全体の証明ではない。
+
+既存の汎用 runner と `tools/ui-build-examples/{minitools,spex,cinema-ui}.json` を使った実ビルド評価: 3アプリ×3 UA×4 viewport点、同一の捕捉済み9 snapshot を Node module loader で変更前の partial-geometry.mjs (5d17082) のみに差し替えて再解析。27環境別契約ケースが成立3→18、Unknown24→9。モデル座標照合72/72、契約観測96成立・12 Unknown（非表示チケット）、捕捉エラー0。各監督ランナー残留0。幅320–1920、高さ320–1080、overlay、DPR1、外部通信遮断、safe area 0。別アプリのコード、配信、CSS は変更していない。
+
+追加 E2E 6/6: 設定フォームの横収容、編集ツールの2領域の共通進捗による一定間隔・縦横収容を Chromium/Firefox/WebKit で検証。非同期進捗で実際に重なる反例、端点違反、未対応の幾何アニメーションを確認。初回 Firefox の座標比較に 0.00001525878906 CSS px の浮動小数丸め差が出たため観測照合のみ従来の許容差へ合わせた。数理的な述語判定は厳密のまま。部分幾何単体15/15。
+サイト固有の入力ハッシュや補間仮定は検証例に留め、今後の追加は HTML/CSS セレクターと意味論の一般的な依存から根拠を導く。自動縮約や補間条件の導出は未対応を残す。
