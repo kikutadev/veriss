@@ -1,10 +1,15 @@
 import type { LayoutSummary, LayoutOptions } from '@mizchi/veriss/src/layout-contracts.d.ts';
 export type Choice = string | number | boolean | null;
 export type Choices = Record<string, Choice>;
+export interface AnalysisFailure {
+    status: 'unknown';
+    diagnostics: LayoutSummary['diagnostics'];
+    sizes: LayoutSummary['sizes'];
+}
 export interface AnalyzedState {
     html: string;
     choices: Choices;
-    report: LayoutSummary;
+    report: LayoutSummary | AnalysisFailure;
 }
 export interface Mark {
     path: string;
