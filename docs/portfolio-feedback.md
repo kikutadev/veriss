@@ -276,3 +276,6 @@ baf9eb0: primary hover/pointer と prefers-reduced-motion の明示値を一般�
 - 新規単体3件・E2E3件、関連単体247件成功。独立した注文画面で3ブラウザー864矩形一致 (0.1px)。追加の汎用 cascade 対照84ケース中72解析・12 Unknown、1440/1440矩形一致 (0.15px)。Z3対照6環境ケース中5成立・1違反 (coarse の幅130%、320×700で利用可能300px/要求390px)。React/Vue/Svelte の同一再現例も fine 成立/coarse 違反。実ビルド入口の正常対照6/6比較一致、不一致プロファイル3/3拒否かつ証拠0。
 - 既存課題: ancestor の動的 selector と状態による custom property の間接的幾何依存、hover 等での全状態 fit の網羅。固定 media 環境の成立をそれらの成立と混同しない。any-hover/any-pointer・未対応論理式・条件付き cascade layer は未対応。配信コード変更なし。
 - 全gate (baf9eb0): 6単体群 fail=0、component-lint 4評価不変、Chromium/Firefox/WebKit 405 E2E passed、supervisor exit=0、698 PID追跡・残留0。独立プロセス検査 CLEAN。gate後の変更は文書のみ。
+
+### 状態依存 custom property の健全性
+目標: state/preference による custom property の代入が var() の連鎖や fallback を通じて幾何・表示・アニメーション等へ伝播する場合、静止時の結果を全状態成立として返さない。既存の token 化済み依存を使い、まず安全側の依存閉包を求める。単純 hover は既存 re-layout を利用できる範囲で比較し、他の状態・混在・間接アニメーション等は Unknown。純色のみ・未使用変数は影響を分離する。サイト非依存の対照入力、3ブラウザー、Z3、既存 gate で確認する。
