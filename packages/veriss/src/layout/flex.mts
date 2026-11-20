@@ -99,7 +99,7 @@ export type FlexItemStyle = Record<
   'min-inline-size' | 'min-block-size' | 'max-inline-size' | 'max-block-size' |
   'box-sizing' | 'overflow-x' | 'overflow-y' | 'container-type' | `margin-${Side}` | `padding-${Side}` | `border-${Side}`,
   string>;
-export interface FlexItemOptions { empty?: boolean; axis?: Axis; contentSizes?: {min: Rational; max: Rational} | undefined }
+export interface FlexItemOptions { empty?: boolean; axis?: Axis; contentSizes?: {min: Rational; max?: Rational} | undefined }
 interface ItemCommon { grow: Rational; shrink: Rational; edges: Rational; autoStart: boolean; autoEnd: boolean; automaticBelowBase: boolean }
 export type FlexItemModel = ItemCommon & (
   | { base: 'content'; minimum: 'content'; contentMinimum?: Rational; percentBasis?: never; linearBasis?: never; contentBox?: never; maximum?: never }
@@ -135,7 +135,10 @@ export function flexItem(style: FlexItemStyle, { empty = false, axis = 'inline',
   else if ((basis === 'auto' || basis === 'content') && style[n.size] === 'auto' && contained) base = q(0);
   else if ((basis === 'auto' || basis === 'content') && axis === 'block' && style[n.size] === 'auto') base = 'content';
   // Content widths given by the engine (border box): the max-content width is the base (§9.2.3 C/E).
-  else if ((basis === 'auto' || basis === 'content') && style[n.size] === 'auto' && contentSizes) base = contentBox ? add(contentSizes.max, mul(own, q(-1))) : contentSizes.max;
+  else if ((basis === 'auto' || basis === 'content') && style[n.size] === 'auto' && contentSizes) {
+    if (contentSizes.max === undefined) throw flexUnknown('Content flex basis requires a measured max-content size');
+    base = contentBox ? add(contentSizes.max, mul(own, q(-1))) : contentSizes.max;
+  }
   else if (basis === 'auto' || basis === 'content') return unknown(`flex-basis: ${basis} with an auto ${n.label} uses the content size; give a px ${n.label} or basis`);
   // A percentage basis is a share of the container's main size, which varies with the viewport; items are modeled with
   // constant sizes here. (A full-width slide: flex: 0 0 100% in a scrolling row.)

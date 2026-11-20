@@ -11,3 +11,5 @@ export interface SharedTracks<Box> {
     box: Box;
     startLine: number;
 }
+export type Side = 'top' | 'right' | 'bottom' | 'left';
+export type DimensionValue = Rational | Affine2;

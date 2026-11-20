@@ -107,8 +107,11 @@ export function flexItem(style, { empty = false, axis = 'inline', contentSizes }
     else if ((basis === 'auto' || basis === 'content') && axis === 'block' && style[n.size] === 'auto')
         base = 'content';
     // Content widths given by the engine (border box): the max-content width is the base (§9.2.3 C/E).
-    else if ((basis === 'auto' || basis === 'content') && style[n.size] === 'auto' && contentSizes)
+    else if ((basis === 'auto' || basis === 'content') && style[n.size] === 'auto' && contentSizes) {
+        if (contentSizes.max === undefined)
+            throw flexUnknown('Content flex basis requires a measured max-content size');
         base = contentBox ? add(contentSizes.max, mul(own, q(-1))) : contentSizes.max;
+    }
     else if (basis === 'auto' || basis === 'content')
         return unknown(`flex-basis: ${basis} with an auto ${n.label} uses the content size; give a px ${n.label} or basis`);
     // A percentage basis is a share of the container's main size, which varies with the viewport; items are modeled with
