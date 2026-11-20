@@ -165,3 +165,9 @@ Chromium/Firefox/WebKit E2E 360件成功、QA supervisor 647 PID追跡・残留0
 独立矩形優先モードは全体解析の前処理も省くため、速度差は cache 単独の効果ではない。
 通常 Grid の CSS 変更時は全体解析を省けず、cache 登録のコストが加わる。
 実サイトの性能保証ではなく合成 HTML/CSS fixture の測定。
+
+実サイトの確認: 保存済み portfolio HOME の HTML/CSS (従来の監査と同様 loading node を除去) は
+既存3契約とも Unknown。View Transition selector、native/foreign element 等の未対応依存により
+geometry cache の hit は0。判定も従来と一致した。合成データでの高速化を実サイトの高速化と混同しない。
+c5a83d5 の gate は exit 0、6単体テスト群失敗0、component-lint 4評価不変、
+Chromium/Firefox/WebKit E2E 363件成功、QA supervisor 638 PID追跡・残留0。
