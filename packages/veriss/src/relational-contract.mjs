@@ -11,11 +11,17 @@ import { verifyPredicateImplication } from './layout/relational-implication.mjs'
 const errorMessage = (e) => e instanceof Error ? e.message : String(e);
 function need(value, message = 'Missing required evidence') { if (value === undefined || value === null)
     throw Error(message); return value; }
-function mutableField(value, k) { return need(value[k], 'Missing rectangle field ' + String(k)); }
+function requiredField(value, k) { return need(value[k], 'Missing rectangle field ' + String(k)); }
 const zero = q(0), neg = (a) => times(a, q(-1));
 const axes = ['inlineStart', 'blockStart', 'inlineSize', 'blockSize'];
 const read = (v) => rational(v);
-const affine = (a) => ({ x: read(a.coefficient), y: read(a.heightCoefficient ?? '0'), b: read(a.constant) });
+const record = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const array = (v) => Array.isArray(v);
+function affine(a) {
+    if (!record(a))
+        throw new TypeError('Invalid affine geometry');
+    return { x: read(a.coefficient), y: read(a.heightCoefficient === undefined ? '0' : a.heightCoefficient), b: read(a.constant) };
+}
 const id = (v) => typeof v === 'string' && v.length > 0 && v.length <= 128;
 function ensure(v, msg) { if (!v)
     throw new TypeError(msg); }
@@ -39,7 +45,7 @@ function minusRegion(region, cs) {
     return out;
 }
 // All built-in linear relations lower to the same serializable predicate AST.
-const equal = (a, b, fields = axes) => fields.flatMap(k => { const d = diff(mutableField(a, k), mutableField(b, k)); return [[[d, true]], [[neg(d), true]]]; });
+const equal = (a, b, fields = axes) => fields.flatMap(k => { const d = diff(requiredField(a, k), requiredField(b, k)); return [[[d, true]], [[neg(d), true]]]; });
 const compare = (relation, left, right) => ({ op: 'compare', relation, left, right });
 const all = (items) => ({ op: 'all', items }), any = (items) => ({ op: 'any', items });
 const ref = (target, field, endpoint) => ({ target, field, ...(endpoint ? { endpoint } : {}) });
@@ -146,21 +152,25 @@ function prepare(entry, domain, budget, required = axes) {
         throw Error('missing geometry evidence');
     if (entry.reason)
         throw Error(entry.reason);
-    if (!entry.rows?.length || entry.rows.length > 128)
+    if (!array(entry.rows) || !entry.rows.length || entry.rows.length > 128)
         throw Error('geometry row limit or empty geometry');
     const fields = evidenceFields(entry);
     if (required.some(k => !fields.includes(k)))
         throw Error('Required geometry axis not proved');
-    const rows = entry.rows.map(row => {
-        if (!list(row.constraints ?? [], 64))
+    const rows = Array.from(entry.rows, (row) => {
+        if (!record(row))
+            throw Error('Invalid geometry row');
+        const constraints = row.constraints === undefined ? [] : row.constraints;
+        if (!array(constraints) || constraints.length > 64)
             throw Error('region constraint limit');
-        const cs = (row.constraints ?? []).map(c => { if (typeof c.strict !== 'boolean')
+        const cs = Array.from(constraints, c => { if (!record(c) || typeof c.strict !== 'boolean')
             throw Error('invalid strict constraint'); return [affine(c), c.strict]; });
-        if (!row.rect || Object.keys(row.rect).length !== fields.length || fields.some(k => !Object.hasOwn(row.rect, k)))
+        const source = row.rect;
+        if (!record(source) || Object.keys(source).length !== fields.length || fields.some(k => !Object.hasOwn(source, k)))
             throw Error('Geometry does not match declared axes');
         const rect = {};
         for (const k of fields)
-            Object.assign(rect, { [k]: affine(mutableField(row.rect, k)) });
+            rect[k] = affine(source[k]);
         const region = cond(domain, cs);
         return region ? [{ cs, rect, region }] : [];
     }).flat();
@@ -172,7 +182,7 @@ function prepare(entry, domain, budget, required = axes) {
         if (gaps.length > 256)
             throw Error('coverage region limit exceeded');
         for (const k of fields.filter(k => k.endsWith('Size')))
-            if (clip(row.region, neg(mutableField(row.rect, k)), true))
+            if (clip(row.region, neg(requiredField(row.rect, k)), true))
                 throw Error('negative rectangle dimension');
         if (!gaps.length)
             break;
@@ -183,7 +193,7 @@ function prepare(entry, domain, budget, required = axes) {
     for (let i = 0; i < rows.length; i++) {
         const a = need(rows[i]);
         for (const k of fields.filter(k => k.endsWith('Size')))
-            if (clip(a.region, neg(mutableField(a.rect, k)), true))
+            if (clip(a.region, neg(requiredField(a.rect, k)), true))
                 throw Error('negative rectangle dimension');
         for (const b of rows.slice(i + 1)) {
             if (--budget.left < 0)
@@ -217,7 +227,7 @@ function failure(c, p, predicate, refs, region, rects, budget) {
     }
     if (c.kind !== 'max-occupancy')
         throw Error('Unsupported non-linear predicate');
-    const full = (r) => ({ inlineStart: mutableField(r, 'inlineStart'), blockStart: mutableField(r, 'blockStart'), inlineSize: mutableField(r, 'inlineSize'), blockSize: mutableField(r, 'blockSize') });
+    const full = (r) => ({ inlineStart: requiredField(r, 'inlineStart'), blockStart: requiredField(r, 'blockStart'), inlineSize: requiredField(r, 'inlineSize'), blockSize: requiredField(r, 'blockSize') });
     return occupancyFailure(region, full(need(rects[0])), rects.slice(1).map(full), read(c.max), budget);
 }
 // Browser coordinates are finite IEEE-754 numbers, not authored CSS
@@ -317,7 +327,7 @@ function transferGeometry(transfer, child, parent) {
             return null;
     const substitute = (a) => sum(scalar(a.b), sum(times(w, a.x), times(h, a.y)));
     const mappedEvidence = (e) => ({ ...e, ...(e.rows ? { rows: e.rows.map(r => ({
-                rect: Object.fromEntries(axes.map(k => [k, serializeAffine(sum(substitute(affine(mutableField(r.rect, k))), k === 'inlineStart' ? x : k === 'blockStart' ? y : scalar(0)))])),
+                rect: Object.fromEntries(axes.map(k => [k, serializeAffine(sum(substitute(affine(requiredField(r.rect, k))), k === 'inlineStart' ? x : k === 'blockStart' ? y : scalar(0)))])),
                 constraints: (r.constraints ?? []).map(c => ({ ...serializeAffine(substitute(affine(c))), strict: c.strict }))
             })) } : {}) });
     const operand = (a) => ({ op: 'add', items: [exact(a.b), { op: 'scale', factor: exact(a.x), item: { environment: 'width' } }, { op: 'scale', factor: exact(a.y), item: { environment: 'height' } }] });
@@ -466,8 +476,10 @@ function immutable(value) {
             return;
         ensure(o !== null && typeof o === 'object' && (Array.isArray(o) || [Object.prototype, null].includes(Object.getPrototypeOf(o))) && !seen.has(o), 'IR requires finite acyclic JSON data');
         seen.add(o);
-        if (Array.isArray(o))
-            o.forEach((v) => validate(v));
+        if (array(o)) {
+            for (const v of o)
+                validate(v);
+        }
         else
             Object.values(o).filter(v => v !== undefined).forEach(validate);
         seen.delete(o);

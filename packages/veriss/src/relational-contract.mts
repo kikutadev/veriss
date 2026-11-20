@@ -99,11 +99,16 @@ type UIInput={model:UIModel;evidence?:readonly GeometryEvidence[];observations?:
 type TransferMapping={mappedEvidence(e:GeometryEvidence):GeometryEvidence;rewrite(v:ExpandedPredicate,bind:Readonly<Record<string,string>>):ExpandedPredicate;domain:Region};
 const errorMessage=(e:unknown)=>e instanceof Error?e.message:String(e);
 function need<T>(value:T,message='Missing required evidence'):NonNullable<T> {if(value===undefined||value===null)throw Error(message);return value}
-function mutableField<K extends keyof T,T>(value:T,k:K):NonNullable<T[K]> {return need(value[k],'Missing rectangle field '+String(k))}
+function requiredField<K extends keyof T,T>(value:T,k:K):NonNullable<T[K]> {return need(value[k],'Missing rectangle field '+String(k))}
 const zero=q(0), neg=(a:Affine2)=>times(a,q(-1));
 const axes:readonly Field[]=['inlineStart','blockStart','inlineSize','blockSize'];
 const read=(v:unknown)=>rational(v);
-const affine=(a:LayoutAffine):Affine2=>({x:read(a.coefficient),y:read(a.heightCoefficient??'0'),b:read(a.constant)});
+const record=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const array=(v:unknown):v is readonly unknown[]=>Array.isArray(v);
+function affine(a:unknown):Affine2 {
+ if(!record(a))throw new TypeError('Invalid affine geometry');
+ return {x:read(a.coefficient),y:read(a.heightCoefficient===undefined?'0':a.heightCoefficient),b:read(a.constant)};
+}
 const id=(v:unknown):v is string=>typeof v==='string'&&v.length>0&&v.length<=128;
 function ensure(v:unknown,msg:string):asserts v{if(!v)throw new TypeError(msg)}
 const list=(v:unknown,max:number):boolean=>Array.isArray(v)&&v.length<=max;
@@ -119,7 +124,7 @@ function minusRegion(region:Region,cs:readonly Constraint[]):Region[] {
   return out;
 }
 // All built-in linear relations lower to the same serializable predicate AST.
-const equal=(a:PartialRect,b:PartialRect,fields=axes):Constraint[][]=>fields.flatMap(k=>{const d=diff(mutableField(a,k),mutableField(b,k));return [[[d,true]],[[neg(d),true]]]});
+const equal=(a:PartialRect,b:PartialRect,fields=axes):Constraint[][]=>fields.flatMap(k=>{const d=diff(requiredField(a,k),requiredField(b,k));return [[[d,true]],[[neg(d),true]]]});
 const compare=(relation:Comparison,left:Operand,right:Operand):ExpandedPredicate=>({op:'compare',relation,left,right});
 const all=(items:readonly ExpandedPredicate[]):ExpandedPredicate=>({op:'all',items}),any=(items:readonly ExpandedPredicate[]):ExpandedPredicate=>({op:'any',items});
 const ref=(target:string,field:RectangleField,endpoint?:Endpoint):Operand=>({target,field,...(endpoint?{endpoint}:{})});
@@ -194,15 +199,18 @@ const evidenceFields=(e:GeometryEvidence|undefined)=>e?.axes===undefined?axes:ax
 function prepare(entry:GeometryEvidence|undefined,domain:Region,budget:WorkBudget,required:readonly Field[]=axes):Prepared[] {
   if(!entry)throw Error('missing geometry evidence');
   if(entry.reason)throw Error(entry.reason);
-  if(!entry.rows?.length||entry.rows.length>128)throw Error('geometry row limit or empty geometry');
+  if(!array(entry.rows)||!entry.rows.length||entry.rows.length>128)throw Error('geometry row limit or empty geometry');
   const fields=evidenceFields(entry);
   if(required.some(k=>!fields.includes(k)))throw Error('Required geometry axis not proved');
-  const rows=entry.rows.map(row=>{
-    if(!list(row.constraints??[],64))throw Error('region constraint limit');
-    const cs=(row.constraints??[]).map(c=>{if(typeof c.strict!=='boolean')throw Error('invalid strict constraint');return [affine(c),c.strict] as const});
-    if(!row.rect||Object.keys(row.rect).length!==fields.length||fields.some(k=>!Object.hasOwn(row.rect,k)))throw Error('Geometry does not match declared axes');
-    const rect:PartialRect={};
-    for(const k of fields)Object.assign(rect,{[k]:affine(mutableField(row.rect,k))});
+  const rows=Array.from(entry.rows,(row:unknown)=>{
+    if(!record(row))throw Error('Invalid geometry row');
+    const constraints=row.constraints===undefined?[]:row.constraints;
+    if(!array(constraints)||constraints.length>64)throw Error('region constraint limit');
+    const cs=Array.from(constraints,c=>{if(!record(c)||typeof c.strict!=='boolean')throw Error('invalid strict constraint');return [affine(c),c.strict] as const});
+    const source=row.rect;
+    if(!record(source)||Object.keys(source).length!==fields.length||fields.some(k=>!Object.hasOwn(source,k)))throw Error('Geometry does not match declared axes');
+    const rect:Partial<Record<Field,Affine2>>={};
+    for(const k of fields)rect[k]=affine(source[k]);
     const region=cond(domain,cs);
     return region?[{cs,rect,region}]:[];
   }).flat();
@@ -210,14 +218,14 @@ function prepare(entry:GeometryEvidence|undefined,domain:Region,budget:WorkBudge
   for(const row of rows){
     if((budget.left-=gaps.length*Math.max(1,row.cs.length))<0)throw Error('coverage budget exceeded');
     gaps=gaps.flatMap(g=>minusRegion(g,row.cs));if(gaps.length>256)throw Error('coverage region limit exceeded');
-    for(const k of fields.filter(k=>k.endsWith('Size')))if(clip(row.region,neg(mutableField(row.rect,k)),true))throw Error('negative rectangle dimension');
+    for(const k of fields.filter(k=>k.endsWith('Size')))if(clip(row.region,neg(requiredField(row.rect,k)),true))throw Error('negative rectangle dimension');
     if(!gaps.length)break;
   }
   if(gaps.length)throw Error('geometry does not cover profile');
   // Even redundant rows must have valid dimensions and agree on shared domains.
   for(let i=0;i<rows.length;i++){
     const a=need(rows[i]);
-    for(const k of fields.filter(k=>k.endsWith('Size')))if(clip(a.region,neg(mutableField(a.rect,k)),true))throw Error('negative rectangle dimension');
+    for(const k of fields.filter(k=>k.endsWith('Size')))if(clip(a.region,neg(requiredField(a.rect,k)),true))throw Error('negative rectangle dimension');
     for(const b of rows.slice(i+1)){
       if(--budget.left<0)throw Error('consistency budget exceeded');
       const both=cond(a.region,b.cs);
@@ -241,7 +249,7 @@ function failure(c:CanonicalRelation,p:EnvironmentProfile,predicate:ExpandedPred
   return failures.length?sample(need(failures[0])):null;
  }
  if(c.kind!=='max-occupancy')throw Error('Unsupported non-linear predicate');
- const full=(r:PartialRect):AffineRectangle=>({inlineStart:mutableField(r,'inlineStart'),blockStart:mutableField(r,'blockStart'),inlineSize:mutableField(r,'inlineSize'),blockSize:mutableField(r,'blockSize')});
+ const full=(r:PartialRect):AffineRectangle=>({inlineStart:requiredField(r,'inlineStart'),blockStart:requiredField(r,'blockStart'),inlineSize:requiredField(r,'inlineSize'),blockSize:requiredField(r,'blockSize')});
  return occupancyFailure(region,full(need(rects[0])),rects.slice(1).map(full),read(c.max),budget);
 }
 // Browser coordinates are finite IEEE-754 numbers, not authored CSS
@@ -319,7 +327,7 @@ function transferGeometry(transfer:AllocationTransfer,child:EnvironmentProfile,p
   if(clip(domain,diff(scalar(r.min),a),true)||clip(domain,diff(a,scalar(r.max)),true))return null;
  const substitute=(a:Affine2)=>sum(scalar(a.b),sum(times(w,a.x),times(h,a.y)));
  const mappedEvidence=(e:GeometryEvidence):GeometryEvidence=>({...e,...(e.rows?{rows:e.rows.map(r=>({
-  rect:Object.fromEntries(axes.map(k=>[k,serializeAffine(sum(substitute(affine(mutableField(r.rect,k))),k==='inlineStart'?x:k==='blockStart'?y:scalar(0)))])),
+  rect:Object.fromEntries(axes.map(k=>[k,serializeAffine(sum(substitute(affine(requiredField(r.rect,k))),k==='inlineStart'?x:k==='blockStart'?y:scalar(0)))])),
   constraints:(r.constraints??[]).map(c=>({...serializeAffine(substitute(affine(c))),strict:c.strict}))
  }))}: {})});
  const operand=(a:Affine2):Operand=>({op:'add',items:[exact(a.b),{op:'scale',factor:exact(a.x),item:{environment:'width'}},{op:'scale',factor:exact(a.y),item:{environment:'height'}}]});
@@ -446,7 +454,7 @@ function immutable<T>(value:T):T {
   if(o===null||typeof o==='string'||typeof o==='boolean'||typeof o==='number'&&Number.isFinite(o))return;
   ensure(o!==null&&typeof o==='object'&&(Array.isArray(o)||[Object.prototype,null].includes(Object.getPrototypeOf(o)))&&!seen.has(o),'IR requires finite acyclic JSON data');
   seen.add(o);
-  if(Array.isArray(o))o.forEach((v:unknown)=>validate(v));else Object.values(o).filter(v=>v!==undefined).forEach(validate);
+  if(array(o)){for(const v of o)validate(v)}else Object.values(o).filter(v=>v!==undefined).forEach(validate);
   seen.delete(o);
  };
  validate(value);
