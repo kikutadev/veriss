@@ -485,6 +485,10 @@ export interface LayoutWarning {
     media?: string;
     attributes?: string[];
     tag?: string;
+    boxes?: string[];
+    query?: string;
+    name?: string;
+    reason?: string;
     parent?: string;
     srcset?: string | undefined;
     sizes?: string;

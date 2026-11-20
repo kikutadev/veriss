@@ -1,3 +1,4 @@
+import {checkQueryCoverage} from './engine-coverage.mjs';
 import {checkHoverShifts,checkAnimationShifts} from './engine-state-shifts.mjs';
 import {checkLayoutWarnings} from './engine-warnings.mjs';
 import {hasCarousel,checkCarouselShifts} from './engine-carousel.mjs';
@@ -2353,34 +2354,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     checkCarouselShifts({root,pristine,block,diagnostics,ranges,
       analyze:copy=>analyzeBoxTree(copy, { ...options, $slideVariant: true }, scrollbarProfile, budget, inlineSheets, [], preferences)});
   }
-  // A picture source that is never the selected one in the checked range: an earlier source's media covers every
-  // width where its own matches (the first matching source wins), or its media never matches. Its files are dead.
-  if (!diagnostics.some(d => d.severity === 'unknown')) for (const use of sourceUse.values()) use.sources.forEach((source, i) => {
-    if (use.chosen.has(i)) return;
-    const media = source.facts.media ?? 'all', earlier = use.sources.slice(0, i).map(s => s.facts.media ?? 'all');
-    layoutWarnings.push({ code: 'W_LAYOUT_SOURCE_SHADOWED', severity: 'warning', box: use.box.label, path: use.box.path, source: i, media, srcset: source.facts.srcset,
-      message: use.active.has(i)
-        ? `<source media="${media}"> (source ${i + 1}) of ${use.box.label}'s picture is never used: wherever it matches, an earlier source (${earlier.join(', ')}) matches too, and the first match wins. Order the sources from the most specific media to the least`
-        : `<source media="${media}"> (source ${i + 1}) of ${use.box.label}'s picture never matches in the checked viewport range, so it is never used` });
-  });
-  // A container query that matches no element anywhere in the checked range: no ancestor is a query container (of
-  // that name), or the containers it finds are never that size. Its rules never apply.
-  {
-    const byRule = new Map();
-    for (const f of queryFacts) {
-      const key = `${f.condition.css?.file}:${f.condition.css?.line}:${f.condition.params}`;
-      if (!byRule.has(key)) byRule.set(key, []);
-      byRule.get(key).push(f);
-    }
-    for (const facts of byRule.values()) {
-      if (facts.some(f => f.matched) || diagnostics.some(d => d.severity === 'unknown')) continue;
-      const { condition } = facts[0], targets = [...new Set(facts.map(f => f.target).filter(Boolean))], boxes = [...new Set(facts.map(f => f.box))];
-      const why = !targets.length ? (condition.name ? `no ancestor of ${boxes.join(', ')} has container-name: ${condition.name}` : `no ancestor of ${boxes.join(', ')} has a container-type`) : `its container ${targets.join(', ')} is never that size in the checked viewport range`;
-      layoutWarnings.push({ code: 'W_CSS_CONTAINER_QUERY_NEVER', severity: 'warning', box: boxes[0], boxes, query: condition.params, ...(condition.name ? { name: condition.name } : {}), reason: targets.length ? 'size' : 'no-container',
-        ...(condition.css ? { css: condition.css } : {}),
-        message: `@container ${condition.params} never matches: ${why}, so its rules never apply${targets.length ? '' : ` (give an ancestor container-type: inline-size${condition.name ? ` and container-name: ${condition.name}` : ''})`}` });
-    }
-  }
+  checkQueryCoverage({diagnostics,layoutWarnings,sourceUse,queryFacts});
   const status = diagnostics.some(d => d.severity === 'unknown') ? 'unknown' : diagnostics.length ? 'violated' : 'verified';
   return { version: 1, ok: status === 'verified', status, component,
     scope: { ...(options.mediaFeatures!==undefined?{mediaFeatures:Object.fromEntries(mediaFeatureEntries(options.mediaFeatures))}:{}), axis: block ? 'both' : 'inline', viewport: { ...projection(initial, 'x'), ...(block ? { height: options.viewport.height ? projection(initial, 'y') : null } : {}) }, hostInset: options.hostInset ?? 0, ...(block ? { hostBlockInset: options.hostBlockInset ?? 0 } : {}), closedCSS: true, browserRounding: false, blockSizing: block },
