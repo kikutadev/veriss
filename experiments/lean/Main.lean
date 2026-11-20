@@ -1,4 +1,4 @@
-import VerissLeanSource
+import VerissLeanReport
 open Lean VerissLean
 
 def readJson (file : String) : IO (Except String Json) := do
@@ -24,8 +24,65 @@ def checkFile (file : String) (source : Option (String × String × String × St
       return 0
     else fail "Invalid or insufficient certificate"
 
+structure RelationRequest where
+  mode : String
+  report : String
+  state : String
+  profile : String
+  contract : String
+  certificate : Option String := none
+  deriving FromJson
+
+def unknown (msg : String) : Nat × Json := (2,toJson ("Unknown: " ++ msg))
+
+def relationalResult (req : RelationRequest) : IO (Nat × Json) := do
+  match (← readJson req.report) >>= fun raw => Relation.getProblem raw req.state req.profile req.contract with
+  | .error msg => return unknown msg
+  | .ok problem =>
+    if req.mode == "plan" then return (0,Relation.planJson problem)
+    let some path := req.certificate | return unknown "Missing certificate"
+    let data ← readJson path
+    if req.mode == "verify" then
+      match data >>= fromJson? (α := Relation.VerifiedCertificate) with
+      | .error msg => return unknown msg
+      | .ok c =>
+        if problem.checkVerified c then
+          return (0,toJson "Verified: source-derived relational model")
+        else return unknown "Invalid or insufficient relational certificate"
+    else if req.mode == "violate" then
+      match data >>= fromJson? (α := Relation.ViolationCertificate) with
+      | .error msg => return unknown msg
+      | .ok c =>
+        if problem.checkViolated c then
+          return (1,toJson "Violated: exact source-derived relational counterexample")
+        else return unknown "Invalid or insufficient counterexample certificate"
+    else return unknown "Unsupported request mode"
+
+def runRequest (req : RelationRequest) : IO (Nat × Json) := do
+  try relationalResult req catch e => return unknown (toString e)
+
+def relational (mode report state profile contract : String) (certPath : Option String) : IO UInt32 := do
+  let (code,data) ← runRequest ⟨mode,report,state,profile,contract,certPath⟩
+  let msg := data.getStr?.toOption.getD data.compress
+  if code == 2 then IO.eprintln msg else IO.println msg
+  return code.toUInt32
+
+def batch (file : String) : IO UInt32 := do
+  match (← readJson file) >>= fromJson? (α := List RelationRequest) with
+  | .error msg => fail msg
+  | .ok reqs =>
+    if reqs.isEmpty || reqs.length > 128 then return ← fail "Batch size limit"
+    let results ← reqs.mapM runRequest
+    IO.println (toJson (results.map fun (code,data) =>
+      Json.mkObj [("code",toJson code),("result",data)])).compress
+    return (if results.any (·.1 == 2) then 2 else if results.any (·.1 == 1) then 1 else 0)
+
 def main (args : List String) : IO UInt32 := do
   match args with
+  | ["batch",file] => batch file
+  | ["plan",report,state,profile,contract] => relational "plan" report state profile contract none
+  | ["verify",report,state,profile,contract,file] => relational "verify" report state profile contract (some file)
+  | ["violate",report,state,profile,contract,file] => relational "violate" report state profile contract (some file)
   | [file] => checkFile file none
   | ["report",report,state,profile,target,file] => checkFile file (some (report,state,profile,target))
-  | _ => fail "usage: veriss-check [report REPORT.json STATE PROFILE TARGET] CERTIFICATE.json"
+  | _ => fail "usage: plan|verify|violate REPORT STATE PROFILE CONTRACT [CERTIFICATE], batch REQUESTS.json, or legacy [report REPORT STATE PROFILE TARGET] CERTIFICATE"

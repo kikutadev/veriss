@@ -99,9 +99,80 @@ Additional saved evidence:
 
 Baseline gate (unchanged production code at 722fbfd): all six unit-test groups, four component-lint evaluations unchanged, 408/408 E2E; supervisor exit 0, 658 tracked PIDs, 0 remaining. Lean research is isolated in experiments/lean.
 
-## Next milestone: relational certificates
-Prove model validity (coverage, dimensions, overlap agreement) separately from
-contract truth. Extend to both axes and multiple boxes, construct the negation
-of a linear Boolean predicate in the Lean checker, and validate exact
-counterexamples. Replay saved positive and negative contract cases unchanged.
-Only research files change; state reachability and CSS extraction remain premises.
+## Relational certificates (second milestone)
+The second milestone is implemented. Model validity (coverage, nonnegative
+dimensions, agreement of overlapping pieces) is proved separately from
+contract truth. The relational checker reads the original report's explicit
+state/profile/contract instance, selects each geometry entry, combines all
+rows, and lowers the supported contract inside Lean. The producer receives
+the resulting proof obligations and supplies only evidence; the checker
+reconstructs the problem again. It does not trust the producer's plan or the
+prior reported status.
+
+Supported contract instances: within-viewport, contains, disjoint (including
+zero-area and edge contact), integer min-size, and linear predicates with
+all/any/not, six comparisons, addition and rational scaling. Inline-only and
+block-only evidence are accepted only when all referenced fields are present.
+Full rectangles and multiple targets are supported. A positive certificate
+covers every real viewport in the declared rectangle. A negative certificate
+includes an exact rational point and must establish the same model validity
+plus actual falsity of the selected predicate at the point. Missing evidence,
+unknown formulas, unsupported dependencies and budget exhaustion are Unknown.
+The producer consumes supplied violation witnesses, rather than finding new
+witnesses automatically. State reachability, event/stable contracts, occupancy,
+named predicate expansion, decimal minimum sizes and original CSS extraction
+are outside this milestone. Parsing and the complete raw-report-to-model
+semantic bridge are not yet mechanically certified end-to-end; the theorems
+cover normalized geometry/formulas, including arithmetic normalization and
+comparison meaning. These results do not establish CSS/browser correspondence.
+
+Reproduce a relational check (from this directory):
+
+```sh
+lake build VerissLean
+lake env lean --run Main.lean plan REPORT.json STATE PROFILE CONTRACT
+lake env lean --run Main.lean verify REPORT.json STATE PROFILE CONTRACT CERT.json
+lake env lean --run Main.lean violate REPORT.json STATE PROFILE CONTRACT CERT.json
+lake env lean --run Main.lean batch REQUESTS.json
+python3 relational.py CHECKER REPORT1.json REPORT2.json --output relational-results/
+python3 kernel_relational.py relational-results/kernel-input.json > ConcreteRelations.lean
+lake env lean ConcreteRelations.lean
+python3 test_relational.py CHECKER TEST_OUTPUT_DIR
+```
+
+Use the same wrapper described for the first milestone. Requests for batch
+are an array of objects with mode (plan/verify/violate), report, state, profile,
+contract, and certificate (required for verify/violate). Codes: 0 verified
+(or plan generated, for plan requests), 1 exact violation, 2 Unknown. A batch
+with any Unknown exits 2, otherwise any violation exits 1. The replay runner
+selects the saved explicit case instances for comparison, not all possible
+reachable states. It does not make new CSS models.
+
+2026-11-20 result:
+- Existing reports from five portfolio pages and three games: 46 contract
+  instances, 28 verified, 4 violated, 14 Unknown, zero classification
+  mismatches. The four saved Voxel Tide Defense violations have witness
+  1120 × 360 CSS px. Unknown includes missing geometry and action cases.
+- All 32 accepted real-data results (including violations) and 14 positive/
+  negative synthetic cases passed concrete kernel reduction via `by decide`.
+- The 29 regression cases (14 expected classifications and 15 rejected
+  certificates/sources) all passed in the final batch execution. Rejected
+  cases include omitted obligations, an alternative source, absent axis,
+  missing boundary, inconsistent overlapping rows, invalid dimensions,
+  wrong profile/state, and invalid or non-violating witness.
+- General theorems model_sound, nonnegative_sizes, overlap_agreement,
+  verified_sound, violated_sound, normalizeAffine_sound, plus_sound,
+  mulLiteral_sound and compareFormula_sound built and depend only on
+  standard propext/Classical.choice/Quot.sound. Concrete checks depend
+  only on propext. No sorry or native_decide.
+- 46-instance batch planning/generation/checking took 15.43 s on the local
+  host, including Lean interpreter startup. This is one measurement on
+  saved reports, not a production performance guarantee.
+- Unchanged production baseline passed all six unit groups, component-lint
+  evaluations and 408/408 E2E, supervisor exit 0, 688 tracked PIDs, 0 remaining.
+  TypeScript worktrees, npm packages and main were not modified.
+
+Next: verify reachability and cross-state contracts, certify the full
+source semantic bridge and component implication/composition, then connect
+to the TypeScript pipeline on an agreed stable IR. Do not claim complete CSS
+semantics until extraction itself is validated.
