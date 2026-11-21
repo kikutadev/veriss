@@ -339,10 +339,10 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - Full ordinary unit suite on 7715427: root 33, veriss 782, adapter-core 66, React 12, Vue 6, Svelte 12 — **911 passed, zero failures**. Strict TypeScript compile/build-output parity check passed; independent MoonBit CSS oracle with 5000 seeds passed 18/18.
 - d36d974 merges the concurrently advanced origin/main rule-catalog demo into this TypeScript branch. The sole conflict was the handoff document; preserved both the catalog publication notes and this browser-quality record; library source/test files did not conflict. Working tree clean. Re-run the full mandatory gate on the merged HEAD before pushing either branch; fetch again to preserve later main changes. This checkpoint does not claim native classic scrollbars were measured on a Mac, or that Firefox implements display transitions with allow-discrete.
 
-### 幅遷移の型付き移植（実装中、2026-11-22）
+### 幅遷移の型付き移植（実装・個別検証済み、2026-11-22）
 
-- 旧 JavaScript の \`verifyInterpolatedPredicate\` と CSS から閉じた幅遷移を導出する
-  \`verifyCSSWidthTransition\` を現行の \`.mts\` に実装し、生成 \`.mjs\` と公開型も再生成。
+- 旧 JavaScript の `verifyInterpolatedPredicate` と CSS から閉じた幅遷移を導出する
+  `verifyCSSWidthTransition` を現行の `.mts` に実装し、生成 `.mjs` と公開型も再生成。
   既存の relational/1、幾何抽出、CSS lexer、easing 領域判定を再利用する。
 - 固定 viewport、単一の data-attribute 変化、全枝の単調な幅、同一 bounded progress、
   非幾何 CSS の固定、overlay gutter などを守れない入力は Unknown。
@@ -350,4 +350,17 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - 旧枝のアプリ別 hash 固定の island audit runner は、旧スナップショット/ビルドに
   依存する研究用再生プログラムとして履歴に保存する。新 main の汎用 API に
   依存させず、各プロジェクトが現行ビルドで再監査する。横幅の汎用
-  モデルと複数アプリの JSON 契約例は移植対象。
+  モデルと複数アプリの JSON 契約例は移植した。
+
+- 2026-11-22 個別受入: CSS幅遷移6件、関係契約を含む16件、
+  adapter部分幾何16件を確認。追加ブラウザE2EはChromium・Firefox・
+  WebKitそれぞれ4件、計12/12成功。未対応CSS/異なる進捗/変動する
+  クロス軸をUnknownにする負例は維持。TypeScript strict、
+  build:tsとcheck:tsも成功。正式gateは別途実行する。
+- 旧 `automatic-width-transition` の履歴には汎用レビュー、旧
+  island監査と追加テストも含む。現行 `.mts` に役立つロジック・
+  テストを取り込み、`-s ours` で旧JSツリーを上書きせず祖先を記録。
+  `ts-contracts` の不正media条件の排除、および
+  `verification-reuse-review` の再利用調査はすでにmainの
+  現行コード/ADRに反映されていたので、旧内容に戻さず祖先のみ追加した。
+  `gh-pages` は配信成果物専用であり mainへ統合しない。
