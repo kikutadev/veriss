@@ -5,6 +5,10 @@ import { readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { isolatedFirefoxAppData } from '../../tools/firefox-app-data.mjs';
+
+const firefoxData = isolatedFirefoxAppData();
+process.once('exit', firefoxData.cleanup);
 
 const [root, guardPath, mode] = process.argv.slice(2);
 if (!root || !guardPath) throw Error('usage: node test_cascade_browser.mjs OUTPUT_DIR GUARDED_CHROMIUM_MODULE [--watchdog-probe|chromium|firefox|webkit]');
@@ -46,7 +50,7 @@ if (mode === '--watchdog-probe') {
   for (const [name,engine] of engines.filter(([name])=>!mode||mode===name)) {
     const browser=name==='chromium'
       ? await launchGuardedChromium(engine,{headless:true})
-      : await engine.launch({headless:true});
+      : await engine.launch(name==='firefox' ? {headless:true,env:firefoxData.env} : {headless:true});
     try {
       const context=await browser.newContext({viewport:{width:320,height:320},deviceScaleFactor:1});
       try {

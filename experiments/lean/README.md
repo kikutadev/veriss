@@ -548,12 +548,22 @@ and JSON parser semantics remain in the trusted boundary.
   (tolerance 0.03125). These are observations of the two CSS fixtures,
   not proof of browser/profile correspondence for every viewport or DPR
   (second synthetic profile-key fixture declares DPR 1.25).
-  Firefox 1555 launch failed with "Could not find profile folder" even
-  with explicit TMPDIR and persistent profile, so no Firefox observation.
-  Existing guarded Chromium launcher passed a separate SIGKILL cleanup
-  probe; post-run Chrome PID inspection was clean.
-- The full production gate was not run. No production package or TypeScript
-  worktree edits. General cascade (descendants, inheritance, layers,
+  Firefox 1555 originally failed to launch with "Could not find profile
+  folder", including when pointing `TMPDIR` or `-profile` to fresh directories.
+  The cause on macOS 27 was the OS-protected shared Firefox application-data
+  area, separate from the test profile. At 2026-11-21 this was repaired by
+  isolating both `MOZ_APP_DATA` and `MOZ_LOCAL_APP_DATA` per QA run through
+  `tools/firefox-app-data.mts`, the generated `.mjs`, and
+  `playwright.layout.config.mts`. Firefox 157.0 then passed 49/49 point
+  observations (max error 0.00000611 CSS px); Chromium and WebKit already
+  passed 49/49 each. The original result is retained here as diagnostic
+  history, not the current status. The guarded Chromium launcher passed a
+  separate SIGKILL cleanup probe; Chrome PID inspection was clean.
+- The sixth-milestone research run did not execute the full production gate.
+  The subsequent TypeScript-main integration adds the Firefox test-launch
+  fix, strict `.mts` sources and generated artifacts, and a
+  `tools/gate-guarded.mts` runner to clean up the exact QA process group
+  even if the runner is killed. It does not modify the veriss layout rules. General cascade (descendants, inheritance, layers,
   inline style, selector lists, arbitrary CSS parser, media boolean
   expressions), min/max/calc branches, axis projection, Flex/Grid,
   JS source linking, multi-child composition, actual CSS timing and
