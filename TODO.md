@@ -189,6 +189,19 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] セレクタリストの中の `-moz-` / `-ms-` の擬似で規則全体が捨てられる(F132)
 - 確かめて既存で足りていたもの: flex / grid コンテナの `text-overflow`(効かない宣言として報告済み)、中身のある `aspect-ratio`(理由付きの Unknown)
 
+## 座標計算サブセット L1 の参照仕様([ADR-0018](docs/adr/0018-coordinate-subset.md)、`models/layout/`)
+
+engine から独立した Z3 の仕様で、engine(範囲全体で UNSAT)と 3 ブラウザー(ランダムな設定)に照合する。第一段は済み。
+
+- [x] 第一段: Grid(px・`minmax(0, fr)` のトラック、gap、線での配置、self の揃え)と Flex row・nowrap(basis・grow・shrink・min、
+  justify-content、align)。中身のない項目、padding・border・margin なし
+- [ ] はみ出す center・end の揃え(既定の overflow alignment)を 3 ブラウザーで測り、L1 に入れるか決める(今は位置を比べない)
+- [ ] 第二段: padding・border・margin、`%` と `calc()`、文字を含む項目(ADR-0010 の幅の区間)
+- [ ] `flex-wrap: wrap`(行の分け方が W の区間で変わる)、column、`max-width`(伸びるときの凍結)
+- [ ] Grid の auto-placement、名前つきの線と領域、暗黙のトラック、`auto` の行、subgrid
+- [ ] 性質(はみ出さない、重ならない、W に対して単調)を仕様の上で Z3 に確かめさせる。Lean で定理にするかは未決
+- [ ] engine を仕様から作り直すか(今は照合だけ)
+
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
 - [x] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
@@ -229,6 +242,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 実装済み(最近)
 
+- 座標計算サブセット L1 の参照仕様(ADR-0018、`models/layout/`): engine と幅の範囲全体で一致、3 ブラウザーとランダムな設定で一致
 - eval の基準を Chromium 156 で記録し直した。結果に `browser`(記録したブラウザーの版)を書き、gate は eval が変わったときに記録と今回の版を並べて出す
 - F133. container のない軸の container query の単位(`cqw` / `cqh` が `svw` / `svh` になる)
 - F126 の健全性の修正: `clip` の横のスクロール値で `clip` を `hidden` にするのは Firefox と WebKit だけ(Chromium 156 は `clip` のまま)。`browsers` を付けて報告し、解析は Unknown
