@@ -19,7 +19,7 @@ export function run({html, css, boxes, vw = [375,1280],accessibility = true}:Pic
   walk(r);
   return {status: r.status, findings: [...seen.values()]};
 }
-if (process.argv[2]) {
+if (typeof process !== 'undefined' && process.argv[2]) {
   const {examples, sides} = await import('./examples.mjs');
   for (const ex of examples.filter(e => process.argv[2] === 'all' || e.id === process.argv[2])) for (const s of sides(ex)) {
     const o = run(s); console.log('##', ex.id, s.side, o.status);

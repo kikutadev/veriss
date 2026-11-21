@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>veriss 検査ルール一覧 — kikutadev fork</title>
-<meta name="description" content="veriss フォークのCSS・DOM静的検査一覧。13分類の検査範囲、NG/OK例、TypeScript移行・Lean研究の追加点。">
+<title>veriss フォーク版 — HTML/CSSの静的検査を試す</title>
+<meta name="description" content="kikutadev/verissのHTML/CSS静的検査をブラウザで試す。18個のNG/OK例と診断、13分類のルール一覧、TypeScript移行・Lean研究。">
 <link rel="canonical" href="https://kikutadev.github.io/veriss/">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -69,20 +69,68 @@ tr[hidden]{display:none}
 .vnote{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 @media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr);gap:16px;padding-block:24px 60px}nav{position:static;display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:thin;padding-block:4px 12px}nav a{white-space:nowrap;flex:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px}h1 .fork{margin:0 0 0 4px}}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+
+.catalog-controls{margin:0 0 34px;padding:14px 0 20px;border-bottom:1px solid var(--line)}
+.catalog-label{font:600 12px var(--mono);letter-spacing:.08em;color:var(--accent);margin:0 0 10px}
+/* Live verifier: this is the fork runtime, not a screenshot of an upstream example. */
+#live-check{padding:16px 0 20px;margin-bottom:38px;border-bottom:2px solid var(--line)}
+#live-check h2{font-size:clamp(23px,3vw,29px);border:0;padding:0;margin-bottom:4px}
+.demo-intro{color:var(--muted);font-size:13px;margin:4px 0 18px}
+.demo-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.demo-toolbar label,.demo-input label{font-size:13px;font-weight:700}
+.demo-toolbar select,.demo-toolbar button,.demo-input textarea{font:13px/1.6 var(--mono);border:1px solid var(--line);border-radius:6px;color:var(--fg);background:var(--surface)}
+.demo-toolbar select{padding:8px;max-width:100%;min-width:0}
+.demo-toolbar button{padding:8px 14px;cursor:pointer;font-weight:600}
+.demo-toolbar button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.demo-toolbar button#demo-run{background:var(--fg);border-color:var(--fg);color:var(--bg);margin-left:auto}
+.demo-editor-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.demo-input{min-width:0;display:grid;gap:6px}
+.demo-input textarea{display:block;box-sizing:border-box;width:100%;min-height:156px;padding:10px;resize:vertical;white-space:pre;tab-size:2}
+.demo-caption{font-size:13px;margin:12px 0;color:var(--muted)}
+.demo-output{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:16px}
+.demo-result{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;max-height:305px;overflow:auto}
+.demo-result h3,.demo-preview-wrap h3{margin:0 0 8px;font-size:14px}
+.demo-status{display:block;font:700 15px var(--mono);margin:6px 0 10px}
+.demo-status[data-status="verified"]{color:var(--ok)}.demo-status[data-status="violated"]{color:#d44141}.demo-status[data-status="unknown"],.demo-status[data-status="warning"]{color:var(--part)}
+.demo-findings{font:12px/1.55 var(--mono);padding:0;margin:0;list-style:none;max-width:none}
+.demo-findings li{padding:7px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.demo-findings .code{font-weight:700}.demo-findings .desc{display:block;font:12px/1.5 var(--sans);color:var(--muted)}
+.demo-preview-wrap{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
+.demo-preview-wrap iframe{box-sizing:border-box;border:1px solid var(--line);border-radius:5px;background:white;height:224px;max-width:100%;width:100%;display:block}
+.demo-note{font-size:12px;color:var(--muted);margin:10px 0 0;max-width:none}
+@media(max-width:700px){.demo-editor-grid,.demo-output{grid-template-columns:minmax(0,1fr)}.demo-toolbar button#demo-run{margin-left:0;width:100%}.demo-preview-wrap iframe{height:180px}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
-  <div class="topline"><div class="eyebrow">kikutadev / veriss · static CSS × DOM</div><div class="links"><a href="https://github.com/kikutadev/veriss">フォークのコード</a><a href="https://mizchi.github.io/veriss/">元のカタログ</a></div></div>
-  <h1>veriss 検査ルール一覧 <span class="fork">FORK EDITION</span></h1>
-  <p>約420の検査コードを13の役割に整理し、検査できる条件とUnknownになる境界を説明する。元のカタログのNG/OK実例を引き継ぎ、フォークで加えたTypeScript実装とLeanの独立検算（研究段階）を区別して掲載。</p>
-  <p class="fork-note">フォーク独自の変更点と、形式的に証明できる範囲の境界は<a href="#フォークで追加統合したこと">こちら</a>。上流の新規ルールF116〜F133も取り込み済み。</p>
-  <div class="legend" id="legend"></div>
-  <div class="tools"><label for="q" class="hits">コードや語で絞り込む</label><input id="q" type="search" placeholder="例: CONTRAST、表、Unknown" autocomplete="off"><span class="hits" id="hits"></span></div>
+  <div class="topline"><div class="eyebrow">kikutadev / veriss · static CSS × DOM</div><div class="links"><a href="#live-check">検査を試す</a><a href="https://github.com/kikutadev/veriss">フォークのコード</a><a href="https://mizchi.github.io/veriss/">元のカタログ</a></div></div>
+  <h1>veriss — CSSをその場で検証 <span class="fork">FORK EDITION</span></h1>
+  <p>HTML/CSSを入力し、実際の検査器で問題を確認できるフォーク版。TypeScript化した本体をブラウザで実行します。検査ルール一覧とLean研究については下へ。</p>
+
 </header>
 <nav aria-label="役割"><!--NAV--></nav>
-<main><!--BODY--></main>
+<main>
+<section id="live-check" aria-labelledby="live-title">
+  <h2 id="live-title">LIVE CHECK <span style="font:600 11px var(--mono);vertical-align:middle;color:var(--accent)">FORK RUNTIME</span></h2>
+  <p class="demo-intro">静止画ではなく、フォークのveriss検査コードで実際に解析。新しく統合したF116・F129・F133や従来のNG/OKを切り替えて、CSSを編集できます。</p>
+  <div class="demo-toolbar">
+    <label for="demo-case">例を選択</label><select id="demo-case"></select>
+    <button id="demo-ng" type="button" aria-pressed="true">NG</button><button id="demo-ok" type="button" aria-pressed="false">修正後 OK</button>
+    <button id="demo-run" type="button">静的検査を実行</button>
+  </div>
+  <div class="demo-editor-grid">
+    <div class="demo-input"><label for="demo-html">HTML</label><textarea id="demo-html" spellcheck="false" aria-label="検査対象HTML"></textarea></div>
+    <div class="demo-input"><label for="demo-css">CSS</label><textarea id="demo-css" spellcheck="false" aria-label="検査対象CSS"></textarea></div>
+  </div>
+  <p id="demo-caption" class="demo-caption" aria-live="polite"></p>
+  <div class="demo-output">
+    <div class="demo-result" aria-live="polite"><h3>検査結果 <span style="font:400 11px var(--mono);color:var(--muted)">viewport 375–1280px</span></h3><output id="demo-status" class="demo-status">読み込み中…</output><ul id="demo-findings" class="demo-findings"></ul></div>
+    <div class="demo-preview-wrap"><h3>描画プレビュー（現在幅）</h3><iframe id="demo-preview" title="HTML/CSSの表示プレビュー" sandbox="" loading="lazy"></iframe></div>
+  </div>
+  <p class="demo-note">VERIFIEDは対応する配置条件についての判定で、警告が0件という意味ではありません。右のブラウザ表示は別の参考プレビューです。対応できない入力はUnknownとして扱います。JavaScriptは実行しません。Lean検証は別の研究用チェッカーで、ここで自動実行するものではありません。</p>
+</section>
+<div class="catalog-controls"><p class="catalog-label">RULE REFERENCE · 420+ CHECK CODES</p><div class="legend" id="legend"></div><div class="tools"><label for="q" class="hits">コードや語で絞り込む</label><input id="q" type="search" placeholder="例: CONTRAST、表、Unknown" autocomplete="off"><span class="hits" id="hits"></span></div></div><!--BODY--></main>
 </div>
 <script>
 (() => {
@@ -98,6 +146,7 @@ tr[hidden]{display:none}
   q.addEventListener('input', apply);
 })();
 </script>
+<script type="module" src="./demo.js"></script>
 
 </body>
 </html>
