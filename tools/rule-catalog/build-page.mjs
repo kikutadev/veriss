@@ -102,4 +102,5 @@ const nav = sections.map(({ id, title }) => `<a href="#${id}">${inline(title)}</
 const page = template.replace('<!--NAV-->', nav).replace('<!--BODY-->', out.join('\n'));
 writeFileSync(join(outDir, 'index.html'), page);
 buildSync({ entryPoints: [join(here, 'demo.mjs')], outfile: join(outDir, 'demo.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, logLevel: 'silent' });
+buildSync({ entryPoints: [join(here, 'scan-engine.mjs')], outfile: join(outDir, 'worker.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, logLevel: 'silent' });
 console.log(`${outDir}/index.html: ${sections.length} sections, ${readdirSync(join(outDir, 'img')).length} images`);
