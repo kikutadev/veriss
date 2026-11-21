@@ -1,15 +1,38 @@
-// Run the repository gate in a dedicated process group. An independent
-// watchdog tears down that exact group if this parent is SIGKILLed, so a
-// Playwright Chromium (including GPU processes) cannot outlive a failed QA.
+// Run a gate in its own process group. On runner SIGKILL, an independent
+// watchdog stops that group AND separately detached Chromium browser groups.
+// Chrome parent PIDs are only recorded if their ancestry leads to this gate.
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 const file = fileURLToPath(import.meta.url);
 const root = resolve(dirname(file), '..');
+function processTable() {
+    const result = new Map();
+    try {
+        const output = execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,command='], {
+            encoding: 'utf8', timeout: 3000, maxBuffer: 16 * 1024 * 1024,
+        });
+        for (const line of output.split('\n')) {
+            const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/.exec(line);
+            if (!match)
+                continue;
+            const pid = Number(match[1]);
+            result.set(pid, {
+                pid, ppid: Number(match[2]), pgid: Number(match[3]), command: match[4] ?? '',
+            });
+        }
+    }
+    catch {
+        // A failed snapshot cannot justify terminating an unidentified process.
+    }
+    return result;
+}
 function processIsAlive(pid) {
     try {
-        const state = execFileSync('/bin/ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8', timeout: 3000 }).trim();
+        const state = execFileSync('/bin/ps', ['-p', String(pid), '-o', 'stat='], {
+            encoding: 'utf8', timeout: 3000,
+        }).trim();
         return state.length > 0 && !state.startsWith('Z');
     }
     catch {
@@ -34,6 +57,42 @@ function stopGroup(pgid, signal) {
             throw error;
     }
 }
+function isAutomationChrome(p) {
+    return /(?:\/chrome-headless-shell|\/Google Chrome for Testing)/.test(p.command) &&
+        p.command.includes('--remote-debugging-pipe') &&
+        p.command.includes('--user-data-dir=') &&
+        !p.command.includes('--type=');
+}
+function belongsToGate(p, gateGroup, table) {
+    let current = p;
+    for (let depth = 0; current && depth < 64; depth++) {
+        if (current.pgid === gateGroup)
+            return true;
+        current = table.get(current.ppid);
+    }
+    return false;
+}
+function ownedChromePids(gateGroup, table) {
+    return [...table.values()]
+        .filter(p => isAutomationChrome(p) && belongsToGate(p, gateGroup, table))
+        .map(p => p.pid);
+}
+function stopChrome(pid, table, signal) {
+    const p = table.get(pid);
+    // Validate the exact recorded PID before each signal; never kill by name.
+    if (!p || !isAutomationChrome(p))
+        return;
+    try {
+        if (p.pgid === p.pid)
+            stopGroup(p.pgid, signal);
+        else
+            process.kill(p.pid, signal);
+    }
+    catch (error) {
+        if (error.code !== 'ESRCH')
+            throw error;
+    }
+}
 if (process.argv[2] === '--watchdog') {
     const parent = Number(process.argv[3]);
     const group = Number(process.argv[4]);
@@ -41,20 +100,43 @@ if (process.argv[2] === '--watchdog') {
         process.exitCode = 2;
     }
     else {
-        while (processIsAlive(parent))
-            await sleep(1500);
-        if (groupIsAlive(group)) {
-            stopGroup(group, 'SIGTERM');
-            await sleep(4000);
-            if (groupIsAlive(group))
-                stopGroup(group, 'SIGKILL');
+        const chromePids = new Set();
+        while (processIsAlive(parent)) {
+            const table = processTable();
+            for (const pid of ownedChromePids(group, table))
+                chromePids.add(pid);
+            await sleep(1250);
         }
+        const table = processTable();
+        for (const pid of ownedChromePids(group, table))
+            chromePids.add(pid);
+        // First release the gate and then any independently detached Chrome.
+        if (groupIsAlive(group))
+            stopGroup(group, 'SIGTERM');
+        for (const pid of chromePids)
+            stopChrome(pid, processTable(), 'SIGTERM');
+        await sleep(3500);
+        const remaining = processTable();
+        for (const pid of chromePids)
+            stopChrome(pid, remaining, 'SIGKILL');
+        if (groupIsAlive(group))
+            stopGroup(group, 'SIGKILL');
     }
 }
 else {
     const probe = process.argv[2] === '--probe';
-    const args = probe ? ['-c', 'sleep 60'] : ['tools/gate.sh'];
-    const command = probe ? '/bin/sh' : '/bin/bash';
+    const browserProbe = process.argv[2] === '--probe-browser';
+    const browserScript = `
+    import { chromium } from '@playwright/test';
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setContent('<div id="ready">browser probe</div>');
+    console.log('GUARDED_BROWSER_READY', process.pid);
+    setInterval(() => browser.isConnected(), 1000);
+  `;
+    const command = browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
+    const args = browserProbe ? ['--input-type=module', '-e', browserScript] :
+        probe ? ['-c', 'sleep 60'] : ['tools/gate.sh'];
     const gate = spawn(command, args, {
         cwd: root,
         env: process.env,
@@ -65,14 +147,19 @@ else {
     if (!group)
         throw Error('Could not start the guarded gate');
     const watcher = spawn(process.execPath, [file, '--watchdog', String(process.pid), String(group)], {
-        cwd: root,
-        detached: true,
-        stdio: 'ignore',
+        cwd: root, detached: true, stdio: 'ignore',
     });
     watcher.unref();
-    if (probe)
+    if (probe || browserProbe)
         console.log(`GUARDED_GATE_PROBE parent=${process.pid} group=${group}`);
-    const terminate = () => stopGroup(group, 'SIGTERM');
+    const terminate = () => {
+        const table = processTable();
+        for (const pid of ownedChromePids(group, table))
+            stopChrome(pid, table, 'SIGTERM');
+        stopGroup(group, 'SIGTERM');
+        setTimeout(() => { if (groupIsAlive(group))
+            stopGroup(group, 'SIGKILL'); }, 4000).unref();
+    };
     process.once('SIGINT', terminate);
     process.once('SIGTERM', terminate);
     const status = await new Promise((done) => {
