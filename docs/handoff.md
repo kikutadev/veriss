@@ -1,11 +1,14 @@
-# 引き継ぎ(2026-11-19)
+# 引き継ぎ(2026-11-20)
 
 isle から切り出した CSS 検証器(veriss)を、別のマシンで続けて開発するための文書。今どこにいて、何をどう続けるか。
 
 ## 今どこにいるか
 
 - `main` に全部入っている(このセッションの作業も)。isle は veriss を git 依存で使う利用者になった(isle の `package.json` の `@mizchi/veriss` が commit を指す)
-- **静的検査のパターン**: [docs/static-check-checklist.md](static-check-checklist.md) に F1〜F106(このセッションで F79〜F106)。カテゴリごとの進み具合と残りの観点は [TODO.md](../TODO.md)(52 / 77)
+- **静的検査のパターン**: [docs/static-check-checklist.md](static-check-checklist.md) に F1〜F133。カテゴリごとの進み具合と残りの観点は [TODO.md](../TODO.md)(89 / 90)
+  - F26 の見逃しを直した(PR #2): 補われた tbody をセレクタの途中で飛ばす `.t > .r > td` も報告する(3 ブラウザーで照合済み)
+  - F126 の健全性の修正: `clip` の横のスクロール値で `clip` が `hidden` になるのは Firefox・WebKit だけ(Chromium 156 は `clip`)。解析は Unknown
+  - F133: container のない軸の `cqw` / `cqh` は `svw` / `svh` になる
   - 保留: F91(段組の外の `break-*`。印刷を対象にするか未決)、F95(`li{display:flex}` でマーカーが消える。警告の条件が未決)
   - 見送り(実測したら効いていた): flex の `text-indent`、`perspective`、表のセルの `max-width`
   - 健全性の修正: F89(`calc(100%-10px)` を 100%−10px として計算していた)、F99(引用符のない不正な `font-family` を適用していた)
@@ -15,6 +18,11 @@ isle から切り出した CSS 検証器(veriss)を、別のマシンで続け�
   - M3 構文の段の結果を `notes[]` に(`src/rules/syntax-notes.mjs` が文言)
   - M4 捨てた宣言を `style.$dropped[]` に(`src/layout/dropped.mjs`)
   - M5 CSS の誤りの検査を `src/rules/css-mistakes.mjs` の `createCssMistakes({ report, facts, tools })` に
+- **検査ルール一覧**: [docs/rule-catalog.md](rule-catalog.md)(Web 版 https://mizchi.github.io/veriss/、README からリンク)。約 420 のコードを
+  13 の役割に分け、「検査可 / 一部 / 仕様のみ / 差を報告 / Unknown」を表にし、役割ごとに NG / OK の実例の画像(`docs/rule-catalog/*.png`)を付けた
+  - 実例は `tools/rule-catalog/examples.mjs`。`run.mjs all` で判定、`shoot.mjs` で画像、`build-page.mjs <出力先>` で Web 版
+  - main に push すると `.github/workflows/pages.yml` が Pages に出す(画像は CI では作らない。例を変えたら手元で作り直して commit)
+  - 新しい検査を足したら、一覧の役割の表にも行を足す
 - **実験**: [experiments/style-language/](../experiments/style-language/README.md)(ADR-0014・0015 の構文案 A〜E と、今の veriss での扱い)
 
 ## 始め方
@@ -46,6 +54,7 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 ## 次にやること
 
+- **eval の基準**: `evals/results/component-lint/` は古い Chromium で記録されていて、Playwright 1.64.1 の Chromium 156 では文字の組み方の差で `before`・`run-1` が変わる(TODO.md の 0)。gate の「eval が変わらない」は、同じブラウザーで main と比べて確かめる
 - **M6**: `solve` の中に残る「効かない宣言」の判定(`reasons` の一覧)を `rules/css-mistakes.mjs` に移す。layout の段は「親の display」「flow の中か」を事実として出す。レイアウトが Unknown のときに検査をやり直す `walkStyles` をなくす
 - **M7**: `rules/contrast`(色の規則を `src/color/` の上に。祖先の塗りの鎖だけで判定し、後ろに重なる箱の判定だけ layout があるときに足す)
 - **M8**: a11y を DOM の規則と幾何の規則に分ける。integrity と CLS も規則にする
@@ -60,6 +69,12 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 - ゲートの実行中に作業ツリーを変えると、結果がどの版のものか分からなくなる。ゲートの間はツリーの外(一時ディレクトリ)で準備する
 - `css-mistakes.test.mjs` は 1 ファイルで 20 秒以上かかる(止まっているのではない)
+- ブラウザーが Playwright の期待する場所にない環境(クラウドのセッションなど)では、e2e も `tools/eval-component-lint.mjs` も起動の時点で
+  失敗する(「Executable doesn't exist」。eval は結果を書かないので、`git status evals/` だけ見ると変わっていないように見える)。
+  e2e は `launchOptions.executablePath` を設定した一時の config で、eval は `chromium.launch` を差し替える `node --import <フック>` で回す
+- e2e の F26 のように「ブラウザーで当たらない」と「警告が出る」を 1 つの印で比べる表には、「当たらないが警告も出ない」組
+  (tbody を書いた表の `.t > .r > td`)を入れられない。そういう対照は単体テストに置く
+- 撮影(`tools/rule-catalog/shoot.mjs`)でページを使い回すと、前の撮影のホバーやフォーカスが残る。撮影ごとに新しいページを開く
 - Playwright の `setContent` はページのグローバルを持ち越す: script の `const` はブロックで包む
 - WebKit の `::selection` の基準には `::selection{--z:1}` の規則が要る。canvas は描かれるのを待ってから撮る
 - div を `display: list-item` にしてもマーカーは箱の左外に描かれて写らない(`ul > li` で比べる)。グラデーションは固有の大きさがないので `list-style-image` の対照に使えない(SVG の data URL を使う)
@@ -232,3 +247,10 @@ tools/gate.sh                                     # push の前に毎回。20〜
 main で追加された hover・CSS変数の推移的依存関係、hover時の独立ツリー再検証、
 操作時の容量制約のZ3への引き渡し、上限超過時のUnknownを .mts 正本へ移植。
 main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して引き続き使う。
+
+## Upstream同期とフォーク版ルールカタログ公開 (2026-11-21)
+
+**目的**: 上流 `mizchi/veriss` の変更を TypeScript 正本に移し、Lean と状態検証等のフォーク独自拡張を保持した上で、`kikutadev/veriss` の検査ルール一覧をブラウザーで閲覧できる公開ページとして届ける。
+**完了条件**: 上流コミットの取り込み、上流新規テストの TypeScript 化、生成 JS 一致、検証ゲート、最新 fork `main` への統合、GitHub Actions を使用しない静的ページ配布、公開 URL で表示・検索・リンク・スマホ幅を確認すること。
+**方針**: ルールデータ・NG/OK 画像・ページ生成器は上流の実装を活用。追加機能は独立したフォーク拡張を明示し、未検証の Lean の範囲は証明済みと表示しない。公開ファイルは `gh-pages` ブランチに生成物のみを置き、CI / GitHub Actions は追加しない。
+**現在**: 変更の一次移植とブラウザー差の復元が完了。上流・並行 `main` の統合、Webページのフォーク向け調整、三ブラウザー検証と公開作業が残る。

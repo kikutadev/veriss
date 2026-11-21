@@ -6,7 +6,7 @@ import { droppedOf } from './dropped.mjs';
 import { compileSelector } from './selectors.mjs';
 import { paintFacts } from './accessibility.mjs';
 const zero = q(0);
-export function createInlineSolver({ styles, edgeValue, generatedTexts, layoutWarnings, geometry, ranges, paints, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, inlineOverflow, firstPseudoInert, decorationNone }) {
+export function createInlineSolver({ styles, edgeValue, generatedTexts, layoutWarnings, geometry, ranges, paints, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, preserve3dInert, inlineOverflow, firstPseudoInert, decorationNone }) {
     // Inline content of a text leaf: phrasing elements that stay display: inline add no geometry when
     // they have no horizontal padding, border or margin (and keep a font-derived contract's font).
     // Each gets its own computed style and DOM facts as a row without a rectangle.
@@ -222,6 +222,7 @@ export function createInlineSolver({ styles, edgeValue, generatedTexts, layoutWa
                 inlineStateTransforms(child, style);
                 inlineTextAlignment(child, style);
                 inlineAutoMargin(child, style);
+                preserve3dInert(child, style, leafStyle);
                 inlineOverflow(child, style);
                 decorationNone(child, style, parents);
                 firstPseudoInert(child, style);

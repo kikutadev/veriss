@@ -32,6 +32,9 @@ export function timingProblem(property, value) {
     if (!text || /var\(|env\(|attr\(/i.test(text) || /^(?:inherit|initial|unset|revert|revert-layer)$/i.test(text))
         return null;
     const items = split(text, /,/).map(i => i.trim());
+    const timing = /^(?:transition|animation)(?:-[a-z-]+)?$/.test(prop);
+    if (!timing)
+        return null;
     if (items.some(i => !i))
         return 'an empty item in the comma-separated list';
     if (/^(?:transition|animation)-(?:duration|delay)$/.test(prop)) {

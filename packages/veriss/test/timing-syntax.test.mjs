@@ -13,3 +13,7 @@ test('valid values and var() are not reported', () => {
         ['transition', 'opacity var(--t)'], ['animation', 'spin 1s infinite alternate both'], ['transition-delay', '-1s, 0s']])
         assert.equal(timingProblem(p, v), null, `${p}: ${v}`);
 });
+test('a trailing comma in a property that is not a transition or an animation is not judged here', () => {
+    for (const [p, v] of [['will-change', 'transform,'], ['font-family', 'a,'], ['color', 'red,']])
+        assert.equal(timingProblem(p, v), null, p);
+});

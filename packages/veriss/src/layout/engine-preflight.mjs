@@ -99,16 +99,42 @@ export function preflight({ options, boxes, parsed, diagnostics, layoutWarnings,
                 message: b.restructured === 'fostered' ? `${b.label} is written inside a <table> but outside its cells, so the HTML parser moves it before the table (foster parenting): it is not in the table in the page. Put it in a cell (<td>) or a <caption>, or outside the table` : b.restructured === 'nested-form' ? `${b.label} has a <form> written inside it: the HTML parser drops the inner <form> start tag, so its fields belong to the outer form and its attributes (action, method) are lost. Forms cannot be nested: close the outer one first, or use the form attribute on the fields` : b.restructured === 'implied' ? `${b.label} is not in the source: the HTML parser made it (a stray </${b.tag}> after an element that cannot be inside a <${b.tag}> — a block in a paragraph — closed the open one, and the end tag became an empty <${b.tag}>). The elements written inside it are siblings in the page: nest only phrasing content in <${b.tag}>` : `${b.label} is closed early by the HTML parser (its </${b.tag}> does not end it: an element it cannot contain — a nested <a>, a block in a <button> or a heading in a heading — was written inside), so the elements after that point are not inside it in the page. Fix the nesting` });
     // F26: a child combinator through an element the HTML parser inserted (the tbody of a table written with its rows
     // directly inside): table > tr never matches — the selector matches only with the implied element skipped.
-    for (const b of boxes)
-        if (b.implied)
-            for (const c of b.children ?? [])
-                for (const rule of rules)
-                    for (const sel of rule.selectors ?? []) {
-                        if (sel.state || sel.pseudoElement || matches(sel, c) || !matches(sel, { ...c, [PARENT]: b[PARENT] }) || layoutWarnings.some(w => w.code === 'W_CSS_SELECTOR_IMPLIED_PARENT' && w.selector === sel.source))
-                            continue;
-                        layoutWarnings.push({ code: 'W_CSS_SELECTOR_IMPLIED_PARENT', severity: 'warning', box: c.label, path: c.path, selector: sel.source, css: [{ property: 'selector', file: rule.file, line: rule.line, selector: sel.source }],
-                            message: `${sel.source} never matches ${c.label}: the HTML parser puts a ${b.tag} between it and its ${b[PARENT]?.tag ?? 'parent'} (no ${b.tag} is written in the source, but every table has one), so the child combinator skips nothing. Write ${b[PARENT]?.tag ?? 'table'} > ${b.tag} > ${c.tag}, or use a descendant combinator` });
-                    }
+    // Include every descendant of an implied element, not only its direct child.
+    // Match the DOM as authored by omitting implied parser ancestors.
+    {
+        const written = new Map();
+        const asWritten = (box) => {
+            if (!box?.[PARENT])
+                return box;
+            if (!written.has(box)) {
+                let parent = box[PARENT];
+                while (parent?.implied)
+                    parent = parent[PARENT];
+                written.set(box, { ...box, [PARENT]: asWritten(parent) });
+            }
+            return written.get(box);
+        };
+        const impliedAbove = (box) => {
+            for (let a = box[PARENT], child = box; a; child = a, a = a[PARENT])
+                if (a.implied)
+                    return { implied: a, child };
+            return undefined;
+        };
+        for (const c of boxes) {
+            const above = impliedAbove(c);
+            if (!above)
+                continue;
+            for (const rule of rules)
+                for (const sel of rule.selectors ?? []) {
+                    const authored = asWritten(c);
+                    if (sel.state || sel.pseudoElement || layoutWarnings.some(w => w.code === 'W_CSS_SELECTOR_IMPLIED_PARENT' && w.selector === sel.source) || matches(sel, c) || !authored || !matches(sel, authored))
+                        continue;
+                    const { implied: b, child: row } = above, table = b[PARENT]?.tag ?? 'table';
+                    layoutWarnings.push({ code: 'W_CSS_SELECTOR_IMPLIED_PARENT', severity: 'warning', box: c.label, path: c.path, selector: sel.source, css: [{ property: 'selector', file: rule.file, line: rule.line, selector: sel.source }],
+                        message: `${sel.source} never matches ${c.label}: the HTML parser puts a ${b.tag} between ${row === c ? 'it' : `its ${row.tag}`} and the ${table} (no ${b.tag} is written in the source, but every table has one), so a child combinator from the ${table} to the ${row.tag} skips nothing. Write ${table} > ${b.tag} > ${row.tag}, or use a descendant combinator` });
+                }
+        }
+    }
     setRegisteredProperties(registered);
     if (defaultNamespace.length && boxes.some(box => ['svg', 'math'].includes(box.tag)))
         unknown('U_LAYOUT_CSS', 'A default XHTML @namespace keeps type and universal selectors off the SVG and MathML elements of this page, which is not modeled', defaultNamespace[0].line, undefined, defaultNamespace[0].file);

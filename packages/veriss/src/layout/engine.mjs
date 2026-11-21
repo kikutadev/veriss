@@ -123,7 +123,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
         else
             unknown(code, message, line, undefined, file);
     }, { scripting: options.scripting, mediaFeatures: options.mediaFeatures });
-    const { rules, layers, keyframes: keyframeNames = new Set(), dependentDeclarations = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, startingRules = [], animatedCustom = [], animatedReads = [] } = parsed;
+    const { rules, layers, keyframes: keyframeNames = new Set(), dependentDeclarations = [], firstPseudo = [], radiusRules = [], contentRules = [], userSelectNone = [], keyframeFrames, fontFaces, startingRules = [], animatedCustom = [], animatedReads = [], unreadContainers = [] } = parsed;
     preflight({ options, boxes, parsed, diagnostics, layoutWarnings, unknown });
     // style attributes: each element's declarations as a rule that matches only it, element-attached in the cascade.
     for (const box of boxes.filter(box => box.inlineStyle !== undefined)) {
@@ -228,13 +228,23 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     // walk where the layout did not run, so they are reported whether or not the layout is decided).
     // F9: a ::before or ::after styled but with no content is never generated.
     // CSS mistakes found on one box's computed style (rules/css-mistakes.mjs, ADR-0016 M5).
-    const { firstInert, firstPseudoInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
+    const { firstInert, firstPseudoInert, dialogMarginReset, preserve3dInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert } = createCssMistakes({
         report: { warnings: layoutWarnings, unknown, diagnostics, ranges },
-        facts: { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles },
+        facts: { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles, unreadContainers },
         tools: { matches, PARENT, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: box => focusableBox(box) },
     });
     const resolveStyles = createStyleResolver({ rules, preferences, hovered, untransformed, options, spend, bounded, loadedSource, context, textFonts, layoutWarnings, sourceUse, queryFacts, queries, invalidSubstitutions, ranges, cssMistakes, noteTransform: () => { sawTransform = true; } });
-    function styles(...args) { return resolveStyles(...args); }
+    function styles(...args) {
+        try {
+            return resolveStyles(...args);
+        }
+        catch (error) {
+            // The UA places an open dialog outside this layout model; still diagnose its margin reset.
+            if (args[0].tag === 'dialog' && error && typeof error === 'object' && '$sources' in error)
+                dialogMarginReset(args[0], { $sources: error.$sources });
+            throw error;
+        }
+    }
     // A box paints when it has a border or a background (vlmkit's painted-parent filter).
     const paints = (style) => ['left', 'right', 'top', 'bottom'].some(side => cmp(px(style[`border-${side}`]), zero) > 0) || style['background-image'] !== 'none' ||
         !/^(?:transparent|initial|unset|revert|rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*0\s*\)|#(?:[\da-f]{3}0|[\da-f]{6}00)|hsla\([^)]*,\s*0\s*\))$/.test(style['background-color']);
@@ -244,7 +254,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     const { hasViewportMargin, marginValue, resolvedViewportLength, resolvedGap, padding, edgeValue, hasViewportPadding, isZeroAffine, positivePadding, positiveEdge, responsiveBlockMargins } = createEdgeSolver(viewportLength, bounded, block);
     const { flex, resolveFlexLine, constantItem, breakLines, mainStarts } = createTrackSolver(bounded);
     const layoutFlex = (input) => createFlexLayout({ block, options, viewportLength, bounded, frAutoMinimums, scrolls, obligation, solve, finish, resolvedGap, hasViewportMargin, hasViewportPadding, resolvedViewportLength, isZeroAffine, constantItem, resolveFlexLine, breakLines, mainStarts })(input);
-    const { generatedElsewhere, inlineContent } = createInlineSolver({ styles, edgeValue, generatedTexts, layoutWarnings, geometry, ranges, paints, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, inlineOverflow, firstPseudoInert, decorationNone });
+    const { generatedElsewhere, inlineContent } = createInlineSolver({ styles, edgeValue, generatedTexts, layoutWarnings, geometry, ranges, paints, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, preserve3dInert, inlineOverflow, firstPseudoInert, decorationNone });
     let finalize;
     function finish(...args) {
         finalize ??= createFinalizer({ options, block, hovered, scrollbarProfile, getPageScroll: () => pageScroll, setPageScroll: v => { pageScroll = v; }, geometry, sizes, layoutWarnings, animated, styles, inlineContent, ancestorPaint: () => ancestorPaint, paints, captionBackdrop, startingRules, keyframeFrames, fontFaces, rules, cover, metaViewport: root.metaViewport, intrinsic, unknown, translated, resolvedOrigin, padding, edgeValue, obligation, cellGrows, ranges });
@@ -275,6 +285,15 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     setUAProfile(resolveUAProfile(options.ua));
     uaEngine = resolveUAProfile(options.ua)?.engine;
     unitContext.heightKnown = Boolean(block && options.viewport.height);
+    // F129: a closed dialog has display:none and is not visited by the layout walk.
+    // Diagnose its reset declarations too; the box may later be opened via showModal().
+    for (const dialog of boxes.filter(box => box.tag === 'dialog')) {
+        try {
+            for (const state of styles(dialog, initial, [], undefined, false, false))
+                dialogMarginReset(dialog, state.style);
+        }
+        catch { /* open dialogs are Unknown; the style wrapper still records their reset */ }
+    }
     // A flex item's main size that a non-auto flex-basis replaces, when no automatic minimum reads it (flex.mjs keeps
     // that case Unknown): the property, or null. The layout treats it as auto; finish() reports it as inert.
     // Shared by actual sizing and block-flow auto-margin placement. CSS uses
@@ -638,7 +657,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
     // Checklist F where the layout did not run to the end: a style walk over every box (no layout), so the mistakes in
     // the CSS are reported whatever is Unknown. (Each warning is reported once per box.)
     if (diagnostics.some(d => d.severity === 'unknown') && hovered === undefined && !options.$animationFrame && !options.$slideVariant && !untransformed) {
-        checkUnknownStyles({ root, initial, styles, cssMistakes, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, inlineOverflow, decorationNone, firstPseudoInert });
+        checkUnknownStyles({ root, initial, styles, cssMistakes, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, preserve3dInert, inlineOverflow, decorationNone, firstPseudoInert });
     }
     // F37: a ::first-letter / ::first-line that may apply (a block container it selects, not shown to have none) restyles
     // text in a way that is not modeled.

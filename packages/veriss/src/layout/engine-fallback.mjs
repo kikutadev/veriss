@@ -1,4 +1,4 @@
-export function checkUnknownStyles({ root, initial, styles, cssMistakes, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, inlineOverflow, decorationNone, firstPseudoInert }) {
+export function checkUnknownStyles({ root, initial, styles, cssMistakes, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, preserve3dInert, inlineOverflow, decorationNone, firstPseudoInert }) {
     const walkStyles = (box, ancestors, inherited) => {
         let state;
         try {
@@ -45,6 +45,10 @@ export function checkUnknownStyles({ root, initial, styles, cssMistakes, pseudoW
             catch { /* the rest still runs */ }
             try {
                 inlineAutoMargin(child, c.style);
+            }
+            catch { /* the rest still runs */ }
+            try {
+                preserve3dInert(child, c.style, parentStyle);
             }
             catch { /* the rest still runs */ }
             try {

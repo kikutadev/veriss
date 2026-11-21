@@ -3,6 +3,57 @@ interface NoteSource {
     line: number;
 }
 export interface SyntaxNotePayloads {
+    W_CSS_SELECTOR_LIST_VENDOR: NoteSource & {
+        selector: string;
+        vendor: string;
+        pseudo: string;
+        drops: string[];
+    };
+    W_CSS_SCROLLBAR_WEBKIT_IGNORED: {
+        base: string;
+        webkit: NoteSource & {
+            selector: string;
+            hides: boolean;
+        };
+        standard: (NoteSource & {
+            property: string;
+            value: string;
+        })[];
+    };
+    W_CSS_SCROLLBAR_FIREFOX_SHOWN: {
+        base: string;
+        webkit: NoteSource & {
+            selector: string;
+            hides: boolean;
+        };
+    };
+    W_CSS_MARGIN_PERCENT_WIDTH: NoteSource & {
+        property: string;
+        value: string;
+        percent: string;
+        selector: string;
+    };
+    W_CSS_BOX_SIZING_NOT_INHERITED: NoteSource & {
+        selector: string;
+        affected: string;
+    };
+    W_CSS_MEDIA_EM_ROOT: NoteSource & {
+        params: string;
+        root: NoteSource & {
+            value: string;
+            selector: string;
+        };
+    };
+    W_CSS_ISOLATION_SELF: NoteSource & {
+        blend: string;
+        selector: string;
+    };
+    W_CSS_SIZE_BROWSER_DEPENDENT: NoteSource & {
+        property: string;
+        selector: string;
+        keywords: string[];
+        used: Record<string, string | null>;
+    };
     W_CSS_BACKGROUND_INVALID: NoteSource & {
         problem: string;
         selector: string;
@@ -149,6 +200,7 @@ export interface SyntaxWarning {
     message: string;
     selector?: string | undefined;
     property?: string | undefined;
+    browsers?: Record<string, string[] | Record<string, string | null> | string | null>;
     css: {
         property: string;
         file: string;

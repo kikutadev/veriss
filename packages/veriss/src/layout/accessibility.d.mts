@@ -97,6 +97,7 @@ export interface PaintFacts extends BackdropLayer {
     isolation: CssText;
     transform: CssText;
     backdropFilter: string;
+    preserve3d?: boolean;
     stacks?: boolean;
     willChange: string;
     scrollMargin: {

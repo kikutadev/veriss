@@ -10,6 +10,35 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - 解析が Unknown を成功に変えないこと(判定できない値は Unknown のまま)
 - lint の説明(新しいコードのとき `packages/adapter-core/src/lint.mjs`)とチェックリストの行
 
+## 現在の予定(2026-11-20 時点、次に再開するとき用)
+
+パターンの一覧(カテゴリ 1〜13)は F95 を除いて済み(89 / 90)。次は次の順で進める。
+
+0. **eval の基準を Chromium 156 で記録し直すか決める**: `tools/eval-component-lint.mjs` の結果(`evals/results/component-lint/`)は古い Chromium で
+   記録されている。Playwright 1.64.1 が使う Chromium 156 では文字の組み方が 0.4px ほど違い、`before` と `run-1` が変わる(320〜375px の
+   はみ出しの判定が「確かめられない」になる。見逃しではない)。基準を記録し直すか、eval をブラウザーの版に結びつけるかを決める
+1. **パターンの追加を続ける**(新しい観点を足すときはカテゴリの表と一覧の両方に足す。[検査ルール一覧](docs/rule-catalog.md) の該当する役割の表にも行を足す)。まだ調べていない候補:
+   - `:focus-visible` とキーボード / マウスでの見え方の差、`:has()` の重さと無効な引数
+   - (済)`@container` の単位(`cqw` / `cqh`)を container のない要素で使う(F133)。`container-type: size` で高さが 0 になるのは既存の配置の検査(`E_LAYOUT_TRACKS`)で捕まる
+   - `writing-mode: vertical-*` と物理プロパティ(`width` / `margin-top`)の取り違え
+   - `inert` / `popover` と CSS の `display` の組み合わせ
+   - `<picture>` / `srcset` と CSS の `width` / `object-fit`
+2. **構成の作業 M6**: `solve` の中の「効かない宣言」の判定(engine.mjs の reasons の塊)を `rules/` に移す。今回の F118・F124・F129 の「レイアウトが Unknown だと届かない」問題がこれで減る
+3. **M7〜M9**: contrast を規則に、a11y を DOM と幾何に分ける、`packages/` に出す
+4. **ADR-0017 の R2**(マージンの相殺の一般化)と **R3**(web-platform-tests の部分集合を回帰試験に)。R2 が Unknown を直接減らす
+5. **保留の判断**: F95(`li` の display を変えてマーカーが消える)と F91(印刷)。どちらも利用者の判断待ち
+
+作業の進め方の約束:
+
+- ゲート `tools/gate.sh`(全パッケージの単体テスト、component-lint の eval が変わらないこと、css-mistakes の e2e を 3 ブラウザーで)を通してから commit し、main と claude ブランチへ push
+  (claude ブランチからは PR を作って merge する。PR では CodeRabbit がレビューする)
+- [検査ルール一覧](docs/rule-catalog.md) は main に push すると `.github/workflows/pages.yml` が https://mizchi.github.io/veriss/ に出す。
+  実例の画像(NG / OK の組)は CI では作らないので、`tools/rule-catalog/examples.mjs` を変えたら `node tools/rule-catalog/shoot.mjs` で
+  作り直して commit する(`node tools/rule-catalog/run.mjs all` で、NG に狙いのコードが出て OK が verified かを確かめる)
+- ゲートの実行中はソースを変えない(テストが途中の変更を読む)。測るだけの使い捨てスクリプトは `tools/_m.mjs` に置いて消す
+- スクロールバーを測るときは Chromium を `ignoreDefaultArgs: ['--hide-scrollbars']` で起動する(F130)
+- 実測は Chromium・Firefox(157)・WebKit。結果が分かれるものは `browsers` を付けて報告し、レイアウトは Unknown のまま
+
 ## 進み具合(カテゴリごと)
 
 「観点」はそのカテゴリで調べる切り口。済 = 実測して実装したか、効いていると確かめて外したもの。
@@ -18,15 +47,18 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 |---|---|---|
 | 1. 宣言ごと捨てられる値(構文) | 11 / 11 | 済 |
 | 2. at-rule(`@media` ほか) | 8 / 8 | 済 |
-| 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 9 / 10 | ほぼ済 |
+| 3. 親の表示形式で効かない宣言(block / inline / flex / grid / positioned) | 10 / 10 | 済 |
 | 4. 表 | 9 / 9 | 済 |
-| 5. テキストと折り返し | 8 / 9 | ほぼ済 |
+| 5. テキストと折り返し | 9 / 9 | 済 |
 | 6. リスト・マーカー・カウンター | 4 / 5 | ほぼ済(1 つ保留) |
-| 7. transform・重なり・描画 | 3 / 6 | 進行中 |
-| 8. フォーム部品・置換要素 | 4 / 8 | 進行中 |
+| 7. transform・重なり・描画 | 6 / 6 | 済 |
+| 8. フォーム部品・置換要素 | 8 / 8 | 済 |
 | 9. セレクタ × DOM(状態・構造) | 8 / 8 | 済 |
-| 10. ブラウザで結果が違うもの | 1 / 5 | 着手 |
-| 合計 | 65 / 79(82%) | |
+| 10. ブラウザで結果が違うもの | 5 / 5 | 済 |
+| 11. 単位と計算値の落とし穴(書いた値と計算値が違う) | 5 / 5 | 済 |
+| 12. HTML 要素ごとの既定の振る舞いとリセット CSS | 4 / 4 | 済 |
+| 13. 状態のセレクタとカスケードの順 | 2 / 2 | 済 |
+| 合計 | 89 / 90(99%) | |
 
 観点を足したら分母が増える。カテゴリの中で新しい観点が見つかったら、表と下の一覧の両方に足す。
 
@@ -66,7 +98,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] absolute の `float`、`margin: auto`(F77、F38)
 - [x] `columns` を flex / grid に、段組の外の `column-span`(F34、F81)
 - [x] `aspect-ratio` を表と inline に(F98)
-- [ ] absolute / fixed の子の flex 項目プロパティ(`order`、`flex-grow`)。現状は解析が Unknown
+- [x] absolute / fixed の子の flex 項目プロパティ(`order`、`flex-grow`)(F118)。flex の中の absolute の子の配置そのものは Unknown のまま(flex の経路で containing block の大きさが最後に決まるため。insets が両軸で決まる子から対応する余地あり)
 
 ### 4. 表
 
@@ -90,7 +122,7 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] `text-decoration: none` で祖先の線は消えない(F58)
 - [x] `letter-spacing` / `word-spacing` の不正: 3 ブラウザで `%` は有効、単位のない数は F93 で報告済み、と確かめた
 - [x] `letter-spacing` / `word-spacing` の `auto`(F109 で報告)
-- [ ] `text-wrap: balance` が `white-space: nowrap` を打ち消す(折り返しが戻る)ことの知らせ
+- [x] `text-wrap: balance` が `white-space: nowrap` を打ち消す(折り返しが戻る)ことの知らせ(F119。`text-wrap: pretty` は Firefox で捨てられる)
 
 ### 6. リスト・マーカー・カウンター
 
@@ -105,9 +137,9 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] transform のない `transform-origin`(F83)
 - [x] 祖先の後ろに回る負の z-index(F72)
 - [x] `perspective`(重なり順が変わると確かめて見送り)
-- [ ] `backface-visibility` / `transform-style: preserve-3d` を 3D の transform なしで
-- [ ] `isolation` / `mix-blend-mode` の組み合わせ
-- [ ] `will-change` の値が効かないプロパティ名
+- [x] `transform-style: preserve-3d` が grouping property で平らになる・inline で効かない、fixed の子を閉じ込める(F117)。`backface-visibility` は受け付けるだけ(3D の transform は Unknown のまま)
+- [x] `isolation` / `mix-blend-mode` の組み合わせ(F123。混ぜる要素自身の `isolation: isolate` は効かない。同じ規則の中だけ判定)
+- [x] `will-change` の不正な値(`auto` や `all` を含むリスト、カンマなし)(F116)。知らない名前は有効で、効かないだけ(判定しない)
 
 ### 8. フォーム部品・置換要素
 
@@ -115,10 +147,10 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] `input type=hidden`、`datalist`、置換要素の擬似要素(F68、F69、F32)
 - [x] `object-fit` / `object-position`(既存、F39)
 - [x] canvas の引き伸ばし(F71)
-- [ ] `select` / `input` の `padding`・`text-align` のブラウザ差(実測では 3 ブラウザとも効いた。差の出る条件を探す)
-- [ ] `<option>` のスタイル(閉じた select では描かれない)
-- [ ] `<br>` の `margin`(Firefox だけ効く)
-- [ ] `<img>` / `<video>` の `width` / `height` 属性と CSS の優先
+- [x] `select` / `input` の `padding`・`text-align` のブラウザ差(`padding`・`text-align`・`text-align-last` は揃った。差が出たのは select の `text-indent`: Firefox だけ 2 倍、F124)
+- [x] `<option>` のスタイル(F121。ドロップダウンでは大きさ・余白が select に効かない。開いたメニューの描画は測っていない)
+- [x] `<br>` の `margin`(Firefox だけ効く)(F120。`line-height` は WebKit だけ、ほかはどこでも効かない)
+- [x] `<img>` / `<video>` の `width` / `height` 属性と CSS の優先(実測: CSS の width だけ、または max-width: 100% だけだと高さは属性のまま残り比率が崩れる。`height: auto` で保たれる。既存の `W_LAYOUT_IMAGE_DISTORTED` が属性の比率と描く大きさの差として報告する)
 
 ### 9. セレクタ × DOM
 
@@ -134,10 +166,31 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 ### 10. ブラウザで結果が違うもの
 
 - [x] block レイアウトの `justify-self` / `justify-items`(F105)
-- [ ] `<br>` の `margin`(カテゴリ 8 と同じ)
-- [ ] `::-webkit-scrollbar` と `scrollbar-width` / `scrollbar-color`(重ねて描くスクロールバーのヘッドレスでは測れない。測り方を決める)
-- [ ] `-webkit-` だけの書き方(`-webkit-line-clamp` 以外)
-- [ ] フォーム部品の既定の大きさ(UA プロファイルと突き合わせる)
+- [x] `<br>` の `margin`(カテゴリ 8 と同じ、F120)
+- [x] `::-webkit-scrollbar` と `scrollbar-width` / `scrollbar-color`(F130。測り方: Chromium は `--hide-scrollbars` を外して従来型のスクロールバーにし、`offsetWidth - clientWidth` で幅を読む。WebKit は `::-webkit-scrollbar` の幅がそのまま測れる。Firefox は重ねて描くスクロールバーを止められないので `CSS.supports` で受け付けるかを読む)
+- [x] `-webkit-` だけの書き方(`-webkit-line-clamp` 以外): 大きさのキーワード(F122)。`-webkit-box-reflect` などの描画だけのものは測れていない
+- [x] フォーム部品の既定の大きさ(UA プロファイル `ua-profile.mjs` が Chromium・Firefox・WebKit ごとに持ち、cross-browser lint が差を報告する)
+
+### 11. 単位と計算値の落とし穴
+
+- [x] メディアクエリの `em` / `rem` がルートの `font-size` を見ない(F125)
+- [x] `overflow-x: hidden` の横の `overflow-y: visible` が `auto` になる(F126)
+- [x] html / body だけの `box-sizing` は継承されない(F127)
+- [x] 縦の `margin` の % は幅に対する割合(F128)
+- [x] container のない軸の `cqw` / `cqh` は small viewport の単位になる(F133)
+
+### 12. HTML 要素ごとの既定の振る舞いとリセット CSS
+
+- [x] リセット CSS で中央に来なくなる `<dialog>`(F129)
+- [x] `<fieldset>` の既定の `min-inline-size: min-content`(実測: 3 ブラウザーとも中身の幅まで広がる。解析は UA の値をリセットされるまで特別に扱い、判定はしない)
+- [x] `<sup>` / `<sub>` で行が高くなる(実測: 3 ブラウザーとも。解析は baseline 以外の vertical-align を Unknown にする)
+- [x] `<details>` の `display: flex`、`<hr>` の `color`(実測: 3 ブラウザーとも効く。報告することはない)
+
+### 13. 状態のセレクタとカスケードの順
+
+- [x] 後の規則に負けて見えない `:hover` / `:focus` / `:active`(F131。LVHA の順)
+- [x] セレクタリストの中の `-moz-` / `-ms-` の擬似で規則全体が捨てられる(F132)
+- 確かめて既存で足りていたもの: flex / grid コンテナの `text-overflow`(効かない宣言として報告済み)、中身のある `aspect-ratio`(理由付きの Unknown)
 
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
@@ -184,6 +237,12 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 実装済み(最近)
 
+- F133. container のない軸の container query の単位(`cqw` / `cqh` が `svw` / `svh` になる)
+- F126 の健全性の修正: `clip` の横のスクロール値で `clip` を `hidden` にするのは Firefox と WebKit だけ(Chromium 156 は `clip` のまま)。`browsers` を付けて報告し、解析は Unknown
+- F26 の 3 ブラウザー照合(Firefox・WebKit でも通った)
+- F26 の見逃しの修正: 補われた tbody をセレクタの途中で飛ばす子の結合子(`.t > .r > td`、`table > tr .x`)も報告する(PR #2)
+- [検査ルール一覧](docs/rule-catalog.md): 約 420 のコードを 13 の役割に分け、検査できるもの・Unknown のものを表にし、役割ごとに
+  NG / OK の実例の画像を付けた。GitHub Pages(https://mizchi.github.io/veriss/)に出し、README からリンク(PR #1)
 - F79. media query の単位なし長さ・単位前の空白
 - F80. `white-space: nowrap` / `pre` の下の `overflow-wrap`
 - F81. 段組の外の `column-span`
@@ -206,6 +265,23 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - F102. どこからも読まれない CSS カウンター
 - F103. inline 系の箱の左右の `margin: auto`
 - F105. block レイアウトの `justify-self` / `justify-items`(ブラウザで違う)
+- F132. セレクタリストの中の `-moz-` / `-ms-` の擬似
+- F131. 後の規則に負けて見えない `:hover` / `:focus` / `:active`
+- F130. `::-webkit-scrollbar` と標準の `scrollbar-width` / `scrollbar-color`
+- F129. リセット CSS で中央に来なくなる `<dialog>`
+- F128. 縦の `margin` の % は幅に対する割合
+- F127. html / body だけの `box-sizing` は継承されない
+- F126. 片方の軸だけの `overflow: hidden`(もう片方の visible が auto になる)
+- F125. メディアクエリの `em` / `rem` はルートの `font-size` を見ない
+- F124. `select` の `text-indent`(Firefox だけ 2 倍)
+- F123. `mix-blend-mode` と同じ要素の `isolation: isolate`
+- F122. 一部のブラウザーしか受け付けない大きさのキーワード
+- F121. ドロップダウンの `<option>` の大きさ・余白
+- F120. `<br>` に書いたスタイル
+- F119. `white-space: nowrap` の後の `text-wrap: balance`
+- F118. absolute / fixed の箱の flex 項目プロパティ
+- F117. `transform-style: preserve-3d` の平坦化と fixed の閉じ込め
+- F116. 不正な `will-change`
 - F115. 不正な `background` ショートハンド
 - F114. 不正な `transition` / `animation`
 - F113. 不正な `@font-face`

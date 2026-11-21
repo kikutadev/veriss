@@ -596,10 +596,9 @@ export interface LayoutWarning {
     lineHeight?: string | undefined;
     intervals?: [number, number][];
     state?: string | undefined;
-    browsers?: {
-        aligns: string[];
-        ignores: string[];
-    };
+    browsers?: Record<string, string[] | Record<string, string | null> | string | null>;
+    select?: string;
+    units?: string[];
     loserAt?: string;
     winnerAt?: string;
     winner?: string;

@@ -18,7 +18,8 @@ export declare function setSafeArea(area: SafeArea | "unknown" | null): void;
 export declare const viewportLength: (text: unknown) => boolean;
 export declare function px(text: string): Rational;
 export declare const noPseudoHost: (box: Pick<SelectorBox, "tag" | "inputType">) => boolean;
-export declare const containsFixed: (style: Pick<ComputedStyle, "transform" | "backdrop-filter" | "will-change"> | null | undefined) => boolean;
+export declare const fixedContainer: (style: Pick<ComputedStyle, "transform" | "backdrop-filter" | "will-change" | "transform-style" | "display">) => string;
+export declare const containsFixed: (style: Pick<ComputedStyle, "transform" | "backdrop-filter" | "will-change" | "transform-style" | "display"> | null | undefined) => boolean;
 export declare const dependentProperty: Record<string, Pair<string>>;
 export declare const paintProperties: string[];
 export declare const textProperties: string[];
@@ -45,6 +46,7 @@ interface DeclarationBase extends CSSLocation {
     important: 0 | 1;
     flip?: string;
     specified?: string;
+    wrapShorthand?: string;
 }
 export type CSSDeclaration = DeclarationBase & ({
     expression: VariableExpression;
@@ -69,6 +71,11 @@ export interface CSSRule extends CSSLocation {
     hoverLayout?: boolean;
     variableHover?: boolean;
     unmodeledVariableConsumer?: boolean;
+    unmodeled?: (CSSLocation & {
+        property: string;
+        specified: string;
+        selector: string;
+    })[];
 }
 interface CSSRuleReference extends CSSLocation {
     selectors: Selector[];
@@ -143,6 +150,9 @@ export declare function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: 
     startingRules: StartingRule[];
     animatedCustom: AnimatedCustom[];
     animatedReads: AnimatedRead[];
+    unreadContainers: (CSSLocation & {
+        selector: string;
+    })[];
 };
 declare const textInitial: {
     'font-family': string;
@@ -181,6 +191,7 @@ export interface CSSOrigin extends CSSLocation {
     specified: string | undefined;
     conditions?: OriginCondition[];
     logical?: true;
+    wrapShorthand?: string;
 }
 type SourceMap = Record<string, CSSOrigin | undefined>;
 type OriginLists = Record<string, CSSOrigin[]>;
@@ -213,6 +224,18 @@ interface ComputedMetadata extends DroppedStyle {
     $variables?: VariableEnvironment;
     $hiddenInputDisplay?: string | undefined;
     $pseudoNotRendered?: string | undefined;
+    $wrapRestored?: {
+        whiteSpace: string;
+        from: CSSOrigin;
+        by: CSSOrigin;
+    };
+    $overflowPromoted?: {
+        property: string;
+        written: string;
+        other: string;
+        source: CSSOrigin;
+    }[];
+    $selectIndent?: string;
     $tableOverflow?: CSSValueMap;
 }
 type KnownComputedProperties = Partial<Record<keyof ReturnType<typeof defaultStyle> | keyof typeof textInitial | `scroll-${'margin' | 'padding'}-${'top' | 'right' | 'bottom' | 'left'}` | 'content' | 'clear' | 'column-count' | 'column-width' | 'list-style-image', string | undefined>>;
@@ -356,6 +379,8 @@ declare function defaultStyle(box: CSSBox, inherited: InheritedStyle): {
     'content-visibility': string;
     'contain-intrinsic-block-size': string;
     isolation: string;
+    'transform-style': string;
+    'backface-visibility': string;
     transform: string;
     'transform-origin': string;
     translate: string;

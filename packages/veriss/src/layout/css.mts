@@ -30,6 +30,7 @@ import { calcOperatorProblem } from './calc-syntax.mjs';
 import { drop } from './dropped.mjs';
 import { colorSyntaxProblem, parseColor } from '../color/index.mjs';
 import { backgroundProblem } from './background-syntax.mjs';
+import { sizeKeywordSplits } from './size-keyword-syntax.mjs';
 import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import { keywordProblem } from './keyword-syntax.mjs';
@@ -161,14 +162,15 @@ const statePaint = /^(?:z-index|color|clip|clip-path|background(?:-.*)?|border-(
 // Paint and hit-testing facts for the accessibility rules (never geometry).
 // An element that is the containing block of its fixed (and absolute) descendants: a transform, a backdrop filter, or
 // will-change naming a property that would make one.
-export const containsFixed = (style: Pick<ComputedStyle, 'transform' | 'backdrop-filter' | 'will-change'> | null | undefined) => !!style && ((style.transform ?? 'none') !== 'none' || (style['backdrop-filter'] ?? 'none') !== 'none' || /(?:^|,\s*)(?:transform|translate|rotate|scale|filter|backdrop-filter|perspective)(?:\s*,|$)/.test(style['will-change'] ?? 'auto'));
+export const fixedContainer = (style: Pick<ComputedStyle, 'transform' | 'backdrop-filter' | 'will-change' | 'transform-style' | 'display'>): string => style.transform !== 'none' ? `transform: ${style.transform}` : style['transform-style'] === 'preserve-3d' && style.display !== 'inline' ? 'transform-style: preserve-3d' : style['backdrop-filter'] !== 'none' ? `backdrop-filter: ${style['backdrop-filter']}` : `will-change: ${style['will-change']}`;
+export const containsFixed = (style: Pick<ComputedStyle, 'transform' | 'backdrop-filter' | 'will-change' | 'transform-style' | 'display'> | null | undefined) => !!style && ((style.transform ?? 'none') !== 'none' || (style['transform-style'] === 'preserve-3d' && style.display !== 'inline') || (style['backdrop-filter'] ?? 'none') !== 'none' || /(?:^|,\s*)(?:transform|translate|rotate|scale|filter|backdrop-filter|perspective)(?:\s*,|$)/.test(style['will-change'] ?? 'auto'));
 // Declarations that only act together with another property of the same element (checklist F15, F16): the property
 // they need, and the computed value at which they do nothing. (Not inherited, so they act on this element only.)
 export const dependentProperty: Record<string, Pair<string>> = {
   'background-size': ['background-image', 'none'], 'background-position': ['background-image', 'none'], 'background-repeat': ['background-image', 'none'], 'background-attachment': ['background-image', 'none'], 'background-origin': ['background-image', 'none'],
   'text-decoration-color': ['text-decoration-line', 'none'], 'text-decoration-style': ['text-decoration-line', 'none'], 'text-decoration-thickness': ['text-decoration-line', 'none'],
 };
-export const paintProperties = ['hyphens', 'object-fit', 'scroll-behavior', 'overscroll-behavior-x', 'overscroll-behavior-y', 'scroll-snap-type', 'scroll-snap-align', 'resize', 'text-wrap-mode', 'text-wrap-style', 'text-overflow', 'line-clamp', 'box-orient', 'touch-action', 'color', 'visibility', 'pointer-events', 'opacity', 'text-decoration-line', 'outline-style', 'outline-width', 'outline-color', 'outline-offset', 'box-shadow', 'cursor', 'list-style-type', 'animation-name', 'animation-duration', 'animation-iteration-count', 'animation-play-state', 'animation-direction', 'animation-timing-function', 'animation-delay', 'animation-fill-mode', 'animation-timeline', 'transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay', 'color-scheme', 'z-index', 'isolation', 'transform', 'transform-origin', 'translate', 'rotate', 'scale', 'backdrop-filter', 'will-change', 'justify-self', 'justify-items', 'fill', 'stroke', 'list-style-position', 'caret-color', 'content-visibility', 'contain-intrinsic-block-size'];
+export const paintProperties = ['hyphens', 'object-fit', 'scroll-behavior', 'overscroll-behavior-x', 'overscroll-behavior-y', 'scroll-snap-type', 'scroll-snap-align', 'resize', 'text-wrap-mode', 'text-wrap-style', 'text-overflow', 'line-clamp', 'box-orient', 'touch-action', 'color', 'visibility', 'pointer-events', 'opacity', 'text-decoration-line', 'outline-style', 'outline-width', 'outline-color', 'outline-offset', 'box-shadow', 'cursor', 'list-style-type', 'animation-name', 'animation-duration', 'animation-iteration-count', 'animation-play-state', 'animation-direction', 'animation-timing-function', 'animation-delay', 'animation-fill-mode', 'animation-timeline', 'transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay', 'color-scheme', 'z-index', 'isolation', 'transform-style', 'backface-visibility', 'transform', 'transform-origin', 'translate', 'rotate', 'scale', 'backdrop-filter', 'will-change', 'justify-self', 'justify-items', 'fill', 'stroke', 'list-style-position', 'caret-color', 'content-visibility', 'contain-intrinsic-block-size'];
 const inheritedPaint = ['color', 'fill', 'stroke', 'list-style-position', 'caret-color', 'visibility', 'pointer-events', 'cursor', 'list-style-type', 'color-scheme', 'text-wrap-style', 'text-wrap-mode'];
 // Inherited text properties. They are kept as specified strings and only
 // interpreted for boxes whose contract derives text metrics from a font.
@@ -670,6 +672,9 @@ function expand(property: string, value: string): Expansion[] {
     if (property === 'contain-intrinsic-size') return [['contain-intrinsic-block-size', sizes[1] ?? at(sizes, 0)]];
     return /height|block/.test(property) ? [['contain-intrinsic-block-size', at(sizes, 0)]] : [];
   }
+  // F117: transform-style and backface-visibility only change how 3D transforms paint (3D transforms stay Unknown);
+  // preserve-3d also makes the element the containing block of fixed descendants (containsFixed).
+  if (property === 'transform-style' || property === 'backface-visibility') { const ok = property === 'transform-style' ? ['flat', 'preserve-3d'] : ['visible', 'hidden']; if (!wide.has(value) && !ok.includes(value)) throw new Error(`Unsupported ${property}: ${value}`); return [[property, value]]; }
   if (property === 'isolation') { if (!wide.has(value) && !['auto', 'isolate'].includes(value)) throw new Error(`Unsupported isolation: ${value}`); return [[property, value]]; }
   if (property === 'z-index') { if (!wide.has(value) && !/^(?:auto|-?\d+)$/.test(value)) throw new Error(`Unsupported z-index: ${value}`); return [[property, value]]; }
   // justify-self / justify-items are admitted where they do nothing (flex items and containers); the engine keeps a
@@ -720,7 +725,7 @@ export interface CSSLocation {file: string; line: number}
 export interface CSSCondition extends ParsedCondition { css: CSSLocation }
 export interface CSSPreference {feature: string; value: string}
 export interface PendingDeclaration {property: string; expression: VariableExpression}
-interface DeclarationBase extends CSSLocation {property: string; value: string | undefined; important: 0 | 1; flip?: string; specified?: string}
+interface DeclarationBase extends CSSLocation {property: string; value: string | undefined; important: 0 | 1; flip?: string; specified?: string; wrapShorthand?: string}
 export type CSSDeclaration = DeclarationBase & (
   | {expression: VariableExpression; pending?: never}
   | {pending: PendingDeclaration; expression?: never}
@@ -730,6 +735,7 @@ export interface CSSRule extends CSSLocation {
   selectors: Selector[]; declarations: CSSDeclaration[]; contexts: CSSCondition[];
   layer: number | null; layerName?: string|undefined; attached?: boolean; preferences?: CSSPreference[];
   stateGeometry?: boolean; stateLayout?: boolean; hoverLayout?: boolean; variableHover?: boolean; unmodeledVariableConsumer?: boolean;
+  unmodeled?: (CSSLocation & {property:string;specified:string;selector:string})[];
 }
 interface CSSRuleReference extends CSSLocation {selectors: Selector[]; selector: string}
 interface DependentDeclaration extends CSSRuleReference {contexts: CSSCondition[]; property: string; value: string}
@@ -753,6 +759,20 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
   const notes: SyntaxNote[] = [], note = (data: SyntaxNote) => { notes.push(data); }, notesOf = <K extends SyntaxNoteCode,>(code: K) => notes.filter((n): n is Extract<SyntaxNote, {code: K}> => n.code === code);
   const dependentDeclarations: DependentDeclaration[] = [], markerSizing: MarkerSizing[] = [], firstPseudo: CSSRuleReference[] = [], radiusRules: RadiusRule[] = [], contentRules: Selector[][] = [], userSelectNone: CSSRuleReference[] = [], rules: CSSRule[] = [], layers: string[] = [], keyframes = new Set<string>(), keyframeFrames = new Map<string, Keyframe[]>(), fontFaces: FontFace[] = [], registered = new Map<string, PropertyRegistration>(), defaultNamespace: CSSLocation[] = [], startingRules: StartingRule[] = [];
   const animatedCustom:AnimatedCustom[]=[],animatedReads:AnimatedRead[]=[];
+  const unreadContainers: (CSSLocation & {selector:string})[] = [];
+  const reportedMediaEm = new Set<string>();
+  // F125: media query em/rem are relative to the browser's default font, not html font-size.
+  let rootFont: (CSSLocation & {value:string;selector:string}) | null = null;
+  for (const sheet of sheets) {
+    let sheetRoot; try { sheetRoot = postcss.parse(sheet.css, {from:sheet.file}); } catch {continue;}
+    sheetRoot.walkRules(rule => {
+      if (rule.parent?.type !== 'root' || !postcss.list.comma(rule.selector).some(sel => /^(?:html|:root)$/i.test(sel.trim()))) return;
+      rule.walkDecls(/^(?:font-size|font)$/i,d => {
+        const v = d.prop.toLowerCase() === 'font' ? (/(?:^|\s)(\d*\.?\d+(?:px|%|em|rem|pt))(?:\/|\s)/i.exec(d.value)?.[1] ?? '') : d.value.trim().toLowerCase();
+        if (v && !/^(?:16px|100%|1em|1rem|medium|12pt|inherit|initial|unset|revert|revert-layer|var\(.*)$/i.test(v)) rootFont={value:v,selector:rule.selector,file:sheet.file,line:sourceStart(d).line};
+      });
+    });
+  }
   const layerIndex = (name: string) => { if (!layers.includes(name)) layers.push(name); return layers.indexOf(name); };
   let count = 0, scope: (Selector & {limit?: Selector}) | null = null;
   const visit = (nodes: ChildNode[], contexts: CSSCondition[], layer: number | null, filename: string, depth = 0, preferences: CSSPreference[] = []): void => {
@@ -914,6 +934,10 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
           const bad = values.find(v => /^\s*(?:\d*\.)?\d+\s*$/.test(v) && Number(v) !== 0 || /^\s*(?:\d*\.)?\d+\s+[a-z%]+\s*$/i.test(v));
           if (bad) { note({code: 'W_CSS_MEDIA_INVALID_LENGTH', params: node.params.trim(), value: bad.trim(), file: filename, line: sourceStart(node).line }); continue; }
         }
+        if (rootFont && node.name.toLowerCase() === 'media' && /\d\s*r?em\b/i.test(node.params) && !reportedMediaEm.has(`${filename}:${sourceStart(node).line}`)) {
+          reportedMediaEm.add(`${filename}:${sourceStart(node).line}`);
+          note({code:'W_CSS_MEDIA_EM_ROOT',params:node.params.trim(),root:rootFont,file:filename,line:sourceStart(node).line});
+        }
         // F87: "and(", "or(" or "not(" (no space) is a function token, not the keyword: the query is invalid and never matches (measured
         // in Chromium, Firefox and WebKit). In a list only that query fails, so only a single query is handled.
         if (node.name.toLowerCase() === 'media' && /(?<![\w:-])(?:and|or|not)\(/i.test(node.params) && !postcss.list.comma(node.params).slice(1).length) { note({code: 'W_CSS_MEDIA_AND_SPACE', params: node.params.trim(), written: capture(/(?<![\w:-])(?:and|or|not)\(/i.exec(node.params), 0), file: filename, line: sourceStart(node).line }); continue; }
@@ -945,6 +969,13 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
       }
       let selectors: Selector[];
       if (node.type !== 'rule') { problem('U_LAYOUT_SELECTOR', `Unsupported CSS node: ${node.type}`, sourceStart(node).line); continue; }
+      // F132: one invalid vendor selector in a comma list invalidates the entire rule in its browser.
+      if (postcss.list.comma(node.selector).length>1) {
+        const outside=(sel:string):string=>{let out='', depth=0;for(let i=0;i<sel.length;i++) {const rest=sel.slice(i);const m=depth===0&&/^:(?:is|where)\(/i.exec(rest);if(m){depth=1;i+=m[0].length-1;continue;}if(depth){if(sel[i]==='(')depth++;else if(sel[i]===')')depth--;continue;}out+=sel[i];}return out;};
+        const vendor=postcss.list.comma(node.selector).map(sel=>({sel:sel.trim(),m:/::?-(moz|ms|o)-[a-z-]+/i.exec(outside(sel))})).find(x=>x.m);
+        if(vendor?.m) {const prefix=vendor.m[1]?.toLowerCase(), drops=prefix==='moz'?['chromium','webkit']:['chromium','firefox','webkit'];
+          note({code:'W_CSS_SELECTOR_LIST_VENDOR',selector:node.selector,vendor:vendor.sel,pseudo:vendor.m[0],drops,file:filename,line:sourceStart(node).line});}
+      }
       try {
         // Inside @scope (checklist C2): :scope is the root itself (one pseudo-class of specificity) and & is
         // :where(:scope) (no specificity, whatever the root's selector: measured in Chromium, Firefox and WebKit);
@@ -958,7 +989,9 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
           if (rest.chain || /:scope\b|&/.test(rest.source)) throw new Error(`${text} inside @scope: a selector with more combinators, or :scope / & further in, is not modeled there`);
           return { ...rest, source: text, specificity: [rest.specificity[0] + lead[0], rest.specificity[1] + lead[1], rest.specificity[2] + lead[2]], scope: scopeRoot, scopeMode: m && capture(m, 2).trim() === '>' ? 'child' : 'descendant' };
         }) : node.selectors.map(selector => compileSelector(selector));
-      } catch (error) { problem('U_LAYOUT_SELECTOR', messageOf(error), sourceStart(node).line); continue; }
+      } catch (error) { problem('U_LAYOUT_SELECTOR', messageOf(error), sourceStart(node).line);
+        if ((node.nodes ?? []).some(d=>d.type==='decl' && /^container(?:-type)?$/i.test(d.prop) && /\b(?:inline-)?size\b/i.test(d.value))) unreadContainers.push({selector:node.selector,file:filename,line:sourceStart(node).line});
+        continue; }
       // Checklist F20: in a :visited rule browsers apply only color properties (CSS Selectors 4 §8.2, privacy): every other
       // declaration is ignored — reported, and dropped as the browser does.
       if (selectors.some(sel => sel.state === 'visited')) {
@@ -1059,6 +1092,7 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
       const stateLayout = !stateGeometry && !checkedMark && (focusLayout || hoverLayout);
       if (!stateGeometry && !checkedMark && !stateLayout && selectors.some(selector => selector.state) && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase()))) { problem('U_LAYOUT_SELECTOR', `State selector rules may only change paint (color, background, outline, box-shadow, text-decoration); ${node.selector} changes layout`, sourceStart(node).line); continue; }
       const declarations: CSSDeclaration[] = [];
+      let unmodeled: NonNullable<CSSRule["unmodeled"]> | undefined;
       const authored=node.nodes.filter(isDeclaration);
       // Rules that declare content at all (also a value not read here, such as attr()): F9 does not call them content-less.
       if (authored.some(d => d.prop.toLowerCase() === 'content')) contentRules.push(selectors);
@@ -1078,6 +1112,28 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
             related:[{css:location(conflict.earlier),message:`Earlier ${conflict.properties[0]} declaration`}]});
       }
       if(conflicts.length) continue;
+      // F123: isolation: isolate next to mix-blend-mode on the same element isolates its descendants, not the element: it
+      // still blends with what is behind it (measured in Chromium, Firefox and WebKit). The parent needs the isolation.
+      { const decls= node.nodes.filter(isDeclaration), last=(prop:string)=>[...decls].reverse().find(d=>d.prop.toLowerCase()===prop);
+        const blend = last('mix-blend-mode'), iso = last('isolation');
+        if (blend && iso && iso.value.trim().toLowerCase() === 'isolate' && !/^(?:normal|initial|unset|inherit|revert|revert-layer)$/i.test(blend.value.trim()) && !/var\(/i.test(blend.value))
+          note({code:'W_CSS_ISOLATION_SELF',blend:blend.value.trim(),selector:node.selector,file:filename,line:sourceStart(iso).line}); }
+      // F128: a percentage margin-top / margin-bottom is a share of the containing block's width, not its height (CSS 2.2
+      // §8.3; measured in Chromium, Firefox and WebKit: 10% in a 400x100 box is 40px). Vertical padding in % is the usual
+      // aspect-ratio trick and is not reported. (The layout stays Unknown on % margins.)
+      for (const d of node.nodes) if (d.type === 'decl') {
+        const prop = d.prop.toLowerCase(), parts = prop === 'margin' ? postcss.list.space(d.value) : null;
+        const vertical = prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-block' || prop === 'margin-block-start' || prop === 'margin-block-end' ? [d.value.trim()] : parts ? [parts[0], parts[2] ?? parts[0]] : [];
+        const pct = vertical.filter((v):v is string=>v!==undefined).find(v => /^-?(?:\d*\.)?\d+%$/.test(v) && !/^-?0+(?:\.0+)?%$/.test(v));
+        if (pct) note({code:'W_CSS_MARGIN_PERCENT_WIDTH',property:prop,value:d.value.trim(),percent:pct,selector:node.selector,file:filename,line:sourceStart(d).line});
+      }
+      // F122: a size keyword some browsers drop (stretch, -moz-available, -webkit-fit-content, intrinsic) without a value
+      // the others take: each browser ends on a different value (measured in Chromium, Firefox and WebKit). Reported;
+      // the layout stays Unknown on these keywords.
+      for (const split of sizeKeywordSplits(node.nodes.filter(isDeclaration).map(d=>({prop:d.prop,value:d.value})))) {
+        const relevant=[...node.nodes.filter(isDeclaration)].reverse().find(d=>d.prop.toLowerCase()===split.property);
+        if(relevant) note({code:'W_CSS_SIZE_BROWSER_DEPENDENT',...split,selector:node.selector,file:filename,line:sourceStart(relevant).line});
+      }
       for (const declaration of node.nodes) {
         if (declaration.type === 'comment') continue;
         if (declaration.type !== 'decl') { problem('U_LAYOUT_CSS', 'Nested CSS rules are outside the subset', sourceStart(declaration).line); continue; }
@@ -1137,13 +1193,57 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
             // A logical inline side (padding-inline-start, margin-inline, inset-inline-end, …) is stored as its ltr
             // physical side; `flip` is the side it means in an rtl box (computeStyle picks it once the direction is known).
             const flip = /-inline(?:-start|-end)?$/.test(property) && /(?:^|-)(?:left|right)$/.test(name) ? name.replace(/(left|right)$/, side => side === 'left' ? 'right' : 'left') : undefined;
-            declarations.push({ property:name, value, ...(flip ? {flip} : {}), ...(custom ? {expression: present(expression)} : pending ? {pending,specified:declaration.value} : {}), important: declaration.important ? 1 : 0, line: sourceStart(declaration).line, file: filename });
+            declarations.push({ property:name, value, ...(declaration.prop.toLowerCase()==='text-wrap' ? {wrapShorthand:declaration.value.trim()} : {}), ...(flip ? {flip} : {}), ...(custom ? {expression: present(expression)} : pending ? {pending,specified:declaration.value} : {}), important: declaration.important ? 1 : 0, line: sourceStart(declaration).line, file: filename });
           }
-        } catch (error) { problem(codeOf(error) ?? 'U_LAYOUT_CSS', messageOf(error), sourceStart(declaration).line); }
+        } catch (error) { problem(codeOf(error) ?? 'U_LAYOUT_CSS', messageOf(error), sourceStart(declaration).line);
+          if (/\d(?:cqw|cqi|cqh|cqb)\b/i.test(declaration.value)) (unmodeled ??= []).push({property:declaration.prop.toLowerCase(),specified:declaration.value.trim(),file:filename,line:sourceStart(declaration).line,selector:node.selector});
+        }
       }
-      rules.push({ selectors, contexts, declarations, layer, file: filename, line: sourceStart(node).line, ...(preferences.length ? { preferences } : {}), ...(stateGeometry ? { stateGeometry: true } : {}), ...(stateLayout && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase())) ? { stateLayout: true, ...(hoverLayout ? { hoverLayout: true } : {}) } : {}) });
+      rules.push({ selectors, contexts, declarations, ...(unmodeled ? {unmodeled} : {}), layer, file: filename, line: sourceStart(node).line, ...(preferences.length ? { preferences } : {}), ...(stateGeometry ? { stateGeometry: true } : {}), ...(stateLayout && node.nodes.some(d => d.type === 'decl' && !d.prop.startsWith('--') && !statePaint.test(d.prop.toLowerCase())) ? { stateLayout: true, ...(hoverLayout ? { hoverLayout: true } : {}) } : {}) });
     }
   };
+  // ::-webkit-scrollbar on an element that sets either standard property (measured: scrollbar-width: thin beside
+  // ::-webkit-scrollbar { width: 4px } is 10px wide in Chromium with classic scrollbars, 0 instead of 4 in WebKit;
+  // scrollbar-color too in Chromium), and Firefox does not take ::-webkit-scrollbar at all (measured:
+  // CSS.supports('selector(::-webkit-scrollbar)') is false), so hiding the bar there needs scrollbar-width: none.
+  // Matched by the selector text before the pseudo-element.
+  { const webkit = new Map<string,{selector:string;file:string;line:number;hides:boolean}>(), standard = new Map<string,Record<string,{value:string;file:string;line:number}>>();
+    for (const sheet of sheets) {
+      let root; try { root = postcss.parse(sheet.css, { from: sheet.file }); } catch { continue; }
+      root.walkRules(rule => { for (const sel of postcss.list.comma(rule.selector)) {
+        const m = /^(.*?)::-webkit-scrollbar(?:-[a-z-]+)?(?::[a-z-]+)*$/i.exec(sel.trim());
+        const decls = (rule.nodes ?? []).filter(d => d.type === 'decl');
+        if (m) { const base = present(m[1]).trim() || '*'; if (!webkit.has(base)) webkit.set(base, { selector: sel.trim(), file: sheet.file, line: sourceStart(rule).line, hides: false }); const w = webkit.get(base);
+          if (/^::-webkit-scrollbar$/i.test(sel.trim().slice(present(m[1]).length).trim()) && decls.some(d => (/^display$/i.test(d.prop) && /^none$/i.test(d.value.trim())) || (/^(?:width|height)$/i.test(d.prop) && /^0(?:px)?$/i.test(d.value.trim())))) if(w) w.hides = true; }
+        else for (const d of decls) if (/^scrollbar-(?:width|color)$/i.test(d.prop) && !/^(?:auto|initial|unset|inherit|revert|revert-layer)$/i.test(d.value.trim())) {
+          const std:Record<string,{value:string;file:string;line:number}> = standard.get(sel.trim()) ?? {}; std[d.prop.toLowerCase()] = { value: d.value.trim(), file: sheet.file, line: sourceStart(d).line }; standard.set(sel.trim(), std); }
+      } });
+    }
+    for (const [base, w] of webkit) {
+      const std = standard.get(base);
+      // scrollbar-width: none hides it in Chrome whatever ::-webkit-scrollbar says (the usual hide-everywhere pair).
+      if (std && /^none$/i.test(std['scrollbar-width']?.value ?? '')) continue;
+      if (std && w) note({code:'W_CSS_SCROLLBAR_WEBKIT_IGNORED', base, webkit: w, standard: Object.entries(std).map(([property, v]) => ({ property, ...v })) });
+      else if (w?.hides) note({code:'W_CSS_SCROLLBAR_FIREFOX_SHOWN', base, webkit: w });
+    } }
+  // F127: box-sizing is not inherited: border-box on html / :root / body alone leaves every other element content-box
+  // (measured in Chromium, Firefox and WebKit). Reported unless some rule also sets it on the other elements (the
+  // *, *::before, *::after { box-sizing: inherit } pattern, or any rule for other elements).
+  { let rootSizing:(CSSLocation & {selector:string}) | null = null, elsewhere=false, affected:string|null=null;
+    for (const sheet of sheets) {
+      let root; try { root = postcss.parse(sheet.css, { from: sheet.file }); } catch { continue; }
+      root.walkDecls(/^box-sizing$/i, d => {
+        const rule = d.parent; if (rule?.type !== 'rule') return;
+        const sels = postcss.list.comma(rule.selector).map(sel => sel.trim());
+        if (sels.every(sel => /^(?:html|:root|body)$/i.test(sel)) && d.value.trim().toLowerCase() === 'border-box') rootSizing ??= { selector: rule.selector, file: sheet.file, line: sourceStart(d).line };
+        else elsewhere = true;
+      });
+      // Only where it matters: a rule for other elements that sets a size and a padding or border.
+      root.walkRules(rule => { if (affected || postcss.list.comma(rule.selector).every(sel => /^(?:html|:root|body)$/i.test(sel.trim()))) return;
+        const has = (re:RegExp) => rule.nodes?.some(d => d.type === 'decl' && re.test(d.prop) && !/^(?:0|0px|auto|none)$/i.test(d.value.trim()));
+        if (has(/^(?:width|height|inline-size|block-size)$/i) && has(/^(?:padding|border)(?:-|$)/i)) affected = rule.selector; });
+    }
+    if (rootSizing && !elsewhere && affected) note({code:'W_CSS_BOX_SIZING_NOT_INHERITED',...(rootSizing as CSSLocation & {selector:string}),affected}); }
   for (const sheet of sheets) {
     try { const root = flattenNesting(postcss.parse(sheet.css, { from: sheet.file })); visit(root.nodes, [], null, sheet.file); }
     catch (error) { diagnostic('U_LAYOUT_CSS', error instanceof Error && 'reason' in error && typeof error.reason === 'string' ? error.reason : messageOf(error), error instanceof Error && 'line' in error && typeof error.line === 'number' ? error.line : undefined, sheet.file); }
@@ -1171,7 +1271,7 @@ export function parseLayoutCSS(sheets: readonly CSSSheet[], diagnostic: CSSDiagn
     if (!notesOf('W_CSS_KEYFRAMES_MISSING').some(m => m.name === name && m.line === declaration.line && m.file === declaration.file)) note({code: 'W_CSS_KEYFRAMES_MISSING', name, file: declaration.file, line: declaration.line, selector: rule.selectors?.[0]?.source });
     return 'none';
   }).join(', ');
-  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules, animatedCustom, animatedReads };
+  return { rules, layers, notes, keyframes, dependentDeclarations, markerSizing, firstPseudo, radiusRules, contentRules, userSelectNone, keyframeFrames, fontFaces, registered, defaultNamespace, startingRules, animatedCustom, animatedReads, unreadContainers };
 }
 
 // The UA default family and the user's default font size are not author
@@ -1187,7 +1287,7 @@ type PendingCSSDeclaration = DeclarationBase & {pending: PendingDeclaration; exp
 type CustomCSSDeclaration = DeclarationBase & VariableDeclaration;
 type CascadeValue = string | PendingCSSDeclaration | undefined;
 interface OriginCondition {kind: CSSCondition['kind']; name?: string; params: string; css: CSSLocation}
-export interface CSSOrigin extends CSSLocation {selector: string; layer?: string | undefined; specified: string | undefined; conditions?: OriginCondition[]; logical?: true}
+export interface CSSOrigin extends CSSLocation {selector: string; layer?: string | undefined; specified: string | undefined; conditions?: OriginCondition[]; logical?: true; wrapShorthand?: string}
 type SourceMap = Record<string, CSSOrigin | undefined>;
 type OriginLists = Record<string, CSSOrigin[]>;
 interface CascadeCandidate {rank: CascadeRank; value: CascadeValue; origin: CSSOrigin; important: 0 | 1}
@@ -1200,6 +1300,9 @@ interface ComputedMetadata extends DroppedStyle {
   $sources?: SourceMap; $layerShadowed?: LayerShadow[]; $dormant?: OriginLists; $overridden?: OriginLists;
   $invalid?: InvalidDeclaration[]; $variables?: VariableEnvironment;
   $hiddenInputDisplay?: string | undefined; $pseudoNotRendered?: string | undefined;
+  $wrapRestored?: {whiteSpace:string;from:CSSOrigin;by:CSSOrigin};
+  $overflowPromoted?: {property:string;written:string;other:string;source:CSSOrigin}[];
+  $selectIndent?: string;
   $tableOverflow?: CSSValueMap;
 }
 // The defaults and CSS aliases define the commonly used property keys; the
@@ -1248,7 +1351,7 @@ function defaultStyle(box: CSSBox, inherited: InheritedStyle) {
     'column-gap': 'normal', 'column-span': 'none', 'grid-template-areas': 'none', 'grid-column': 'auto', 'grid-row': 'auto',
     'background-color': 'transparent', 'background-image': 'none',
     'outline-style': 'none', 'outline-width': 'medium', 'outline-color': 'currentcolor', 'outline-offset': '0', 'box-shadow': 'none',
-    hyphens: inheritedValue(inherited, "hyphens") ?? 'manual', 'object-fit': 'fill', 'object-position': '50% 50%', 'scroll-behavior': 'auto', 'overscroll-behavior-x': 'auto', 'overscroll-behavior-y': 'auto', 'scroll-snap-type': 'none', 'scroll-snap-align': 'none', resize: 'none', 'text-wrap-mode': inheritedValue(inherited, 'text-wrap-mode') ?? 'white-space', 'text-wrap-style': inheritedValue(inherited, 'text-wrap-style') ?? 'auto', 'text-overflow': 'clip', 'line-clamp': 'none', 'box-orient': 'horizontal', 'touch-action': 'auto', 'z-index': 'auto', 'content-visibility': 'visible', 'contain-intrinsic-block-size': 'none', isolation: 'auto', transform: 'none', 'transform-origin': 'origin(0 0.5 0 0.5)', translate: 'none', rotate: 'none', scale: 'none', 'backdrop-filter': 'none', 'will-change': 'auto', 'justify-self': 'auto', 'justify-items': 'normal', clip: 'auto', 'clip-path': 'none', ...Object.fromEntries<string>(['margin', 'padding'].flatMap(kind => ['top', 'right', 'bottom', 'left'].map(side => [`scroll-${kind}-${side}`, kind === 'padding' ? 'auto' : '0']))), 'color-scheme': inheritedValue(inherited, 'color-scheme') ?? 'normal', cursor: inheritedValue(inherited, "cursor") ?? 'auto', 'list-style-type': inheritedValue(inherited, 'list-style-type') ?? 'disc', 'animation-name': 'none', 'animation-duration': '0s', 'animation-iteration-count': '1', 'animation-play-state': 'running', 'animation-direction': 'normal', 'animation-timing-function': 'ease', 'animation-delay': '0s', 'animation-fill-mode': 'none', 'animation-timeline': 'auto', 'transition-property': 'all', 'transition-duration': '0s', 'transition-timing-function': 'ease', 'transition-delay': '0s',
+    hyphens: inheritedValue(inherited, "hyphens") ?? 'manual', 'object-fit': 'fill', 'object-position': '50% 50%', 'scroll-behavior': 'auto', 'overscroll-behavior-x': 'auto', 'overscroll-behavior-y': 'auto', 'scroll-snap-type': 'none', 'scroll-snap-align': 'none', resize: 'none', 'text-wrap-mode': inheritedValue(inherited, 'text-wrap-mode') ?? 'white-space', 'text-wrap-style': inheritedValue(inherited, 'text-wrap-style') ?? 'auto', 'text-overflow': 'clip', 'line-clamp': 'none', 'box-orient': 'horizontal', 'touch-action': 'auto', 'z-index': 'auto', 'content-visibility': 'visible', 'contain-intrinsic-block-size': 'none', isolation: 'auto', 'transform-style':'flat','backface-visibility':'visible',transform: 'none', 'transform-origin': 'origin(0 0.5 0 0.5)', translate: 'none', rotate: 'none', scale: 'none', 'backdrop-filter': 'none', 'will-change': 'auto', 'justify-self': 'auto', 'justify-items': 'normal', clip: 'auto', 'clip-path': 'none', ...Object.fromEntries<string>(['margin', 'padding'].flatMap(kind => ['top', 'right', 'bottom', 'left'].map(side => [`scroll-${kind}-${side}`, kind === 'padding' ? 'auto' : '0']))), 'color-scheme': inheritedValue(inherited, 'color-scheme') ?? 'normal', cursor: inheritedValue(inherited, "cursor") ?? 'auto', 'list-style-type': inheritedValue(inherited, 'list-style-type') ?? 'disc', 'animation-name': 'none', 'animation-duration': '0s', 'animation-iteration-count': '1', 'animation-play-state': 'running', 'animation-direction': 'normal', 'animation-timing-function': 'ease', 'animation-delay': '0s', 'animation-fill-mode': 'none', 'animation-timeline': 'auto', 'transition-property': 'all', 'transition-duration': '0s', 'transition-timing-function': 'ease', 'transition-delay': '0s',
     'table-layout': 'auto', // HTML UA: table { border-collapse: separate; border-spacing: 2px } (a UA rule on table, not inherited from above).
     'border-collapse': box.tag === 'table' ? 'separate' : inheritedValue(inherited, 'border-collapse') ?? 'separate', 'border-spacing': box.tag === 'table' ? '2px' : inheritedValue(inherited, 'border-spacing') ?? '0', 'caption-side': inheritedValue(inherited, 'caption-side') ?? 'top', 'empty-cells': 'show',
     // HTML UA: thead, tbody, tfoot, tr { vertical-align: middle } and td, th { vertical-align: inherit }.
@@ -1365,7 +1468,8 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
   // A closed dialog: dialog:not([open]) { display: none } (UA). An open one is placed by the UA (position: absolute,
   // centred, fit-content), which is not modeled.
   if(box.tag==='dialog' && box.dialogOpen===false) values.display='none';
-  if(box.tag==='dialog' && box.dialogOpen!==false) throw Object.assign(new Error(box.dialogOpen==='dynamic' ? 'A dynamic open attribute decides whether the dialog renders' : 'An open dialog is placed by the UA (position: absolute, centred, fit-content), which is not modeled'),{code:'U_LAYOUT_ELEMENT'});
+  // Thrown once the cascade has run, so the error carries the dialog's declarations (F129 reads its margins).
+  const openDialog = box.tag==='dialog' && box.dialogOpen!==false ? Object.assign(new Error(box.dialogOpen==='dynamic' ? 'A dynamic open attribute decides whether the dialog renders' : 'An open dialog is placed by the UA (position: absolute, centred, fit-content), which is not modeled'),{code:'U_LAYOUT_ELEMENT'}) : null;
   // [dir=ltr|rtl] { direction } (UA, inherited): author CSS may override; dir=auto depends on the text.
   if(box.dirAttr==='ltr' || box.dirAttr==='rtl') values.direction=box.dirAttr;
   else if(box.dirAttr!==undefined) throw Object.assign(new Error(box.dirAttr==='auto' ? 'dir=auto: own text and children both have strong characters, whose order is not known' : `dir=${box.dirAttr} is not a direction`),{code:'U_LAYOUT_ELEMENT'});
@@ -1374,7 +1478,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
   if(box.hiddenAttr==='until-found' || box.hiddenAttr==='dynamic') throw Object.assign(new Error(`hidden=${box.hiddenAttr === 'dynamic' ? '(dynamic)' : 'until-found'} is outside the modeled rendering`),{code:'U_LAYOUT_ELEMENT'});
   // Allocate the CSS-wide initial values only when a winning declaration needs one.
   let initial:CSSValueMap|undefined;
-  const initialValues = ():CSSValueMap => initial ??= { ...defaultStyle(box,inherited), ...textInitial, fill: 'black', stroke: 'none', 'list-style-position': 'outside', 'caret-color': 'auto', hyphens: 'manual', 'object-fit': 'fill', 'scroll-behavior': 'auto', 'overscroll-behavior-x': 'auto', 'overscroll-behavior-y': 'auto', 'scroll-snap-type': 'none', 'scroll-snap-align': 'none', resize: 'none', 'text-wrap-mode': 'white-space', 'text-wrap-style': 'auto', 'text-overflow': 'clip', 'line-clamp': 'none', 'box-orient': 'horizontal', 'touch-action': 'auto', 'table-layout': 'auto', clear: 'none', 'column-count': 'auto', 'column-width': 'auto', 'column-span': 'none', 'border-collapse': 'separate', 'border-spacing': '0', 'caption-side': 'top', 'empty-cells': 'show', 'vertical-align': 'baseline', 'outline-style': 'none', 'outline-width': 'medium', 'outline-color': 'currentcolor', 'outline-offset': '0', 'box-shadow': 'none', 'z-index': 'auto', 'content-visibility': 'visible', 'contain-intrinsic-block-size': 'none', isolation: 'auto', transform: 'none', 'transform-origin': 'origin(0 0.5 0 0.5)', translate: 'none', rotate: 'none', scale: 'none', 'backdrop-filter': 'none', 'will-change': 'auto', 'justify-self': 'auto', 'justify-items': 'normal', 'color-scheme': 'normal', cursor: 'auto', 'list-style-type': 'disc', 'animation-name': 'none', 'animation-duration': '0s', 'animation-iteration-count': '1', 'animation-play-state': 'running', 'animation-direction': 'normal', 'animation-timing-function': 'ease', 'animation-delay': '0s', 'animation-fill-mode': 'none', 'animation-timeline': 'auto', 'transition-property': 'all', 'transition-duration': '0s', 'transition-timing-function': 'ease', 'transition-delay': '0s', color: 'canvastext', 'text-decoration-line': 'none', visibility: 'visible', 'pointer-events': 'auto', display: 'inline', 'white-space': 'normal', 'overflow-wrap': 'normal', 'writing-mode': 'horizontal-tb', direction: 'ltr', 'margin-left': '0', 'margin-right': '0', 'margin-top': '0', 'margin-bottom': '0' };
+  const initialValues = ():CSSValueMap => initial ??= { ...defaultStyle(box,inherited), ...textInitial, fill: 'black', stroke: 'none', 'list-style-position': 'outside', 'caret-color': 'auto', hyphens: 'manual', 'object-fit': 'fill', 'scroll-behavior': 'auto', 'overscroll-behavior-x': 'auto', 'overscroll-behavior-y': 'auto', 'scroll-snap-type': 'none', 'scroll-snap-align': 'none', resize: 'none', 'text-wrap-mode': 'white-space', 'text-wrap-style': 'auto', 'text-overflow': 'clip', 'line-clamp': 'none', 'box-orient': 'horizontal', 'touch-action': 'auto', 'table-layout': 'auto', clear: 'none', 'column-count': 'auto', 'column-width': 'auto', 'column-span': 'none', 'border-collapse': 'separate', 'border-spacing': '0', 'caption-side': 'top', 'empty-cells': 'show', 'vertical-align': 'baseline', 'outline-style': 'none', 'outline-width': 'medium', 'outline-color': 'currentcolor', 'outline-offset': '0', 'box-shadow': 'none', 'z-index': 'auto', 'content-visibility': 'visible', 'contain-intrinsic-block-size': 'none', isolation: 'auto', 'transform-style':'flat','backface-visibility':'visible',transform: 'none', 'transform-origin': 'origin(0 0.5 0 0.5)', translate: 'none', rotate: 'none', scale: 'none', 'backdrop-filter': 'none', 'will-change': 'auto', 'justify-self': 'auto', 'justify-items': 'normal', 'color-scheme': 'normal', cursor: 'auto', 'list-style-type': 'disc', 'animation-name': 'none', 'animation-duration': '0s', 'animation-iteration-count': '1', 'animation-play-state': 'running', 'animation-direction': 'normal', 'animation-timing-function': 'ease', 'animation-delay': '0s', 'animation-fill-mode': 'none', 'animation-timeline': 'auto', 'transition-property': 'all', 'transition-duration': '0s', 'transition-timing-function': 'ease', 'transition-delay': '0s', color: 'canvastext', 'text-decoration-line': 'none', visibility: 'visible', 'pointer-events': 'auto', display: 'inline', 'white-space': 'normal', 'overflow-wrap': 'normal', 'writing-mode': 'horizontal-tb', direction: 'ltr', 'margin-left': '0', 'margin-right': '0', 'margin-top': '0', 'margin-bottom': '0' };
   const inheritedProperties = new Set(['white-space', 'overflow-wrap', 'writing-mode', 'direction', 'border-collapse', 'border-spacing', 'caption-side', 'empty-cells', ...textProperties, ...inheritedPaint]);
   const cascadeValues: Record<string, CascadeValue> = {...values};
   const priorities = new Map<string, CascadeRank>(), sources: SourceMap = {},custom=new Map<string, CustomCSSDeclaration>(),dormant: OriginLists={},overridden: OriginLists={}, candidates: Record<string, CascadeCandidate[]> = {};
@@ -1385,7 +1489,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
     if (!active(rule) || !preferred(rule)) {
       // Matching declarations whose conditions are false here: explanation data.
       const selector = rule.selectors.find(selector => matches(selector, box, state));
-      if (selector) for (const declaration of rule.declarations) (dormant[declaration.property] ??= []).push({file: declaration.file, line: declaration.line, selector: selector.source, ...(rule.layerName ? {layer: rule.layerName} : {}), specified: declaration.specified ?? declaration.value, ...conditions(rule)});
+      if (selector) for (const declaration of rule.declarations) (dormant[declaration.property] ??= []).push({file: declaration.file, line: declaration.line, selector: selector.source, ...(rule.layerName ? {layer: rule.layerName} : {}), specified: declaration.specified ?? declaration.value, ...(declaration.wrapShorthand ? {wrapShorthand:declaration.wrapShorthand}:{}), ...conditions(rule)});
       continue;
     }
     for (const selector of rule.selectors) {
@@ -1395,7 +1499,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
         // The style attribute (element-attached) wins over every selector and layer, below only importance (Cascade 5).
         // Scope proximity (Cascade 6 §6.6): after specificity, the nearer scope root wins; unscoped is farthest.
         const rank: CascadeRank = [declaration.important, rule.attached ? 1 : 0, layer, ...selector.specificity, selector.scope ? -present(scopeProximity(selector, box, state)) : -Infinity];
-        const origin: CSSOrigin = { file: declaration.file, line: declaration.line, selector: selector.source, layer: rule.layerName, specified: declaration.specified ?? declaration.value, ...conditions(rule), ...(declaration.flip ? { logical: true } : {}) };
+        const origin: CSSOrigin = { file: declaration.file, line: declaration.line, selector: selector.source, layer: rule.layerName, specified: declaration.specified ?? declaration.value, ...(declaration.wrapShorthand ? {wrapShorthand:declaration.wrapShorthand} : {}), ...conditions(rule), ...(declaration.flip ? { logical: true } : {}) };
         // A logical side resolves by the box's direction (an rtl pass when the first one finds rtl; CSS Logical 1).
         if (declaration.flip) flipped = true;
         const property = rtl && declaration.flip ? declaration.flip : declaration.property;
@@ -1519,7 +1623,10 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
   const noWrap: CSSValueMap = {normal: 'nowrap', 'pre-wrap': 'pre', nowrap: 'nowrap', pre: 'pre'};
   const wrap: CSSValueMap = {nowrap: 'normal', pre: 'pre-wrap'};
   if (wrapMode === 'nowrap') values['white-space'] = noWrap[ws] ?? `${ws}+nowrap`;
-  else if (wrapMode === 'wrap') values['white-space'] = wrap[ws] ?? values['white-space'];
+  else if (wrapMode === 'wrap') {
+    if (['nowrap','pre'].includes(ws) && sources['white-space'] && sources['text-wrap-mode']) metadata.$wrapRestored={whiteSpace:ws,from:sources['white-space'],by:sources['text-wrap-mode']};
+    values['white-space']=wrap[ws]??values['white-space'];
+  }
   // letter-spacing in em computes to px against the element's own font-size (then inherits as px).
   const em = /^(-?\d+(?:\.\d{1,6})?)em$/.exec(String(values['letter-spacing'] ?? ''));
   if (em) values['letter-spacing'] = /^\d+(?:\.\d{1,6})?px$/.test(String(values['font-size'])) ? `${+(Number(em[1]) * Number(present(values['font-size']).slice(0, -2))).toFixed(6)}px` : 'em-unresolved';
@@ -1605,6 +1712,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
     }
   }
   metadata.$sources = sources;
+  if(openDialog) throw Object.assign(openDialog,{$sources:{...sources}});
   if (layerShadowed.length) metadata.$layerShadowed = layerShadowed;
   metadata.$dormant = dormant;
   metadata.$overridden = overridden;
@@ -1636,8 +1744,10 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
     const container = containerKeys.filter(key => sources[key] && values[key] !== undefined && !present(idleOf[key]).includes(String(sources[key]?.specified ?? values[key]).trim()));
     for (const key of container) drop(metadata, 'inline-container', key, values[key]);
   }
+  for (const [key,own,other] of [['overflow-x',values['overflow-x'],values['overflow-y']],['overflow-y',values['overflow-y'],values['overflow-x']]] as const) if (own && other && !['visible','clip'].includes(other) && ['visible','clip'].includes(own) && sources[key] && !box.pseudo)
+    (metadata.$overflowPromoted ??=[]).push({property:key,written:own,other,source:sources[key]});
   normalizeOverflowAxes(values);
-  // F68: input[type=hidden] { display: none !important } (UA): no author display shows it (measured in Chromium, Firefox
+  // F57: input[type=hidden] { display: none !important } (UA): no author display shows it (measured in Chromium, Firefox
   // and WebKit, even with !important).
   if (!box.pseudo && box.tag === 'input' && box.inputType === 'hidden') { if (sources.display && values.display !== 'none') metadata.$hiddenInputDisplay = values.display; values.display = 'none'; }
   // visibility: collapse removes a table row, row group or column (measured in Chromium, Firefox and WebKit: the next row
@@ -1671,6 +1781,7 @@ export function computeStyle(rules: readonly CSSRule[], box: CSSBox, active: (ru
   for (const [key, idle] of textIdle) {
     if (values[key] === undefined || idle.includes(String(values[key]))) continue;
     if (!box.pseudo && values.display === 'inline' && !(box.children ?? []).some(c => !c.anonymous) && !(box.inline ?? []).length) { drop(metadata, 'inline-text', key, values[key]); delete values[key]; }
+    else if(!box.pseudo && box.tag==='select' && key==='text-indent') {metadata.$selectIndent=values[key];delete values[key];}
     else throw new Error(`Unsupported ${key}: ${values[key]} (it changes line breaking, shaping, containing blocks or paint, which are not modeled)`);
   }
   // F54: clear moves a block below earlier floats; a flex or grid item has none to clear (measured in Chromium, Firefox

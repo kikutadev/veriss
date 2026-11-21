@@ -34,11 +34,12 @@ interface InlineContext {
     inlineStateTransforms: (box: InlineBox, style: SolverStyle) => unknown;
     inlineTextAlignment: (box: InlineBox, style: SolverStyle) => unknown;
     inlineAutoMargin: (box: InlineBox, style: SolverStyle, parentStyle?: SolverStyle) => unknown;
+    preserve3dInert: (box: InlineBox, style: SolverStyle, parentStyle?: SolverStyle) => unknown;
     inlineOverflow: (box: InlineBox, style: SolverStyle) => unknown;
     firstPseudoInert: (box: InlineBox, style: SolverStyle) => unknown;
     decorationNone: (box: InlineBox, style: SolverStyle, parents: readonly InlineAncestor[]) => unknown;
 }
-export declare function createInlineSolver({ styles, edgeValue, generatedTexts, layoutWarnings, geometry, ranges, paints, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, inlineOverflow, firstPseudoInert, decorationNone }: InlineContext): {
+export declare function createInlineSolver({ styles, edgeValue, generatedTexts, layoutWarnings, geometry, ranges, paints, pseudoWithoutContent, inlineStateTransforms, inlineTextAlignment, inlineAutoMargin, preserve3dInert, inlineOverflow, firstPseudoInert, decorationNone }: InlineContext): {
     generatedElsewhere: (box: InlineBox, region: Region, parents: readonly InlineAncestor[], inheritedStyle: SolverStyle) => Generated | null;
     inlineContent: (leaf: InlineBox, leafStyle: SolverStyle, region: Region, parents: readonly InlineAncestor[], chain: PaintFacts[], leafRow?: InlineLeafRow) => void;
     inlineBounds: (child: InlineBox, leaf: InlineBox, leafStyle: SolverStyle, leafRow: InlineLeafRow | undefined, region: Region, childStyle?: Readonly<Record<string, unknown>>) => {

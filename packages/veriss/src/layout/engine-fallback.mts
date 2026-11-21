@@ -6,11 +6,11 @@ import type {LayoutDiagnostic,LayoutRange,LayoutRegion} from '../layout-contract
 
 
 type InlineContext=Parameters<typeof createInlineSolver>[0];
-type StyleContext=Pick<InlineContext,'styles'|'pseudoWithoutContent'|'inlineStateTransforms'|'inlineTextAlignment'|'inlineAutoMargin'|'inlineOverflow'|'decorationNone'|'firstPseudoInert'> & {
+type StyleContext=Pick<InlineContext,'styles'|'pseudoWithoutContent'|'inlineStateTransforms'|'inlineTextAlignment'|'inlineAutoMargin'|'preserve3dInert'|'inlineOverflow'|'decorationNone'|'firstPseudoInert'> & {
   root:InlineBox;initial:Region;
   cssMistakes:(box:InlineBox,style:EngineStyle,ancestors:readonly Ancestor[],inherited:EngineStyle|undefined,gridItem:boolean,region:Region,state?:ReadonlySet<string>)=>void;
 };
-export function checkUnknownStyles({root,initial,styles,cssMistakes,pseudoWithoutContent,inlineStateTransforms,inlineTextAlignment,inlineAutoMargin,inlineOverflow,decorationNone,firstPseudoInert}:StyleContext):void {
+export function checkUnknownStyles({root,initial,styles,cssMistakes,pseudoWithoutContent,inlineStateTransforms,inlineTextAlignment,inlineAutoMargin,preserve3dInert,inlineOverflow,decorationNone,firstPseudoInert}:StyleContext):void {
     const walkStyles = (box:InlineBox, ancestors:readonly Ancestor[], inherited:EngineStyle|undefined):void => {
       let state; try { [state] = styles(box, initial, ancestors, inherited, false, true); } catch { return; }
       if (!state) return;
@@ -28,6 +28,7 @@ export function checkUnknownStyles({root,initial,styles,cssMistakes,pseudoWithou
         try { inlineStateTransforms(child, c.style); } catch { /* the rest still runs */ }
         try { inlineTextAlignment(child, c.style); } catch { /* the rest still runs */ }
         try { inlineAutoMargin(child, c.style); } catch { /* the rest still runs */ }
+        try { preserve3dInert(child,c.style,parentStyle); } catch { /* the rest still runs */ }
         try { inlineOverflow(child, c.style); } catch { /* the rest still runs */ }
         try { decorationNone(child, c.style, chain); } catch { /* the rest still runs */ }
         try { firstPseudoInert(child, c.style); } catch { /* the rest still runs */ }

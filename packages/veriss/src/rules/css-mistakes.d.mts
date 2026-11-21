@@ -31,6 +31,8 @@ interface Report<R> {
     warnings: CssMistakeWarning[];
     unknown: (code: string, message: string, line: number, box: RuleBox, file: string) => unknown;
     diagnostics: readonly {
+        code: string;
+        path?: string;
         message: string;
     }[];
     ranges: (region: R) => RangeFacts;
@@ -49,6 +51,11 @@ interface Facts<R> {
     })[];
     userSelectNone: readonly RuleLocation[];
     transitionSizes: TransitionSize[];
+    unreadContainers?: readonly {
+        file: string;
+        line: number;
+        selector: string;
+    }[];
     styles: (box: RuleBox, region: R, ancestors: readonly Ancestor[], inherited: RuleStyle | undefined, emit: boolean, gridItem: boolean, state?: State) => readonly {
         style: RuleStyle;
     }[];
@@ -90,6 +97,16 @@ export interface CssMistakeContext<R> {
 export declare function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext<R>): {
     firstInert: Set<string>;
     firstPseudoInert: (box: RuleBox, style: RuleStyle) => void;
+    stateShadowed: (box: RuleBox, style: RuleStyle, ancestors: readonly Ancestor[], inherited: RuleStyle | undefined, r: R) => void;
+    dialogMarginReset: (box: RuleBox, style: Pick<RuleStyle, "$sources">) => void;
+    overflowPromoted: (box: RuleBox, style: RuleStyle) => void;
+    containerUnitViewport: (box: RuleBox, style: RuleStyle, ancestors: readonly Ancestor[]) => void;
+    selectIndent: (box: RuleBox, style: RuleStyle, ancestors: readonly Ancestor[]) => void;
+    optionInert: (box: RuleBox, style: RuleStyle, ancestors: readonly Ancestor[]) => void;
+    brStyled: (box: RuleBox, style: RuleStyle) => void;
+    wrapRestored: (box: RuleBox, style: RuleStyle) => void;
+    preserve3dInert: (box: RuleBox, style: RuleStyle, parentStyle?: RuleStyle) => void;
+    outOfFlowFlexInert: (box: RuleBox, style: RuleStyle) => void;
     inlineAutoMargin: (box: RuleBox, style: RuleStyle, parentStyle: RuleStyle | undefined) => void;
     alignBrowserDependent: (box: RuleBox, property: string, value: CssValue) => void;
     inlineTextAlignment: (box: RuleBox, style: RuleStyle) => void;

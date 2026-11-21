@@ -272,7 +272,12 @@ test('F24, F25: table-layout: fixed without a width, border-spacing with collaps
 });
 
 test('F26: a child combinator through the tbody the parser inserts never matches', async ({page}) => {
-  for (const [html, sel, never] of [['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t > .r', true], ['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t .r', false], ['<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>', '.t > tbody > .r', false]] as const) {
+  for (const [html, sel, never] of [['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t > .r', true], ['<table class="t"><tr class="r"><td>x</td></tr></table>', '.t .r', false], ['<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>', '.t > tbody > .r', false],
+    // The implied tbody in the middle of the selector (the subject is the cell or something inside it).
+    ...[['.t > .r > td', true], ['.t > tr > .c', true], ['table > tr td', true], ['.t > .r > .c > .s', true], ['.t > .r .s', true],
+      ['.t .r > td', false], ['.t td', false], ['.t > tbody > .r > td', false], ['.r > .c > .s', false]]
+      .map(([sel, never]) => ['<table class="t"><tr class="r"><td class="c"><span class="s">x</span></td></tr></table>', sel, never]),
+    ['<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>', '.t > tbody > .r > td', false]] as unknown as (readonly [string, string, boolean])[]) {
     await page.setContent(`<!doctype html><html lang="en"><body>${html}</body></html>`);
     expect(await page.evaluate(s => document.querySelector(s)! !== null, sel), sel).toBe(!never);
     expect((analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `${sel}{color:red}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}}).layoutWarnings ?? []).some(w => w.code === 'W_CSS_SELECTOR_IMPLIED_PARENT'), sel).toBe(never);
@@ -1349,5 +1354,264 @@ test('F115: an invalid background shorthand is dropped by the browser, and repor
     expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')!).backgroundColor) === 'rgb(1, 2, 3)', value).toBe(dropped);
     const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}.a{background:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
     expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BACKGROUND_INVALID'), value).toBe(dropped);
+  }
+});
+
+test('F116: an invalid will-change is dropped (the earlier value stays, a fixed child is not trapped); an unknown name is kept', async ({page}) => {
+  const base = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{margin-top:50px;height:100px}.f{position:fixed;top:0;left:0;width:10px;height:10px}';
+  for (const [value, dropped] of [['auto, transform', true], ['transform, all', true], ['none', true], ['will-change', true], ['transform opacity', true], ['transform,', true], ['transform, default', true],
+    ['transform', false], ['transform, opacity', false], ['transfrom', false], ['left, contents', false]] as const) {
+    const html = '<html lang="en"><body><div class="p"><div class="f"></div></div></body></html>', css = `${base}.p{will-change:${value}}`;
+    await page.setContent(`<!doctype html><head><style>${base}.p{will-change:scroll-position}.p{will-change:${value}}</style></head><body><div class="p"><div class="f"></div></div></body>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.p')!).willChange), value).toBe(dropped ? 'scroll-position' : value.replace(/,$/, ''));
+    await page.setContent(`<!doctype html><head><style>${css}</style></head><body><div class="p"><div class="f"></div></div></body>`);
+    const top = await page.evaluate(() => document.querySelector('.f')!.getBoundingClientRect().top);
+    if (dropped) expect(top, value).toBe(0);
+    const r = analyzeHTML(html, {name: 'P', css, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_KEYWORD_INVALID'), value).toBe(dropped);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_FIXED_TRAPPED'), value).toBe(top === 50);
+  }
+});
+
+test('F117: transform-style: preserve-3d contains fixed children and makes a stacking context; a grouping property flattens it, contain: paint only in Firefox', async ({page, browserName}) => {
+  const view = {min: 320, max: 1200, height: {min: 300, max: 900}}, base = '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}';
+  for (const [extra, flattened] of [['', false], ['overflow:hidden', true], ['overflow:clip', true], ['opacity:.5', true], ['isolation:isolate', true], ['contain:paint', browserName === 'firefox']] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.g{perspective:200px;width:300px;height:300px;padding:50px}.p{transform-style:preserve-3d;width:200px;height:200px;${extra}}.c{width:100px;height:100px;background:red;transform:translateZ(100px)}</style><div class="g"><div class="p"><div class="c"></div></div></div>`);
+    expect(await page.evaluate(() => document.querySelector('.c')!.getBoundingClientRect().width), extra).toBe(flattened ? 100 : 200);
+    await page.setContent(`<!doctype html><style>${base}.p{margin-top:50px;height:100px;transform-style:preserve-3d;${extra}}.f{position:fixed;top:0;left:0;width:10px;height:10px}</style><div class="p"><div class="f"></div></div>`);
+    expect(await page.evaluate(() => document.querySelector('.f')!.getBoundingClientRect().top), extra).toBe(50);
+    if (extra === 'contain:paint') continue;
+    const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="f"></div></div></body></html>', {name: 'P', css: `${base}.p{margin-top:50px;height:100px;transform-style:preserve-3d;${extra}}.f{position:fixed;top:0;left:0;width:10px;height:10px}`, viewport: view});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_FIXED_TRAPPED'), extra).toBe(true);
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties?.includes('transform-style')), extra).toBe(flattened);
+  }
+  // A stacking context: a z-index: -1 child stays above the parent's background.
+  for (const [style, above] of [['transform-style:preserve-3d', true], ['transform-style:flat', false]] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.p{width:100px;height:100px;background:blue;${style}}.c{position:relative;z-index:-1;width:50px;height:50px;background:red}</style><div class="p"><div class="c"></div></div>`);
+    expect(await page.evaluate(() => document.elementFromPoint(10, 10)!.className), style).toBe(above ? 'c' : 'p');
+  }
+  // On a span in block flow (not transformable) it does nothing: no containing block.
+  await page.setContent(`<!doctype html><style>*{margin:0}.w{margin-top:50px}.p{transform-style:preserve-3d}.f{position:fixed;top:0;left:0;width:10px;height:10px}</style><div class="w"><span class="p"><span class="f"></span></span></div>`);
+  expect(await page.evaluate(() => document.querySelector('.f')!.getBoundingClientRect().top)).toBe(0);
+  const r = analyzeHTML('<html lang="en"><body><div class="a"><span class="p"></span></div></body></html>', {name: 'P', css: `${base}.a{height:auto}.p{transform-style:preserve-3d}`, viewport: view});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && /display: inline/.test(w!.message))).toBe(true);
+});
+
+test('F118: flex factors and order do not move or size an absolute child (flex, grid or block parent); align-self does', async ({page}) => {
+  const view = {min: 320, max: 1200, height: {min: 300, max: 900}};
+  for (const parent of ['display:flex', 'display:grid;grid-template-columns:100px 100px', 'display:block']) {
+    const css = (e:string) => `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.p{${parent};position:relative;width:300px;height:200px}.s{width:50px;height:50px}.x{position:absolute;top:0;left:0;width:20px;height:20px;${e}}`;
+    const rect = async (e:string) => { await page.setContent(`<!doctype html><style>${css(e)}</style><div class="p"><div class="s"></div><div class="x"></div></div>`); return page.evaluate(() => { const r = document.querySelector('.x')!.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }); };
+    const plain = await rect('');
+    for (const e of ['flex-grow:1', 'flex:1', 'flex-shrink:5', 'flex-basis:100px', 'order:-1']) {
+      expect(await rect(e), `${parent} ${e}`).toEqual(plain);
+      const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="s"></div><div class="x"></div></div></body></html>', {name: 'P', css: css(e), viewport: view});
+      expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.x'), `${parent} ${e}`).toBe(true);
+    }
+    // Without top / bottom, align-self moves it in flex and grid (so it is not reported anywhere).
+    const free = async (e:string) => { await page.setContent(`<!doctype html><style>${css(e).replace('top:0;', '')}</style><div class="p"><div class="s"></div><div class="x"></div></div>`); return page.evaluate(() => document.querySelector('.x')!.getBoundingClientRect().top); };
+    if (parent !== 'display:block') expect(await free('align-self:end'), parent).toBe(180);
+    const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="s"></div><div class="x"></div></div></body></html>', {name: 'P', css: css('align-self:end'), viewport: view});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.box === '.x')).toBe(false);
+  }
+});
+
+test('F119: text-wrap: balance after white-space: nowrap wraps again; text-wrap: pretty is dropped by Firefox', async ({page, browserName}) => {
+  for (const [css, wraps, reported] of [['white-space:nowrap;text-wrap:balance', true, true], ['white-space:pre;text-wrap:stable', true, true], ['white-space:nowrap;text-wrap:pretty', browserName !== 'firefox', true],
+    ['text-wrap:balance;white-space:nowrap', false, false], ['white-space:nowrap;text-wrap-style:balance', false, false], ['white-space:nowrap;text-wrap:wrap', true, false]] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.x{width:100px;font:16px/20px monospace;${css}}</style><div class="x">aaa bbb ccc ddd eee fff</div>`);
+    // Browser fonts/shaping can balance the same text into two or three lines.
+    // Check the semantic transition from nowrap to wrap, not an incidental line count.
+    const observed = await page.evaluate(() => {
+      const node = document.querySelector('.x')!;
+      return {height:node.getBoundingClientRect().height, mode:getComputedStyle(node).textWrapMode};
+    });
+    if (wraps) {
+      expect(observed.mode, css).toBe('wrap');
+      expect(observed.height, css).toBeGreaterThan(20);
+    } else {
+      expect(observed.mode, css).toBe('nowrap');
+      expect(observed.height, css).toBe(20);
+    }
+    const r = analyzeHTML('<html lang="en"><body><div class="x">aaa bbb</div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.x{width:100px;${css}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_WRAP_RESTORED'), css).toBe(reported);
+  }
+});
+
+test('F120: margin on a <br> spaces lines in Firefox only, line-height in WebKit only, the rest nowhere', async ({page, browserName}) => {
+  for (const [css, changes, reported] of [['margin-top:50px', browserName === 'firefox', true], ['margin-bottom:50px', browserName === 'firefox', true], ['line-height:80px', browserName === 'webkit', true],
+    ['padding-top:50px', false, true], ['display:block;height:50px', false, true], ['width:50px', false, true], ['display:none', true, false]] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}div{font:16px/20px monospace;width:300px}br{${css}}</style><div><span>a</span><br><span>b</span></div>`);
+    expect(await page.evaluate(() => document.querySelector('div')!.getBoundingClientRect().height) !== 40, css).toBe(changes);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"><span>a</span><br><span>b</span></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}br{${css}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BR_STYLED'), css).toBe(reported);
+  }
+});
+
+test('F121: font-size, padding, width and height on the options leave a drop-down select the same size', async ({page}) => {
+  const size = async (css:string) => { await page.setContent(`<!doctype html><style>*{margin:0}${css}</style><select><option>xxxxx</option><option>y</option></select>`); return page.evaluate(() => { const r = document.querySelector('select')!.getBoundingClientRect(); return [r.width, r.height]; }); };
+  const plain = await size('');
+  for (const css of ['option{font-size:40px}', 'option{padding:30px}', 'option{width:300px}', 'option{height:80px}', 'option{line-height:60px}']) {
+    expect(await size(css), css).toEqual(plain);
+    const r = analyzeHTML('<html lang="en"><body><label>L <select class="s"><option>xxxxx</option><option>y</option></select></label></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.select), css).toBe(true);
+  }
+  expect(await size('select{font-size:40px}')).not.toEqual(plain);
+});
+
+test('F122: stretch, -moz-available, -webkit-fit-content and intrinsic are taken by some browsers only; the fallbacks make them agree', async ({page, browserName}) => {
+  const takes = { stretch: ['chromium', 'webkit'], '-webkit-fill-available': ['chromium', 'firefox', 'webkit'], '-moz-available': ['firefox'], 'fit-content': ['chromium', 'firefox', 'webkit'], '-webkit-fit-content': ['chromium', 'webkit'], '-moz-fit-content': ['firefox'], intrinsic: ['webkit'] };
+  for (const [value, taken] of Object.entries(takes)) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.a{width:50px;width:${value}}</style><div class="a">x</div>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')!).width) !== '50px', value).toBe(taken.includes(browserName));
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;width:50px;width:${value}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SIZE_BROWSER_DEPENDENT'), value).toBe(taken.length < 3);
+  }
+  // The usual fallback chain: every browser ends on a stretch value.
+  await page.setContent(`<!doctype html><style>*{margin:0}.p{width:300px}.a{display:inline-block;width:50px;width:-webkit-fill-available;width:stretch}</style><div class="p"><div class="a">x</div></div>`);
+  expect(await page.evaluate(() => document.querySelector('.a')!.getBoundingClientRect().width)).toBe(300);
+});
+
+test('F123: isolation: isolate on the blended element itself does not stop the blend; on the parent it does', async ({page}) => {
+  const { PNG } = await import('pngjs');
+  await page.setViewportSize({ width: 200, height: 200 });
+  for (const [parent, self, blends] of [['', '', true], ['', 'isolation:isolate', true], ['isolation:isolate', '', false]] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}body{background:rgb(255,0,0)}.p{width:100px;height:100px;${parent}}.c{width:50px;height:50px;background:rgb(0,255,255);mix-blend-mode:difference;${self}}</style><div class="p"><div class="c"></div></div>`);
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: 10, y: 10, width: 1, height: 1 } }));
+    expect(png.data[0]! > 200, `${parent}|${self}`).toBe(blends); // difference of cyan and red is white; unblended cyan has no red
+  }
+  const r = analyzeHTML('<html lang="en"><body><div class="p"><div class="c"></div></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{height:20px;mix-blend-mode:difference;isolation:isolate}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_ISOLATION_SELF')).toBe(true);
+});
+
+test('F124: Firefox indents the shown option of a select twice; the select size does not change; an input agrees', async ({page, browserName}) => {
+  const { PNG } = await import('pngjs');
+  await page.setViewportSize({ width: 300, height: 100 });
+  const left = async (tag:string, indent:number) => {
+    await page.setContent(`<!doctype html><style>*{margin:0}select,input{width:200px;height:40px;font:20px monospace;color:#000;background:#fff;border:0;padding-left:0;text-indent:${indent}px}</style>${tag === 'select' ? '<select><option>ii</option></select>' : '<input value="ii">'}`);
+    const png = PNG.sync.read(await page.screenshot({ clip: { x: 0, y: 0, width: 200, height: 40 } }));
+    for (let x = 0; x < 200; x++) for (let y = 5; y < 35; y++) { const i = (y * 200 + x) * 4; if (png.data[i]! < 100 && png.data[i + 1]! < 100 && png.data[i + 2]! < 100) return x; }
+    return -1;
+  };
+  const moved = async (tag:string) => (await left(tag, 40)) - (await left(tag, 0));
+  expect(Math.abs((await moved('select')) - (browserName === 'firefox' ? 80 : 40)), 'select').toBeLessThanOrEqual(2);
+  expect(Math.abs((await moved('input')) - 40), 'input').toBeLessThanOrEqual(2);
+  const size = async (css:string) => { await page.setContent(`<!doctype html><style>*{margin:0}${css}</style><select><option>xxxx</option></select>`); return page.evaluate(() => { const r = document.querySelector('select')!.getBoundingClientRect(); return [r.width, r.height]; }); };
+  expect(await size('select{text-indent:40px}')).toEqual(await size(''));
+  const r = analyzeHTML('<html lang="en"><body><select class="s" aria-label="x"><option>x</option></select></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.s{text-indent:10px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_SELECT_INDENT')).toBe(true);
+});
+
+test('F125: a 50rem media query is 800px whatever the root font-size', async ({page}) => {
+  await page.setViewportSize({ width: 600, height: 400 });
+  for (const root of ['', 'html{font-size:10px}', 'html{font-size:62.5%}']) for (const unit of ['em', 'rem']) {
+    await page.setContent(`<!doctype html><style>${root}.a{height:10px}@media (min-width:50${unit}){.a{height:40px}}@media (min-width:500px){.b{height:40px}}</style><div class="a"></div><div class="b"></div>`);
+    expect(await page.evaluate(() => document.querySelector('.a')!.getBoundingClientRect().height), `${root} ${unit}`).toBe(10);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${root}.a{height:10px}@media (min-width:50${unit}){.a{height:40px}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MEDIA_EM_ROOT'), `${root} ${unit}`).toBe(Boolean(root));
+  }
+});
+
+test('F126: overflow-y: visible beside overflow-x: hidden computes to auto, clip beside auto to hidden (not in Chromium); clip keeps visible', async ({page, browserName}) => {
+  // clip beside a scrolling axis: hidden in Firefox (157) and WebKit (27.2), clip in Chromium (156).
+  const clipBeside = browserName === 'chromium' ? 'clip' : 'hidden';
+  for (const [css, y, reported] of [['overflow-x:hidden;overflow-y:visible', 'auto', true], ['overflow:hidden visible', 'auto', true], ['overflow-x:auto;overflow-y:clip', clipBeside, true],
+    ['overflow-x:scroll;overflow-y:clip', clipBeside, true],
+    ['overflow-x:clip;overflow-y:visible', 'visible', false], ['overflow-x:hidden', 'auto', false]] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.a{height:50px;${css}}.c{height:100px}</style><div class="a"><div class="c"></div></div>`);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.a')!).overflowY), css).toBe(y);
+    const r = analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;${css}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_OVERFLOW_PROMOTED'), css).toBe(reported);
+  }
+});
+
+test('F127: box-sizing on html is not inherited; F128: margin-top % is a share of the width', async ({page}) => {
+  const width = async (css:string) => { await page.setContent(`<!doctype html><style>*{margin:0}${css}.b{width:100px;padding:10px}</style><div class="b"></div>`); return page.evaluate(() => document.querySelector('.b')!.getBoundingClientRect().width); };
+  for (const [css, w, reported] of [['html{box-sizing:border-box}', 120, true], ['body{box-sizing:border-box}', 120, true], ['html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}', 100, false]] as const) {
+    expect(await width(css), css).toBe(w);
+    const r = analyzeHTML('<html lang="en"><body><div class="b"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}.b{width:100px;padding:10px;height:20px}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_BOX_SIZING_NOT_INHERITED'), css).toBe(reported);
+  }
+  for (const [w, h] of [[400, 100], [200, 300]] as const) {
+    await page.setContent(`<!doctype html><style>*{margin:0}.p{width:${w}px;height:${h}px;display:flow-root}.c{margin-top:10%;height:10px}</style><div class="p"><div class="c"></div></div>`);
+    expect(await page.evaluate(() => document.querySelector('.c')!.getBoundingClientRect().top), `${w}x${h}`).toBe(w / 10);
+  }
+  const r = analyzeHTML('<html lang="en"><body><div class="c"></div></body></html>', {name: 'P', css: '*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.c{margin-top:10%;height:10px}', viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+  expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_MARGIN_PERCENT_WIDTH')).toBe(true);
+});
+
+test('F129: * { margin: 0 } puts an open or modal dialog at the top-left; dialog { margin: auto } centres it again', async ({page}) => {
+  await page.setViewportSize({ width: 800, height: 600 });
+  for (const [css, centred] of [['', true], ['*{margin:0}', false], ['*{margin:0}dialog{margin:auto}', true]]) for (const modal of [false, true]) {
+    await page.setContent(`<!doctype html><style>${css}</style><dialog ${modal ? '' : 'open'}>d</dialog>`);
+    const left = await page.evaluate(m => { const d = document.querySelector('dialog')!; if (m) d.showModal(); return d.getBoundingClientRect().left; }, modal);
+    expect(left > 100, `${css} ${modal}`).toBe(centred);
+    const r = analyzeHTML(`<html lang="en"><body><dialog ${modal ? '' : 'open'}><p>d</p></dialog></body></html>`, {name: 'P', css: `html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED'), `${css} ${modal}`).toBe(!centred);
+  }
+});
+
+test('F130: Chrome and Safari ignore ::-webkit-scrollbar beside scrollbar-width or scrollbar-color; Firefox does not take it', async ({page, browserName}) => {
+  const html = (css:string) => `<!doctype html><style>*{margin:0}.a{width:200px;height:100px;overflow:scroll}${css}</style><div class="a"><div style="height:300px"></div></div>`;
+  const gutter = (p:Page) => p.evaluate(() => { const a = document.querySelector('.a')! as HTMLElement; return a.offsetWidth - a.clientWidth; });
+  if (browserName === 'chromium') {
+    // Classic scrollbars (Playwright hides them by default), so the bar has a width to measure.
+    const { chromium } = await import('playwright');
+    const browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] }), p = await browser.newPage();
+    try {
+      // macOS overlays the native scrollbar (0px gutter); Linux reserves a classic 15px.
+      // In either environment the explicitly sized pseudo-scrollbar is 4px and standard
+      // properties override it. Do not mistake an OS overlay for a 4px custom scrollbar.
+      await p.setContent(html(''));
+      const normal = await gutter(p);
+      expect([0, 15]).toContain(normal);
+      for (const [css, width] of [['.a::-webkit-scrollbar{width:4px}', 4], ['.a{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}', normal === 0 ? 0 : 10], ['.a{scrollbar-color:red blue}.a::-webkit-scrollbar{width:4px}', normal], ['', normal]] as const) {
+        await p.setContent(html(css));
+        expect(await gutter(p), css).toBe(width);
+      }
+    } finally { await browser.close(); }
+  }
+  if (browserName === 'webkit') for (const [css, width] of [['.a::-webkit-scrollbar{width:4px}', 4], ['.a{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}', 0]] as const) { await page.setContent(html(css)); expect(await gutter(page), css).toBe(width); }
+  expect(await page.evaluate(() => CSS.supports('selector(::-webkit-scrollbar)'))).toBe(browserName !== 'firefox');
+  const lint = (css:string) => (analyzeHTML('<html lang="en"><body><div class="a"></div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px;overflow:auto}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}}).layoutWarnings ?? []).map(w => w.code).filter(c => /SCROLLBAR/.test(c));
+  expect(lint('.a{scrollbar-color:red blue}.a::-webkit-scrollbar{width:4px}')).toEqual(['W_CSS_SCROLLBAR_WEBKIT_IGNORED']);
+  expect(lint('.a::-webkit-scrollbar{display:none}')).toEqual(['W_CSS_SCROLLBAR_FIREFOX_SHOWN']);
+  expect(lint('.a{scrollbar-width:none}.a::-webkit-scrollbar{display:none}')).toEqual([]);
+});
+
+test('F131: a :hover rule a later rule without the state beats shows nothing when hovered (the LVHA order)', async ({page}) => {
+  for (const [css, hovered, reported] of [['a:hover{color:red}a:link{color:blue}', 'rgb(0, 0, 255)', true], ['.b:hover{color:red}.b.c{color:blue}', 'rgb(0, 0, 255)', true],
+    ['a:link{color:blue}a:hover{color:red}', 'rgb(255, 0, 0)', false], ['.b:hover{color:red}.b{color:blue}', 'rgb(255, 0, 0)', false]] as const) {
+    await page.setContent(`<!doctype html><style>${css}</style><a href="#x" class="b c" id="l">link text</a>`);
+    await page.hover('#l');
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('#l')!).color), css).toBe(hovered);
+    const r = analyzeHTML('<html lang="en"><body><a href="/x" class="b c">link text</a></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_STATE_SHADOWED'), css).toBe(reported);
+  }
+});
+
+test('F132: a selector list with a -moz- selector is dropped by Chrome and Safari, with a -ms- one everywhere; :is() forgives', async ({page, browserName}) => {
+  for (const [css, applies, reported] of [['.a::-moz-selection,.a{color:red}', browserName === 'firefox', true], ['.a:-moz-focusring,.a{color:red}', browserName === 'firefox', true], ['.a::-ms-clear,.a{color:red}', false, true],
+    ['.a:is(:-moz-focusring,.x),.a{color:red}', true, false], ['.a::-webkit-input-placeholder,.a{color:red}', true, false]] as const) {
+    await page.setContent(`<!doctype html><style>${css}</style><input class="a">`);
+    expect((await page.evaluate(() => getComputedStyle(document.querySelector('.a')!).color)) === 'rgb(255, 0, 0)', css).toBe(applies);
+    const r = analyzeHTML('<html lang="en"><body><div class="a">t</div></body></html>', {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}${css}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_SELECTOR_LIST_VENDOR'), css).toBe(reported);
+  }
+});
+
+test('F133: a container query unit with no container for its axis is the small-viewport unit', async ({page}) => {
+  const html = '<div class="g"><div class="p"><div class="a"></div></div></div>';
+  // [container css, the cq declaration, the same with the sv unit, reported]
+  for (const [ctx, cq, sv, reported] of [['', 'width:50cqw', 'width:50svw', true], ['', 'height:30cqh', 'height:30svh', true],
+    ['.p{container-type:inline-size}', 'height:30cqh', 'height:30svh', true], ['.p{container-name:card;width:200px}', 'width:50cqw', 'width:50svw', true],
+    ['', 'width:calc(100% - 10cqw)', 'width:calc(100% - 10svw)', true],
+    ['.p{container-type:inline-size;width:200px}', 'width:50cqw', 'width:50svw', false], ['.g{container-type:inline-size;width:200px}', 'width:50cqw', 'width:50svw', false],
+    ['.p{container:card / inline-size;width:200px}', 'width:50cqw', 'width:50svw', false]] as const) {
+    const box = async (decl:string) => { await page.setContent(`<!doctype html><style>*{margin:0}${ctx}.a{height:10px;${decl}}</style>${html}`); return page.evaluate(() => { const r = document.querySelector('.a')!.getBoundingClientRect(); return [r.width, r.height]; }); };
+    // Reported exactly where the cq unit measures what the sv unit does (the viewport), not a container.
+    expect(JSON.stringify(await box(cq)) === JSON.stringify(await box(sv)), `${ctx} ${cq}`).toBe(reported);
+    const r = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css: `*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.a{height:20px}${ctx}.a{${cq}}`, viewport: {min: 320, max: 1200, height: {min: 300, max: 900}}});
+    expect((r.layoutWarnings ?? []).some(w => w.code === 'W_CSS_CONTAINER_UNIT_VIEWPORT'), `${ctx} ${cq}`).toBe(reported);
   }
 });

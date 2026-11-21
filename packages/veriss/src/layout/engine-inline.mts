@@ -26,12 +26,13 @@ interface InlineContext {
   inlineStateTransforms:(box:InlineBox,style:SolverStyle)=>unknown;
   inlineTextAlignment:(box:InlineBox,style:SolverStyle)=>unknown;
   inlineAutoMargin:(box:InlineBox,style:SolverStyle, parentStyle?:SolverStyle)=>unknown;
+  preserve3dInert:(box:InlineBox,style:SolverStyle,parentStyle?:SolverStyle)=>unknown;
   inlineOverflow:(box:InlineBox,style:SolverStyle)=>unknown;
   firstPseudoInert:(box:InlineBox,style:SolverStyle)=>unknown;
   decorationNone:(box:InlineBox,style:SolverStyle,parents:readonly InlineAncestor[])=>unknown;
 }
 const zero=q(0);
-export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnings,geometry,ranges,paints,pseudoWithoutContent,inlineStateTransforms,inlineTextAlignment,inlineAutoMargin,inlineOverflow,firstPseudoInert,decorationNone}:InlineContext) {
+export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnings,geometry,ranges,paints,pseudoWithoutContent,inlineStateTransforms,inlineTextAlignment,inlineAutoMargin,preserve3dInert,inlineOverflow,firstPseudoInert,decorationNone}:InlineContext) {
   // Inline content of a text leaf: phrasing elements that stay display: inline add no geometry when
   // they have no horizontal padding, border or margin (and keep a font-derived contract's font).
   // Each gets its own computed style and DOM facts as a row without a rectangle.
@@ -205,6 +206,7 @@ export function createInlineSolver({styles,edgeValue,generatedTexts,layoutWarnin
       inlineStateTransforms(child, style);
       inlineTextAlignment(child, style);
       inlineAutoMargin(child, style);
+      preserve3dInert(child,style,leafStyle);
       inlineOverflow(child, style);
       decorationNone(child, style, parents);
       firstPseudoInert(child, style);

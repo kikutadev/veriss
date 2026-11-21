@@ -3,6 +3,14 @@
 // how to say it. syntaxNoteOrder is the order the warnings are reported in (stable across releases).
 interface NoteSource { file: string; line: number }
 export interface SyntaxNotePayloads {
+  W_CSS_SELECTOR_LIST_VENDOR: NoteSource & {selector:string; vendor:string; pseudo:string; drops:string[]};
+  W_CSS_SCROLLBAR_WEBKIT_IGNORED: {base:string; webkit:NoteSource & {selector:string;hides:boolean}; standard:(NoteSource & {property:string;value:string})[]};
+  W_CSS_SCROLLBAR_FIREFOX_SHOWN: {base:string; webkit:NoteSource & {selector:string;hides:boolean}};
+  W_CSS_MARGIN_PERCENT_WIDTH: NoteSource & {property:string; value:string; percent:string; selector:string};
+  W_CSS_BOX_SIZING_NOT_INHERITED: NoteSource & {selector:string; affected:string};
+  W_CSS_MEDIA_EM_ROOT: NoteSource & {params:string; root:NoteSource & {value:string; selector:string}};
+  W_CSS_ISOLATION_SELF: NoteSource & {blend:string; selector:string};
+  W_CSS_SIZE_BROWSER_DEPENDENT: NoteSource & {property:string; selector:string; keywords:string[]; used:Record<string,string|null>};
   W_CSS_BACKGROUND_INVALID: NoteSource & { problem: string; selector: string; value: string };
   W_CSS_TIMING_INVALID: NoteSource & { problem: string; property: string; selector: string; value: string };
   W_CSS_FONT_FACE_INVALID: NoteSource & { family?: string; ignored?: boolean; problem: string };
@@ -39,12 +47,32 @@ export interface SyntaxWarning {
   message: string;
   selector?: string | undefined;
   property?: string | undefined;
+  browsers?: Record<string, string[] | Record<string,string|null> | string | null>;
   css: { property: string; file: string; line: number; selector?: string }[];
   counter?: string;
   keyframes?: string;
 }
 type Catalog = { [K in SyntaxNoteCode]: (note: SyntaxNotePayloads[K]) => SyntaxWarning };
 const catalog: Catalog = {
+  W_CSS_SELECTOR_LIST_VENDOR: note => ({ code: 'W_CSS_SELECTOR_LIST_VENDOR', severity: 'warning', selector: note.selector, browsers: { drops: note.drops }, css: [{ property: 'selector', file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector}: ${note.pseudo} is not a valid selector in ${note.drops.length === 3 ? 'any of Chrome, Firefox and Safari' : 'Chrome and Safari'}, and one invalid selector drops the whole list, so ${note.drops.length === 3 ? 'this rule never applies' : 'there the rule does not apply to the other selectors either'}. Put ${note.vendor} in a rule of its own (or inside :is() / :where(), which forgive it)` }),
+  W_CSS_SCROLLBAR_WEBKIT_IGNORED: note => ({ code: 'W_CSS_SCROLLBAR_WEBKIT_IGNORED', severity: 'warning', selector: note.base,
+    css: [{ property: '::-webkit-scrollbar', file: note.webkit.file, line: note.webkit.line, selector: note.webkit.selector }, ...note.standard.map(s => ({ property: s.property, file: s.file, line: s.line, selector: note.base }))],
+    message: `${note.base}: ${note.standard.map(s => `${s.property}: ${s.value}`).join(', ')} is set, so Chrome and Safari ignore ${note.webkit.selector} (they use the standard properties when either is set), and Firefox never takes it: those rules do nothing. Style the scrollbar with scrollbar-width / scrollbar-color only` }),
+  W_CSS_SCROLLBAR_FIREFOX_SHOWN: note => ({ code: 'W_CSS_SCROLLBAR_FIREFOX_SHOWN', severity: 'warning', selector: note.base, browsers: { hidden: ['chromium', 'webkit'], shown: ['firefox'] },
+    css: [{ property: '::-webkit-scrollbar', file: note.webkit.file, line: note.webkit.line, selector: note.webkit.selector }],
+    message: `${note.webkit.selector} hides the scrollbar in Chrome and Safari, but Firefox does not take ::-webkit-scrollbar, so there it is still shown. Add ${note.base} { scrollbar-width: none }` }),
+  W_CSS_MARGIN_PERCENT_WIDTH: note => ({ code: 'W_CSS_MARGIN_PERCENT_WIDTH', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { ${note.property}: ${note.value} }: a vertical margin of ${note.percent} is a share of the containing block's width, not its height, so the gap grows with the width of the page. Use a length (or vh / cqh) for a vertical gap` }),
+  W_CSS_BOX_SIZING_NOT_INHERITED: note => ({ code: 'W_CSS_BOX_SIZING_NOT_INHERITED', severity: 'warning', selector: note.selector, property: 'box-sizing', css: [{ property: 'box-sizing', file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { box-sizing: border-box }: box-sizing is not inherited, so every other element stays content-box (${note.affected} adds its padding and border to its width and height). Add *, *::before, *::after { box-sizing: inherit } (or border-box)` }),
+  W_CSS_MEDIA_EM_ROOT: note => ({ code: 'W_CSS_MEDIA_EM_ROOT', severity: 'warning', css: [{ property: '@media', file: note.file, line: note.line }, { property: 'font-size', file: note.root.file, line: note.root.line, selector: note.root.selector }],
+    message: `@media ${note.params}: em and rem in a media query are the browser's default font size (16px unless the user changed it), not ${note.root.selector} { font-size: ${note.root.value} }, so ${(m => m ? `${m[1]}${m[2]} is ${+(Number(m[1]) * 16).toFixed(2)}px` : 'the breakpoint is 16px-based')(/(\d*\.?\d+)\s*(r?em)\b/i.exec(note.params))}. Write the breakpoint for 16px (or in px)` }),
+  W_CSS_ISOLATION_SELF: note => ({ code: 'W_CSS_ISOLATION_SELF', severity: 'warning', selector: note.selector, property: 'isolation', css: [{ property: 'isolation', file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { mix-blend-mode: ${note.blend}; isolation: isolate }: isolation: isolate keeps this element's descendants from blending with what is behind it, not the element itself, which still blends with the page behind. Put isolation: isolate on the parent to blend only inside it` }),
+  W_CSS_SIZE_BROWSER_DEPENDENT: note => ({ code: 'W_CSS_SIZE_BROWSER_DEPENDENT', severity: 'warning', selector: note.selector, property: note.property, browsers: note.used,
+    css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
+    message: `${note.selector} { ${note.property} }: ${note.keywords.join(', ')} ${note.keywords.length === 1 ? 'is' : 'are'} not taken by every browser, so the ${note.property} differs (${Object.entries(note.used).map(([b, v]) => `${({ chromium: 'Chrome', firefox: 'Firefox', webkit: 'Safari' } as Record<string,string>)[b]}: ${v ?? 'the earlier rule'}`).join(', ')}). ${/fit/.test(note.keywords.join()) ? 'Write fit-content, which every browser takes' : `Write ${note.property}: -webkit-fill-available; ${note.property}: stretch (Firefox takes the first, Chrome and Safari the second)`}` }),
   W_CSS_BACKGROUND_INVALID: note => ({ code: 'W_CSS_BACKGROUND_INVALID', severity: 'warning', selector: note.selector, property: 'background', css: [{ property: 'background', file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { background: ${note.value} }: ${note.problem}, so the browser drops the whole declaration (no image and no color from it). Write image position / size repeat color, with the color in the last layer` }),
   W_CSS_TIMING_INVALID: note => ({ code: 'W_CSS_TIMING_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
@@ -56,7 +84,7 @@ const catalog: Catalog = {
   W_CSS_SUPPORTS_INVALID: note => ({ code: 'W_CSS_SUPPORTS_INVALID', severity: 'warning', css: [{ property: '@supports', file: note.file, line: note.line }],
     message: `@supports ${note.params}: "${note.written}" with no space is read as a function, so the condition is invalid and its rules never apply in any browser. Write ${note.params.replace(/(?<![\w:-])(and|or|not)\(/gi, '$1 (')}` }),
   W_CSS_KEYWORD_INVALID: note => ({ code: 'W_CSS_KEYWORD_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
-    message: `${note.selector} { ${note.property}: ${note.value} }: ${note.property} has no keyword ${note.keyword} (it takes ${note.allowed}), so the browser drops the whole declaration and the earlier ${note.property} stays.${note.suggest ? ` Did you mean ${note.property}: ${note.value.replace(new RegExp(`\\b${note.keyword}\\b`, 'i'), note.suggest)}?` : ''}` }),
+    message: `${note.selector} { ${note.property}: ${note.value} }: ${/\s/.test(note.keyword) ? `${note.keyword} needs commas between the names` : `${note.property} has no keyword ${note.keyword}`} (it takes ${note.allowed}), so the browser drops the whole declaration and the earlier ${note.property} stays.${note.suggest ? ` Did you mean ${note.property}: ${note.value.replace(new RegExp(`\\b${note.keyword}\\b`, 'i'), note.suggest)}?` : ''}` }),
   W_CSS_COLOR_INVALID: note => ({ code: 'W_CSS_COLOR_INVALID', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],
     message: `${note.selector} { ${note.property}: ${note.value} }: ${note.color} is not a valid color (${note.problem}), so the browser drops the whole declaration and the earlier ${note.property} stays. ${/comma/.test(note.problem) ? 'Write the space form (hsl(0 0% 0%), rgb(0 0 0 / 50%)) or keep every value of the comma form the same kind' : /hex/.test(note.problem) ? 'Write 3, 4, 6 or 8 hex digits' : 'Write rgb(r g b / alpha) or hsl(h s l / alpha)'}` }),
   W_CSS_MARKER_IGNORED: note => ({ code: 'W_CSS_MARKER_IGNORED', severity: 'warning', selector: note.selector, property: note.property, css: [{ property: note.property, file: note.file, line: note.line, selector: note.selector }],

@@ -19,3 +19,4 @@ packages/veriss/text-metrics/_build/js/release/build/font_ffi/*
 
 # Local authenticated verification cache; never commit the key or results.
 .veriss-cache/
+_site/

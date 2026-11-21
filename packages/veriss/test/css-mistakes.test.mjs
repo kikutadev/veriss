@@ -233,6 +233,18 @@ test('F26: table > tr never matches: the parser inserts a tbody', () => {
     assert.equal(w('.t > tbody > .r{color:red}').length, 0);
     // A tbody written in the source is not implied.
     assert.equal(codes(run('.t > .r{color:red}', '<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>'), 'W_CSS_SELECTOR_IMPLIED_PARENT').length, 0);
+    // The skipped tbody in the middle of the selector: the subject is a cell (or something inside it), not the row.
+    const deep = '<table class="t"><tr class="r"><td class="c"><span class="s">x</span></td></tr></table>';
+    for (const sel of ['.t > .r > td', '.t > tr > .c', 'table > tr td', '.t > .r > .c > .s', '.t > .r .s']) {
+        const found = codes(run(`${sel}{color:red}`, deep), 'W_CSS_SELECTOR_IMPLIED_PARENT');
+        assert.equal(found.length, 1, sel);
+        assert.match(found[0].message, /tbody/, sel);
+    }
+    // Controls: these match as written (no child combinator across the implied tbody), or never match either way.
+    for (const sel of ['.t .r > td', '.t td', '.t > tbody > .r > td', '.r > .c > .s', '.t > .c', '.t > .r > th'])
+        assert.equal(codes(run(`${sel}{color:red}`, deep), 'W_CSS_SELECTOR_IMPLIED_PARENT').length, 0, sel);
+    // A written tbody is not implied, however deep the subject.
+    assert.equal(codes(run('.t > .r > td{color:red}', '<table class="t"><tbody><tr class="r"><td>x</td></tr></tbody></table>'), 'W_CSS_SELECTOR_IMPLIED_PARENT').length, 0);
 });
 test('F27: the HTML parser changed the structure written in the source', () => {
     const re = (html) => codes(run('', html), 'W_HTML_RESTRUCTURED').map(w => w.tag);
@@ -1192,4 +1204,194 @@ test('minified media conjunction after a closing parenthesis keeps both bounds',
     for (const q of ['(max-height:510px)and (max-width:650px)', '(max-height:510px)and (min-width:651px)']) {
         assert.equal(run('@media ' + q + '{.a{height:40px}}').status, 'verified');
     }
+});
+test('F116: an invalid will-change is dropped, so it does not trap a fixed child (it did)', () => {
+    const html = '<div class="p"><div class="f"></div></div>', css = (wc) => `.p{height:100px;will-change:${wc}}.f{position:fixed;top:0;left:0;width:10px;height:10px}`;
+    assert.equal(codes(run(css('transform'), html), 'W_LAYOUT_FIXED_TRAPPED').length, 1);
+    for (const wc of ['auto, transform', 'transform opacity', 'none']) {
+        const r = run(css(wc), html);
+        assert.equal(codes(r, 'W_LAYOUT_FIXED_TRAPPED').length, 0, wc);
+        assert.equal(codes(r, 'W_CSS_KEYWORD_INVALID').length, 1, wc);
+    }
+    assert.match(codes(run(css('transform opacity'), html), 'W_CSS_KEYWORD_INVALID')[0].message, /needs commas.*transform, opacity\?/);
+});
+test('F117: transform-style: preserve-3d contains fixed children (it was Unknown), and a grouping property or an inline box makes it do nothing', () => {
+    const html = '<div class="p"><div class="f"></div></div>', css = (e) => `.p{height:100px;${e}}.f{position:fixed;top:0;left:0;width:10px;height:10px}`;
+    const inert = (r) => codes(r, 'W_LAYOUT_DECLARATION_INERT').filter(w => w.properties?.includes('transform-style'));
+    assert.equal(codes(run(css('transform-style:flat'), html), 'W_LAYOUT_FIXED_TRAPPED').length, 0);
+    for (const e of ['transform-style:preserve-3d', 'transform-style:preserve-3d;overflow:hidden'])
+        assert.match(codes(run(css(e), html), 'W_LAYOUT_FIXED_TRAPPED')[0].message, /transform-style: preserve-3d/, e);
+    assert.equal(inert(run(css('transform-style:preserve-3d'), html)).length, 0);
+    for (const [e, by] of [['overflow:hidden', 'overflow: hidden'], ['overflow:clip', 'overflow: clip'], ['opacity:.5', 'opacity: .5'], ['isolation:isolate', 'isolation: isolate']])
+        assert.match(inert(run(css(`transform-style:preserve-3d;${e}`), html))[0]?.message ?? '', new RegExp(`flattened by ${by.replace('.', '\\.')}`), e);
+    // display: inline in block flow is not transformable; as a grid item it is blockified, and preserve-3d applies.
+    const inline = run('.a{height:auto}.p{transform-style:preserve-3d}', '<div class="a"><span class="p"></span></div>');
+    assert.match(inert(inline)[0]?.message ?? '', /display: inline/);
+    assert.equal(inert(run('.a{height:auto}.p{display:inline-block;transform-style:preserve-3d}', '<div class="a"><span class="p"></span></div>')).length, 0);
+    assert.equal(run('.a{backface-visibility:hidden;transform-style:flat}').status, 'verified');
+});
+test('F118: flex factors and order on an absolute or fixed box do nothing, whatever its parent (align-self is not reported)', () => {
+    const html = '<div class="p"><div class="s"></div><div class="x"></div></div>';
+    const inert = (parent, e) => codes(run(`.p{${parent};position:relative;width:300px;height:200px}.s{width:50px;height:50px}.x{position:absolute;top:0;left:0;width:20px;height:20px;${e}}`, html), 'W_LAYOUT_DECLARATION_INERT').filter(w => w.box === '.x').flatMap(w => w.properties ?? []);
+    for (const parent of ['display:flex', 'display:grid;grid-template-columns:100px 100px', 'display:block']) {
+        assert.deepEqual(inert(parent, 'flex-grow:1'), ['flex-grow'], parent);
+        assert.deepEqual(inert(parent, 'flex:1'), ['flex-grow', 'flex-basis'], parent);
+        assert.deepEqual(inert(parent, 'order:-1'), ['order'], parent);
+        assert.deepEqual(inert(parent, 'align-self:center'), [], parent);
+        assert.deepEqual(inert(parent, 'flex-grow:0;order:0'), [], parent);
+    }
+    assert.match(codes(run('.x{position:fixed;top:0;left:0;width:20px;height:20px;flex-basis:100px}', '<div class="x"></div>'), 'W_LAYOUT_DECLARATION_INERT')[0]?.message ?? '', /position: fixed, so it is not a flex item/);
+});
+test('F119: text-wrap: balance / pretty / stable after white-space: nowrap on the same element turns wrapping back on (pretty: not in Firefox)', () => {
+    const html = '<div class="p"><div class="x">aaa bbb</div></div>', hit = (css) => codes(run(`.x{width:100px}${css}`, html), 'W_CSS_WRAP_RESTORED');
+    for (const css of ['.x{white-space:nowrap;text-wrap:balance}', '.x{white-space:pre}.x{text-wrap:stable}', '.x{white-space:nowrap}.x{text-wrap:pretty}'])
+        assert.equal(hit(css).length, 1, css);
+    assert.deepEqual(hit('.x{white-space:nowrap;text-wrap:pretty}')[0].browsers, { wraps: ['chromium', 'webkit'], oneLine: ['firefox'] });
+    assert.equal(hit('.x{white-space:nowrap;text-wrap:balance}')[0].browsers, undefined);
+    // the white-space wins, the style longhand, the mode said outright, or white-space from the parent: not reported
+    for (const css of ['.x{text-wrap:balance;white-space:nowrap}', '.x{white-space:nowrap;text-wrap-style:balance}', '.x{white-space:nowrap;text-wrap:wrap}', '.x{white-space:nowrap;text-wrap-mode:wrap}', '.p{white-space:nowrap}.x{text-wrap:balance}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F120: styles on a <br> work in one browser or none (display: none is not reported)', () => {
+    const hit = (css) => codes(run(css, '<div class="a"><span>a</span><br><span>b</span></div>'), 'W_CSS_BR_STYLED');
+    assert.deepEqual(hit('br{margin-top:50px}')[0].browsers, { firefox: ['margin-top'] });
+    assert.deepEqual(hit('br{line-height:80px}')[0].browsers, { webkit: ['line-height'] });
+    assert.match(hit('br{line-height:80px}')[0].message, /line spacing in Safari only/);
+    assert.match(hit('br{padding:10px;width:5px;display:block}')[0].message, /do nothing in any browser/);
+    assert.equal(hit('br{padding:10px}')[0].browsers, undefined);
+    for (const css of ['br{display:none}', 'br{margin:0}', '.a{line-height:30px}', ''])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F121: sizes and spacing on the options of a drop-down do not change the select (a list box and base-select are skipped)', () => {
+    const hit = (css, attrs = '') => codes(run(`.s{width:100px;height:30px}${css}`, `<label>L <select class="s" ${attrs}><option>xxxxx</option><option>y</option></select></label>`), 'W_LAYOUT_DECLARATION_INERT').filter(w => w.select);
+    assert.deepEqual(hit('option{font-size:40px}')[0].properties, ['font-size']);
+    assert.equal(hit('option{padding:30px}').length, 2);
+    assert.match(hit('option{height:80px}')[0].message, /height: 80px does not change the size of \.s: it is a drop-down/);
+    for (const [css, attrs] of [['option{padding:30px}', 'multiple'], ['option{padding:30px}', 'size="4"'], ['select{font-size:20px}', ''], ['option{color:red}', ''], ['option{padding:0}', '']])
+        assert.equal(hit(css, attrs).length, 0, `${css} ${attrs}`);
+});
+test('F122: a size keyword some browsers drop, without a fallback they take, is reported with what each browser uses', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_SIZE_BROWSER_DEPENDENT');
+    const [w] = hit('.a{width:50px;width:stretch}');
+    assert.deepEqual(w.browsers, { chromium: 'stretch', firefox: '50px', webkit: 'stretch' });
+    assert.match(w.message, /width: -webkit-fill-available; width: stretch/);
+    assert.match(hit('.a{max-width:-webkit-fit-content}')[0].message, /Write fit-content/);
+    for (const css of ['.a{width:-webkit-fill-available;width:stretch}', '.a{width:fit-content}', '.a{width:-moz-fit-content;width:fit-content}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F123: isolation: isolate beside mix-blend-mode on the same element does not stop it blending', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_ISOLATION_SELF');
+    assert.match(hit('.a{mix-blend-mode:difference;isolation:isolate}')[0]?.message ?? '', /Put isolation: isolate on the parent/);
+    for (const css of ['.a{mix-blend-mode:normal;isolation:isolate}', '.a{isolation:isolate}', '.a{mix-blend-mode:multiply}', '.a{mix-blend-mode:var(--m);isolation:isolate}', '.a{mix-blend-mode:multiply;isolation:auto}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F124: text-indent on a select is indented twice by Firefox; it no longer makes the select Unknown', () => {
+    const hit = (css) => codes(run(css, '<select class="s" aria-label="x"><option>x</option></select>'), 'W_LAYOUT_SELECT_INDENT');
+    const [w] = hit('.s{text-indent:10px}');
+    assert.deepEqual(w.browsers, { once: ['chromium', 'webkit'], twice: ['firefox'] });
+    assert.match(w.message, /padding-inline-start/);
+    for (const css of ['.s{text-indent:0}', '.s{color:red}', ''])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F125: em / rem in a media query ignore the root font-size the page sets', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_MEDIA_EM_ROOT');
+    assert.match(hit('html{font-size:62.5%}@media (min-width:50rem){.a{width:10px}}')[0]?.message ?? '', /50rem is 800px/);
+    assert.equal(hit('@media (max-width:40em){.a{width:10px}}:root{font-size:10px}').length, 1);
+    for (const css of ['@media (min-width:50rem){.a{width:10px}}', 'html{font-size:100%}@media (min-width:50rem){.a{width:10px}}', 'html{font-size:10px}@media (min-width:500px){.a{width:10px}}', '.x{font-size:10px}@media (min-width:50em){.a{width:10px}}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F126: an axis written visible (or clip) beside a scrolling one computes to auto (hidden)', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_OVERFLOW_PROMOTED');
+    assert.match(hit('.a{overflow-x:hidden;overflow-y:visible}')[0]?.message ?? '', /overflow-y: visible computes to auto.*write overflow-x: clip/);
+    assert.equal(hit('.a{overflow:hidden visible}').length, 1);
+    for (const css of ['.a{overflow-x:hidden}', '.a{overflow-x:clip;overflow-y:visible}', '.a{overflow:hidden}', '.a{overflow:auto}'])
+        assert.equal(hit(css).length, 0, css);
+    // clip beside hidden / auto / scroll: Firefox (157) and WebKit (27.2) compute it to hidden, Chromium (156) keeps clip
+    // (measured with getComputedStyle, every pair). Whether the box scrolls on that axis differs by browser: the warning
+    // says which browser does what, and the layout is Unknown (not hidden, as it once was taken to be everywhere).
+    for (const css of ['.a{overflow-x:auto;overflow-y:clip}', '.a{overflow:clip hidden}', '.a{overflow-x:scroll;overflow-y:clip}']) {
+        const r = run(css), [w] = codes(r, 'W_CSS_OVERFLOW_PROMOTED');
+        assert.ok(w, css);
+        assert.deepEqual(w.browsers, { hidden: ['firefox', 'webkit'], clip: ['chromium'] }, css);
+        assert.match(w.message, /Firefox and Safari.*Chrome/, css);
+        assert.ok(r.diagnostics.some(d => d.code === 'U_LAYOUT_BROWSER' && /clip/.test(d.message)), css);
+    }
+    // visible beside a scrolling axis computes to auto in all three: still verified, and no browsers note.
+    const visible = run('.a{overflow-x:hidden;overflow-y:visible}');
+    assert.equal(codes(visible, 'W_CSS_OVERFLOW_PROMOTED')[0].browsers, undefined);
+    assert.ok(!visible.diagnostics.some(d => d.code === 'U_LAYOUT_BROWSER'));
+});
+test('F127: box-sizing on html or body alone is not inherited by the elements that size with padding', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_BOX_SIZING_NOT_INHERITED');
+    assert.match(hit('html{box-sizing:border-box}.b{width:100px;padding:10px}')[0]?.message ?? '', /not inherited.*box-sizing: inherit/);
+    assert.equal(hit('body{box-sizing:border-box}.b{height:10px;border:1px solid}').length, 1);
+    for (const css of ['html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}.b{width:100px;padding:10px}', 'html{box-sizing:border-box}', 'html{box-sizing:border-box}.b{box-sizing:border-box;width:100px;padding:10px}', '.b{width:100px;padding:10px}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F128: a vertical margin in % is a share of the width', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_MARGIN_PERCENT_WIDTH');
+    for (const css of ['.a{margin-top:10%}', '.a{margin:5% 0}', '.a{margin-bottom:2.5%}'])
+        assert.equal(hit(css).length, 1, css);
+    for (const css of ['.a{margin:0 5%}', '.a{padding-top:56.25%}', '.a{margin-left:10%}', '.a{margin-top:0%}', '.a{margin-top:10px}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F129: a margin reset that reaches a dialog takes away its centring (open and closed dialogs; a rule for the dialog is not reported)', () => {
+    const hit = (css) => (analyzeHTML('<html lang="en"><body><dialog open><p>d</p></dialog><dialog id="m" class="modal"><p>m</p></dialog></body></html>', { name: 'P', css: `html,body{display:grid;grid-template-columns:minmax(0,1fr)}${css}`, viewport: { min: 320, max: 1200, height: { min: 300, max: 900 } } }).layoutWarnings ?? []).filter(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED');
+    assert.deepEqual(hit('*{margin:0}').map(w => w.box), ['dialog@P/0/0', '#m']);
+    assert.match(hit('body *{margin:0}')[0].message, /Add dialog \{ margin: auto \}/);
+    for (const css of ['*{margin:0}dialog{margin:auto}', 'dialog{margin:10px auto}', '.modal{margin:0}', '#m{margin:0}', ''])
+        assert.equal(hit(css).filter(w => w.box === '#m').length, 0, css);
+});
+test('F130: ::-webkit-scrollbar is ignored by Chrome beside scrollbar-width / -color, and not taken by Firefox', () => {
+    const hit = (css, code) => codes(run(`.a{overflow:auto}${css}`), code);
+    assert.match(hit('.a{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}', 'W_CSS_SCROLLBAR_WEBKIT_IGNORED')[0]?.message ?? '', /Chrome and Safari ignore .*those rules do nothing/);
+    assert.equal(hit('.a{scrollbar-color:red blue}.a::-webkit-scrollbar-thumb{background:red}', 'W_CSS_SCROLLBAR_WEBKIT_IGNORED').length, 1);
+    assert.match(hit('.a::-webkit-scrollbar{display:none}', 'W_CSS_SCROLLBAR_FIREFOX_SHOWN')[0]?.message ?? '', /\.a \{ scrollbar-width: none \}/);
+    assert.equal(hit('.a::-webkit-scrollbar{width:0}', 'W_CSS_SCROLLBAR_FIREFOX_SHOWN').length, 1);
+    for (const css of ['.a{scrollbar-width:none}.a::-webkit-scrollbar{display:none}', '.a::-webkit-scrollbar{width:6px}', '.a{scrollbar-width:thin}', '.b{scrollbar-width:thin}.a::-webkit-scrollbar{width:4px}'])
+        assert.equal([...hit(css, 'W_CSS_SCROLLBAR_WEBKIT_IGNORED'), ...hit(css, 'W_CSS_SCROLLBAR_FIREFOX_SHOWN')].length, 0, css);
+});
+test('F131: a :hover / :focus rule beaten by a later or more specific rule without the state never shows', () => {
+    const hit = (css) => codes(run(css, '<a href="/x" class="b c">link text</a>'), 'W_CSS_STATE_SHADOWED');
+    assert.match(hit('a:hover{color:red}a:link{color:blue}')[0]?.message ?? '', /a:hover \{ color: red \} never shows: a:link/);
+    assert.equal(hit('.b:hover{background:red}.b.c{background:blue}').length, 1);
+    assert.equal(hit('a:focus{color:red}a:link{color:blue}')[0]?.state, ':focus');
+    for (const css of ['a:link{color:blue}a:hover{color:red}', '.b:hover{color:red}.b{color:blue}', 'a:hover{color:red}a:link{color:red}', 'a:hover{color:red}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F132: a -moz- or -ms- selector in a list drops the whole rule where it is invalid', () => {
+    const hit = (css) => codes(run(css), 'W_CSS_SELECTOR_LIST_VENDOR');
+    assert.deepEqual(hit('.a::-moz-selection,.a{color:red}')[0]?.browsers, { drops: ['chromium', 'webkit'] });
+    assert.match(hit('.a::-ms-clear,.a{color:red}')[0]?.message ?? '', /this rule never applies/);
+    assert.equal(hit('.a:hover:-moz-any(b),.a{color:red}').length, 1);
+    for (const css of ['.a:is(:-moz-focusring,.x),.a{color:red}', '.a:where(:-moz-focusring),.a{color:red}', '.a::-webkit-input-placeholder,.a{color:red}', '.a::-moz-selection{color:red}', '.a,.b{color:red}'])
+        assert.equal(hit(css).length, 0, css);
+});
+test('F133: a container query unit with no query container for its axis is a small-viewport unit', () => {
+    const nest = '<div class="g"><div class="p"><div class="a"></div></div></div>';
+    const hit = (css, html = nest) => codes(run(css, html), 'W_CSS_CONTAINER_UNIT_VIEWPORT');
+    // No container: cqw is svw, cqh is svh (measured in Chromium, Firefox and WebKit: the same boxes).
+    const [w] = hit('.a{width:50cqw}');
+    assert.ok(w);
+    assert.deepEqual(w.units, ['cqw']);
+    assert.match(w.message, /svw/);
+    assert.match(hit('.a{height:30cqh}')[0]?.message ?? '', /svh/);
+    for (const css of ['.a{font-size:5cqi}', '.a{width:calc(100% - 10cqw)}', '.a{padding-block:2cqb}'])
+        assert.equal(hit(css).length, 1, css);
+    // An inline-size container gives the inline axis only: cqh / cqb still fall back to the viewport; cqw does not.
+    assert.equal(hit('.p{container-type:inline-size}.a{height:30cqh}').length, 1);
+    assert.match(hit('.p{container-type:inline-size}.a{height:30cqh}')[0].message, /container-type: size/);
+    assert.equal(hit('.p{container-type:inline-size}.a{width:50cqw}').length, 0);
+    assert.equal(hit('.g{container-type:inline-size}.a{width:50cqw}').length, 0);
+    assert.equal(hit('.p{container-type:size;height:100px}.a{height:30cqh}').length, 0);
+    assert.equal(hit('.p{container:card / inline-size}.a{width:50cqw}').length, 0);
+    // A container name alone is not a container; the element's own container-type does not count (it queries ancestors).
+    assert.equal(hit('.p{container-name:card}.a{width:50cqw}').length, 1);
+    assert.equal(hit('.a{container-type:inline-size;width:50cqw}').length, 1);
+    // A container that a state or a media query sets may be there: not reported.
+    assert.equal(hit('@media (min-width:600px){.p{container-type:inline-size}}.a{width:50cqw}').length, 0);
+    assert.equal(hit('.g:hover .p{container-type:inline-size}.a{width:50cqw}').length, 0);
+    // Not a unit: a name or a string with the letters in it.
+    assert.equal(hit('.a{animation-name:cqw}@keyframes cqw{to{opacity:.5}}').length, 0);
+    assert.equal(hit('.a{width:50svw}').length, 0);
 });

@@ -20,7 +20,7 @@ interface Dropped { property: string; value: CssValue; reason: string; where?: s
 interface Report<R> {
   warnings: CssMistakeWarning[];
   unknown: (code: string, message: string, line: number, box: RuleBox, file: string) => unknown;
-  diagnostics: readonly { message: string }[];
+  diagnostics: readonly { code: string; path?: string; message: string }[];
   ranges: (region: R) => RangeFacts;
 }
 interface Facts<R> {
@@ -32,6 +32,7 @@ interface Facts<R> {
   dependentDeclarations: readonly (RuleLocation & { property: string; value: CssValue })[];
   userSelectNone: readonly RuleLocation[];
   transitionSizes: TransitionSize[];
+  unreadContainers?: readonly {file:string;line:number;selector:string}[];
   styles: (box: RuleBox, region: R, ancestors: readonly Ancestor[], inherited: RuleStyle | undefined, emit: boolean, gridItem: boolean, state?: State) => readonly { style: RuleStyle }[];
 }
 interface Tools {
@@ -59,7 +60,7 @@ export interface CssMistakeContext<R> { report: Report<R>; facts: Facts<R>; tool
 
 export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext<R>) {
   const { warnings: layoutWarnings, unknown, diagnostics, ranges } = report;
-  const { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles } = facts;
+  const { rules, firstPseudo, contentRules, radiusRules, keyframeNames, dependentDeclarations, userSelectNone, transitionSizes, styles, unreadContainers = [] } = facts;
   const PARENT:Tools['PARENT']=tools.PARENT;
   const { matches, droppedOf, droppedPairs, droppedValue, transitionsOf, animationsOf, dependentProperty, ignoringSiblings, directionality, langMatches, asEditable, readWriteKnown, optionalDivergent, optionalDivergence, requiredCapable, asFormField, placeholderField, focusable: focusableBox } = tools;
   const neverRendered = new Set(['template', 'script', 'style', 'link', 'meta']);
@@ -186,7 +187,213 @@ export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext
     layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: keys, css: keys.map(key => ({ property: key, file: style.$sources[key]!.file, line: style.$sources[key]!.line, selector: style.$sources[key]!.selector })),
       message: `${box.label}: ${keys.join(', ')} ${keys.length === 1 ? 'has' : 'have'} no effect on a table ${box.tag === 'col' ? 'column' : 'column group'}: a column is not an ancestor of its cells (nothing is inherited from it) and has no box to pad or size; only width, background, visibility${String(style['border-collapse']) === 'collapse' ? ' and border' : ' and, with border-collapse: collapse, border'} act on it. Style the cells instead (td:nth-child(…))` });
   }
+  // F117: transform-style: preserve-3d does nothing on an inline box (not transformable), and a grouping property on the
+  // same element (overflow other than visible, opacity below 1, filter, isolation: isolate, mix-blend-mode, clip-path,
+  // mask) flattens it: the children's 3D positions are painted into its plane (CSS Transforms 2 §6.2.1; measured in
+  // Chromium, Firefox and WebKit, overflow: clip included). contain: paint flattens it in Firefox only; not judged.
+  function preserve3dInert(box:RuleBox, style:RuleStyle, parentStyle?:RuleStyle) {
+    // As in inlineAutoMargin: block flow is laid out as a one-column grid, so an inline child reads as blockified; a
+    // real flex or grid parent does blockify it (and makes it transformable).
+    const inline = String(style.$inlineDisplay ?? style.display) === 'inline' && !(parentStyle && ['flex', 'inline-flex', 'grid', 'inline-grid'].includes(String(parentStyle.display)) && !parentStyle.$blockFlow);
+    const source = style.$sources?.['transform-style'];
+    if (box.pseudo || !source || style['transform-style'] !== 'preserve-3d' || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties?.includes('transform-style'))) return;
+    const by = inline ? null : [
+      ...['overflow-x', 'overflow-y'].filter(key => ![undefined, 'visible'].includes(style[key] as string|undefined)).slice(0, 1).map(key => `overflow: ${style[key]}`),
+      ...(style.opacity !== undefined && Number(style.opacity) < 1 ? [`opacity: ${style.opacity}`] : []),
+      ...['filter', 'clip-path', 'mask', 'mask-image'].filter(key => style[key] !== undefined && !['none', 'initial'].includes(String(style[key]))).map(key => `${key}: ${style[key]}`),
+      ...(style.isolation === 'isolate' ? ['isolation: isolate'] : []),
+      ...(style['mix-blend-mode'] !== undefined && style['mix-blend-mode'] !== 'normal' ? [`mix-blend-mode: ${style['mix-blend-mode']}`] : []),
+    ];
+    if (by && !by.length) return;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: ['transform-style'], css: [{ property: 'transform-style', file: source.file, line: source.line, selector: source.selector }],
+      message: by ? `${box.label}: transform-style: preserve-3d is flattened by ${by.join(', ')} on the same element: its children's 3D transforms are painted into its plane, as with flat. Move ${by.length === 1 ? 'that property' : 'those properties'} to a wrapper or to the children`
+        : `${box.label}: transform-style: preserve-3d has no effect on a display: inline box (it is not transformable). Make it inline-block or block` });
+  }
+  // F118: an absolutely positioned (or fixed) box is not a flex item: flex-grow, flex-shrink, flex-basis (and flex) and
+  // order do not size or move it, in a flex, grid or block parent alike (measured in Chromium, Firefox and WebKit:
+  // align-self does move it in flex and grid, and grid placement in a grid, so those are not reported).
+  function outOfFlowFlexInert(box:RuleBox, style:RuleStyle) {
+    if (box.pseudo || !['absolute', 'fixed'].includes(String(style.position)) && !style.$fixed) return;
+    const idle:Record<string,string[]> = { 'flex-grow': ['0'], 'flex-shrink': ['1'], 'flex-basis': ['auto'], order: ['0'] };
+    const found = Object.keys(idle).filter(key => style.$sources?.[key] && !idle[key]!.includes(String(style[key])) && !['initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(style[key])));
+    if (!found.length || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.properties?.includes(found[0]!))) return;
+    const position = style.$fixed ? 'fixed' : style.position;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, properties: found, css: found.map(key => ({ property: key, file: style.$sources![key]!.file, line: style.$sources![key]!.line, selector: style.$sources![key]!.selector })),
+      message: `${box.label}: ${found.map(key => `${key}: ${style[key]}`).join(', ')} ${found.length === 1 ? 'has' : 'have'} no effect: it is position: ${position}, so it is not a flex item and is placed by its insets (top / left / right / bottom), width and height. Size it with width, or take position: ${position} off to make it an item` });
+  }
+  // F119: text-wrap: balance / pretty / stable after white-space: nowrap / pre on the same element turns wrapping back on:
+  // the shorthand also sets text-wrap-mode: wrap (measured in Chromium, Firefox and WebKit). The author meant the style
+  // of wrapping, not the mode (text-wrap: wrap or text-wrap-mode: wrap mean it and are not reported). Firefox (measured
+  // with 157) does not take text-wrap: pretty and drops it, so there the text stays on one line.
+  function wrapRestored(box:RuleBox, style:RuleStyle) {
+    const w = style.$wrapRestored, by = String(w?.by.wrapShorthand ?? '').toLowerCase();
+    if (box.pseudo || !w || !['balance', 'pretty', 'stable'].includes(by) || layoutWarnings.some(x => x.code === 'W_CSS_WRAP_RESTORED' && x.path === box.path)) return;
+    const pretty = by === 'pretty';
+    layoutWarnings.push({ code: 'W_CSS_WRAP_RESTORED', severity: 'warning', box: box.label, path: box.path, ...(pretty ? { browsers: { wraps: ['chromium', 'webkit'], oneLine: ['firefox'] } } : {}),
+      css: [{ property: 'white-space', file: w.from.file, line: w.from.line, selector: w.from.selector }, { property: 'text-wrap', file: w.by.file, line: w.by.line, selector: w.by.selector }],
+      message: `${box.label}: text-wrap: ${by} (${w.by.selector}) also sets text-wrap-mode: wrap, so it undoes white-space: ${w.whiteSpace} (${w.from.selector}) and the text wraps again.${pretty ? ' Firefox does not take text-wrap: pretty and drops it, so there the text stays on one line: the page differs by browser.' : ''} Write text-wrap-style: ${by} to change only how wrapping text breaks, or drop it to keep one line` });
+  }
+  // F120: a <br> is a forced line break, not a box. margin-top / -bottom on it change the line spacing in Firefox only,
+  // line-height in Safari only; padding, width, height, the inline margins and display: block do nothing anywhere
+  // (measured in Chromium, Firefox and WebKit). display: none removes the break everywhere, so it is not reported.
+  function brStyled(box:RuleBox, style:RuleStyle) {
+    if (box.tag !== 'br' || box.pseudo || layoutWarnings.some(w => w.code === 'W_CSS_BR_STYLED' && w.path === box.path)) return;
+    const own = (key:string) => { const src = style.$sources?.[key]; return src && !['initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(src.specified ?? '').trim().toLowerCase()) ? src : null; };
+    const zero = (key:string) => ['0', '0px', 'auto', 'normal', 'none'].includes(String(style[key]));
+    const firefox = ['margin-top', 'margin-bottom'].filter(key => own(key) && !zero(key));
+    const webkit = own('line-height') ? ['line-height'] : [];
+    const nowhere = ['padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'inline-size', 'block-size', 'margin-left', 'margin-right'].filter(key => own(key) && !zero(key));
+    const display = own('display') && style.display !== 'none' && style.display !== 'inline' ? ['display'] : [];
+    const found = [...firefox, ...webkit, ...nowhere, ...display];
+    if (!found.length) return;
+    const name = (key:string):string => ({ 'inline-size': 'width', 'block-size': 'height' } as Record<string,string>)[key] ?? key, shown = (keys:string[]) => keys.map(key => `${name(key)}: ${style.$sources![key]!.specified ?? style[key]}`).join(', ');
+    const parts: (string|null)[] = [firefox.length ? `${shown(firefox)} ${firefox.length === 1 ? 'changes' : 'change'} the line spacing in Firefox only` : null, webkit.length ? `${shown(webkit)} changes ${firefox.length ? 'it' : 'the line spacing'} in Safari only` : null,
+      nowhere.length + display.length ? `${shown([...nowhere, ...display])} ${nowhere.length + display.length === 1 ? 'does' : 'do'} nothing in any browser` : null].filter(Boolean);
+    layoutWarnings.push({ code: 'W_CSS_BR_STYLED', severity: 'warning', box: box.label, path: box.path, properties: found.map(name),
+      ...(firefox.length || webkit.length ? { browsers: { ...(firefox.length ? { firefox: firefox.map(name) } : {}), ...(webkit.length ? { webkit: webkit.map(name) } : {}) } } : {}),
+      css: found.map(key => ({ property: name(key), file: style.$sources![key]!.file, line: style.$sources![key]!.line, selector: style.$sources![key]!.selector })),
+      message: `${box.label}: a <br> is a line break, not a box: ${parts.join('; ')}. Space the lines with margin or padding on the elements around it (or split the text into blocks)` });
+  }
+  // F121: in a drop-down (a select without multiple or size > 1) the options' font-size, padding, margin, width, height
+  // and line-height do not change the control's size (measured in Chromium, Firefox and WebKit); the open menu is drawn
+  // by the browser, which takes few of them, differently in each. Size the select itself. appearance: base-select (customizable
+  // select, Chromium) does style them; it is skipped, as is a list box.
+  function optionInert(box:RuleBox, style:RuleStyle, ancestors:readonly Ancestor[]) {
+    if (!['option', 'optgroup'].includes(box.tag) || box.pseudo || layoutWarnings.some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.path === box.path && w.select)) return;
+    const select = [...ancestors].reverse().find(a => a.box?.tag === 'select');
+    if (!select) return;
+    const attrs = select.box.attributes ?? {}, size = Number(attrs.size ?? 1);
+    if (Object.hasOwn(attrs, 'multiple') || size > 1 || /base-select/.test(String(select.style?.appearance ?? ''))) return;
+    const keys = ['font-size', 'line-height', 'inline-size', 'block-size', 'min-inline-size', 'min-block-size', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left'];
+    const idle = ['0', '0px', 'auto', 'normal', 'none'];
+    const found = keys.filter(key => { const src = style.$sources?.[key], parent = select.style?.$sources?.[key]; return src && !(parent && parent.file === src.file && parent.line === src.line && parent.selector === src.selector) && !idle.includes(String(style[key])) && !['initial', 'unset', 'inherit', 'revert', 'revert-layer'].includes(String(src.specified ?? '').trim().toLowerCase()); });
+    if (!found.length) return;
+    const name = (key:string):string => ({ 'inline-size': 'width', 'block-size': 'height', 'min-inline-size': 'min-width', 'min-block-size': 'min-height' } as Record<string,string>)[key] ?? key;
+    layoutWarnings.push({ code: 'W_LAYOUT_DECLARATION_INERT', severity: 'warning', box: box.label, path: box.path, select: select.box.label, properties: found.map(name), css: found.map(key => ({ property: name(key), file: style.$sources![key]!.file, line: style.$sources![key]!.line, selector: style.$sources![key]!.selector })),
+      message: `${box.label}: ${found.map(key => `${name(key)}: ${style.$sources![key]!.specified ?? style[key]}`).join(', ')} ${found.length === 1 ? 'does' : 'do'} not change the size of ${select.box.label}: it is a drop-down, and its open menu is drawn by the browser, which takes few of these (differently in each browser). Size and pad the select itself` });
+  }
+  // F124: text-indent on a <select> indents the shown option twice in Firefox, once in Chromium and Safari (measured:
+  // 10px gives 22 / 16 / 17, appearance: none too; the control's size does not change); an <input> agrees. Judged on
+  // the select's own computed value (an ancestor's text-indent keeps that ancestor's layout Unknown before it).
+  function selectIndent(box:RuleBox, style:RuleStyle, ancestors:readonly Ancestor[]) {
+    if (box.tag !== 'select' || box.pseudo || layoutWarnings.some(w => w.code === 'W_LAYOUT_SELECT_INDENT' && w.path === box.path)) return;
+    const value = String(style.$selectIndent ?? '0');
+    if (/^-?(?:0|0px|0%|0em|0rem)$/.test(value) || !/\d/.test(value)) return;
+    const own = style.$sources?.['text-indent'], from = own ? null : [...ancestors].reverse().find(a => a.style?.$sources?.['text-indent']);
+    const src = own ?? from?.style.$sources['text-indent'];
+    layoutWarnings.push({ code: 'W_LAYOUT_SELECT_INDENT', severity: 'warning', box: box.label, path: box.path, browsers: { once: ['chromium', 'webkit'], twice: ['firefox'] },
+      ...(src ? { css: [{ property: 'text-indent', file: src.file, line: src.line, selector: src.selector }] } : {}),
+      message: `${box.label}: text-indent: ${value}${from ? ` (inherited from ${from.box.label})` : ''} indents the selected option twice in Firefox and once in Chrome and Safari, so the text sits in a different place. Use padding-inline-start on the select${from ? `, and text-indent: 0 on it` : ' instead'}` });
+  }
+  // F126: overflow-x: hidden with overflow-y: visible (or the other way round) does not keep that axis visible: it
+  // computes to auto, so the box scrolls or clips on both axes (measured in Chromium, Firefox and WebKit). overflow: clip
+  // on the axis to cut keeps the other visible. clip beside hidden / auto / scroll computes to hidden in Firefox (157) and
+  // WebKit (27.2) but stays clip in Chromium (156; getComputedStyle, every pair): reported with the browsers, and the
+  // layout is Unknown.
+  function overflowPromoted(box:RuleBox, style:RuleStyle) {
+    for (const p of style.$overflowPromoted ?? []) {
+      if (layoutWarnings.some(w => w.code === 'W_CSS_OVERFLOW_PROMOTED' && w.path === box.path && w.property === p.property)) continue;
+      const axis = p.property.slice(-1), otherAxis = axis === 'x' ? 'y' : 'x';
+      const css = [{ property: p.property, file: p.source.file, line: p.source.line, selector: p.source.selector }];
+      if (p.written === 'clip') {
+        layoutWarnings.push({ code: 'W_CSS_OVERFLOW_PROMOTED', severity: 'warning', box: box.label, path: box.path, property: p.property, css, browsers: { hidden: ['firefox', 'webkit'], clip: ['chromium'] },
+          message: `${box.label}: overflow-${axis}: clip beside overflow-${otherAxis}: ${p.other} computes to hidden in Firefox and Safari (the box becomes scrollable on the ${axis} axis too) but stays clip in Chrome, so the page differs by browser. Write the same value on both axes (overflow: ${p.other}), or overflow-${otherAxis}: clip to cut only that axis` });
+        // Whether the box scrolls on that axis differs by browser: its layout is not decided (the style keeps hidden).
+        if (!diagnostics.some(d => d.code === 'U_LAYOUT_BROWSER' && d.path === box.path))
+          unknown('U_LAYOUT_BROWSER', `${box.label}: ${p.property}: clip beside a scrolling overflow (${p.other}) computes to hidden in Firefox and Safari but stays clip in Chrome, so whether it scrolls on that axis differs by browser`, p.source.line, box, p.source.file);
+        continue;
+      }
+      layoutWarnings.push({ code: 'W_CSS_OVERFLOW_PROMOTED', severity: 'warning', box: box.label, path: box.path, property: p.property, css,
+        message: `${box.label}: overflow-${axis}: ${p.written} computes to auto because overflow-${otherAxis} is ${p.other}: a box cannot scroll or clip on one axis and stay ${p.written} on the other, so it scrolls (or clips) its overflow on the ${axis} axis too. To cut only the ${otherAxis} axis, write overflow-${otherAxis}: clip` });
+    }
+  }
+  // F133: a container query length unit (cqw, cqi, cqh, cqb) with no query container for its axis among the ancestors
+  // is the small-viewport unit (svw, svi, svh, svb): width: 50cqw with no container is 50svw, and cqh inside a
+  // container-type: inline-size container is svh (only size containers give the block axis). Measured in Chromium,
+  // Firefox and WebKit: the same boxes as with the sv unit, the element's own container-type not counting, a container
+  // name alone not making a container; and a container (inline-size, the shorthand, a grandparent) changes the box.
+  // A container-type set by any rule that may match the ancestor (another state or media query) counts as there, and a
+  // rule that sets one with a selector the analysis cannot match (.card:hover .body) leaves it undecided: not reported.
+  // Horizontal writing modes only (cqw is the inline axis there).
+  const containerUnit = /(?<![\w.-])(?:\d+\.?\d*|\.\d+)(cqw|cqi|cqh|cqb)(?![\w-])/gi;
+  const containerTypes:Record<'inline'|'block',readonly string[]> = { inline: ['inline-size', 'size'], block: ['size'] };
+  function containerUnitViewport(box:RuleBox, style:RuleStyle, ancestors:readonly Ancestor[]) {
+    if (layoutWarnings.some(w => w.code === 'W_CSS_CONTAINER_UNIT_VIEWPORT' && w.path === box.path)) return;
+    const found = new Map<string,{key:string;src:Source}>();
+    for (const [key, src] of Object.entries(style.$sources ?? {})) {
+      const text = String(src?.specified ?? '').replace(/url\([^)]*\)|"[^"]*"|'[^']*'/g, '');
+      for (const m of text.matchAll(containerUnit)) { const unit = m[1]!.toLowerCase(); if (!found.has(unit) && src) found.set(unit, { key, src }); }
+    }
+    // Declarations the style stage could not read (a shorthand expanded to px lengths, padding: 2cqi): the rules that
+    // match the box with no state or condition.
+    for (const rule of rules) if (rule.unmodeled && !rule.contexts?.length && rule.selectors?.some(sel => !sel.state && !sel.pseudoElement && matches(sel, box)))
+      for (const d of rule.unmodeled) for (const m of d.specified.replace(/url\([^)]*\)|"[^"]*"|'[^']*'/g, '').matchAll(containerUnit)) {
+        const unit = m[1]!.toLowerCase(); if (!found.has(unit)) found.set(unit, { key: d.property, src: d });
+      }
+    if (!found.size || unreadContainers.length) return;
+    if ([style, ...ancestors.map(a => a.style)].some(s => s && s['writing-mode'] && s['writing-mode'] !== 'horizontal-tb')) return;
+    const may = (a:Ancestor, axis:'inline'|'block') => containerTypes[axis].includes(String(a.style?.['container-type'] ?? '').toLowerCase())
+      || rules.some(rule => rule.declarations?.some(d => d.property === 'container-type' && containerTypes[axis].includes(String(d.value).trim().toLowerCase()))
+        && rule.selectors?.some(sel => !sel.pseudoElement && matches(sel, a.box, new Set(sel.state ? [sel.state] : []))));
+    const axisOf = (unit:string):'inline'|'block' => ['cqw', 'cqi'].includes(unit) ? 'inline' : 'block';
+    const missing = [...found].filter(([unit]) => !ancestors.some(a => may(a, axisOf(unit))));
+    if (!missing.length) return;
+    const fallback:Record<string,string> = { cqw: 'svw', cqi: 'svi', cqh: 'svh', cqb: 'svb' }, inlineOnly = ancestors.some(a => may(a, 'inline'));
+    const said = missing.map(([unit, { key, src }]) => `${key}: ${src.specified} (${unit} is ${fallback[unit]})`).join(', ');
+    const why = missing.some(([unit]) => axisOf(unit) === 'block') && inlineOnly
+      ? 'its container has container-type: inline-size, which gives the inline axis only (cqh and cqb need container-type: size)'
+      : 'no ancestor has container-type: inline-size or size (a container-name alone, or the element\'s own container-type, does not count)';
+    layoutWarnings.push({ code: 'W_CSS_CONTAINER_UNIT_VIEWPORT', severity: 'warning', box: box.label, path: box.path, units: missing.map(([unit]) => unit),
+      css: missing.map(([, { key, src }]) => ({ property: key, file: src.file, line: src.line, selector: src.selector })),
+      message: `${box.label}: ${said}: ${why}, so the unit measures the small viewport, not a container. Give the ancestor it should measure container-type: ${missing.some(([unit]) => axisOf(unit) === 'block') ? 'size (and a height)' : 'inline-size'}, or write the ${fallback[missing[0]![0]]} unit if the viewport is meant` });
+  }
+  // F129: a <dialog> is centred by the UA's margin: auto (with inset 0 for a modal); a reset such as * { margin: 0 }
+  // that reaches it puts it at the top-left corner (measured in Chromium, Firefox and WebKit, open and showModal()).
+  // Reported when an author rule sets a horizontal or vertical margin other than auto on a dialog and none sets it back.
+  function dialogMarginReset(box:RuleBox, style:Pick<RuleStyle,'$sources'>) {
+    if (box.tag !== 'dialog' || box.pseudo || layoutWarnings.some(w => w.code === 'W_CSS_DIALOG_NOT_CENTRED' && w.path === box.path)) return;
+    // A rule that names the dialog (its tag, class or id) places it on purpose; only a reset that reaches it is reported.
+    const aimed = (sel:string) => /dialog/i.test(sel) || (box.classes ?? []).some(c => sel.includes(`.${c}`)) || (box.id && sel.includes(`#${box.id}`));
+    const keys = ['margin-left', 'margin-right', 'margin-top', 'margin-bottom'].filter(key => style.$sources?.[key] && !aimed(String(style.$sources![key]!.selector ?? '')) && !/\bauto\b/i.test(String(style.$sources![key]!.specified ?? '')));
+    if (!keys.length) return;
+    const src = style.$sources![keys[0]!]!;
+    layoutWarnings.push({ code: 'W_CSS_DIALOG_NOT_CENTRED', severity: 'warning', box: box.label, path: box.path, properties: keys, css: [{ property: 'margin', file: src.file, line: src.line, selector: src.selector }],
+      message: `${box.label}: ${src.selector} sets ${keys.map(key => `${key}: ${style.$sources![key]!.specified}`).join(', ')} on this <dialog>, which takes away the margin: auto the browser centres it with: it opens at the top-left corner. Add dialog { margin: auto } after the reset` });
+  }
+  // F131: a :hover / :focus / :active rule that a later (or more specific) rule without the state always beats shows
+  // nothing: a:hover { color } before a:link { color } leaves a hovered link blue (measured in Chromium, Firefox and
+  // WebKit; the LVHA order). Judged per box and declaration: with the state on, the winning declaration comes from a
+  // rule that does not need the state and sets another value.
+  function stateShadowed(box:RuleBox, style:RuleStyle, ancestors:readonly Ancestor[], inherited:RuleStyle|undefined, r:R) {
+    if (box.pseudo || r === undefined) return;
+    for (const st of ['hover', 'focus', 'focus-visible', 'active']) {
+      const own = rules.flatMap(rule => rule.selectors.filter(sel => sel.state === st && !sel.pseudoElement && matches(sel, box, new Set([st]))).map(sel => ({ rule, sel })));
+      if (!own.length) continue;
+      let on; try { [on] = styles(box, r, ancestors, inherited, false, false, new Set([st])); } catch { continue; }
+      if (!on) continue;
+      for (const { rule, sel } of own) for (const d of rule.declarations) {
+        const winner = on.style.$sources?.[d.property];
+        if (!winner || (winner.file === d.file && winner.line === d.line && winner.selector === sel.source) || new RegExp(`:${st}(?![\\w-])`, 'i').test(String(winner.selector))) continue;
+        if (String(winner.specified ?? '').trim().toLowerCase() === String(d.value ?? '').trim().toLowerCase()) continue;
+        if (layoutWarnings.some(w => w.code === 'W_CSS_STATE_SHADOWED' && w.path === box.path && w.selector === sel.source && w.property === d.property)) continue;
+        layoutWarnings.push({ code: 'W_CSS_STATE_SHADOWED', severity: 'warning', box: box.label, path: box.path, selector: sel.source, property: d.property, state: `:${st}`,
+          css: [{ property: d.property, file: d.file, line: d.line, selector: sel.source }, { property: d.property, file: winner.file, line: winner.line, selector: winner.selector }],
+          message: `${box.label}: ${sel.source} { ${d.property}: ${d.value} } never shows: ${winner.selector} { ${d.property}: ${winner.specified} } also applies while it is :${st} and wins (it comes later or is more specific). Put the :${st} rule after it (for links: :link, :visited, :hover, :active), or make it more specific` });
+      }
+    }
+  }
+
   function cssMistakes(box: RuleBox, style: RuleStyle, ancestors: readonly Ancestor[], inherited: RuleStyle | undefined, gridItem: boolean, r: R, state: State) {
+    stateShadowed(box,style,ancestors,inherited,r);
+    dialogMarginReset(box,style);
+    overflowPromoted(box,style);
+    containerUnitViewport(box,style,ancestors);
+    selectIndent(box,style,ancestors);
+    optionInert(box,style,ancestors);
+    brStyled(box,style);
+    wrapRestored(box,style);
+    outOfFlowFlexInert(box,style);
+    preserve3dInert(box,style,ancestors?.at(-1)?.style);
     firstPseudoInert(box, style);
     layerShadowed(box, style);
     columnInert(box, style);
@@ -649,5 +856,5 @@ export function createCssMistakes<R>({ report, facts, tools }: CssMistakeContext
         ? `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (a table row or row group has no padding or margins, and its width does not size the columns). Put them on its cells`
         : `${box.label}: ${written.join(', ')} ${written.length === 1 ? 'has' : 'have'} no effect (it is display: contents, which generates no box of its own; its children are laid out in its place). Put them on a child, or use another display`, ...ranges(region) });
   }
-  return { firstInert, firstPseudoInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
+  return { firstInert, firstPseudoInert, stateShadowed, dialogMarginReset, overflowPromoted, containerUnitViewport, selectIndent, optionInert, brStyled, wrapRestored, preserve3dInert, outOfFlowFlexInert, inlineAutoMargin, alignBrowserDependent, inlineTextAlignment, decorationNone, inlineOverflow, inlineStateTransforms, pseudoWithoutContent, cssMistakes, aspectInert, tableRowRadius, contentsInert };
 }
