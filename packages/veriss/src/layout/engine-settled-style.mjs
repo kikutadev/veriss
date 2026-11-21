@@ -4,7 +4,7 @@ import { px, matches } from './css.mjs';
 import { compileSelector } from './selectors.mjs';
 const zero = q(0);
 const dynamicStates = /:(?:hover|focus-visible|focus-within|focus|active|target-within|target|checked|indeterminate|visited|link|any-link|open|closed|popover-open|modal|playing|paused|user-invalid|user-valid|invalid|valid|placeholder-shown|autofill|-webkit-autofill|enabled|disabled|read-only|read-write|required|optional|default|in-range|out-of-range|empty|state\([^)]*\))(?![\w-])/gi;
-export function checkSettledStyle({ box, style, region, parents, emit, cover, options, metaViewport, fontFaces, rules, layoutWarnings, ranges }) {
+export function checkSettledStyle({ box, style, region, parents, emit, cover, options, metaViewport, fontFaces, rules, layoutWarnings, ranges, unknown }) {
     // A bar fixed to the bottom edge under viewport-fit=cover: its content must clear the bottom safe area (the home
     // indicator), so its bottom padding has to be at least that inset (env(safe-area-inset-bottom)).
     if (style.$fixed && cover && (options.safeArea?.bottom ?? 0) > 0 && ['0', '0px'].includes(String(style.bottom)) && (box.children ?? []).length && cmp(px(String(style['padding-bottom'])), q(String(options.safeArea.bottom))) < 0 && !layoutWarnings.some(w => w.code === 'W_LAYOUT_SAFE_AREA' && w.path === box.path))
@@ -185,9 +185,15 @@ export function checkSettledStyle({ box, style, region, parents, emit, cover, op
         if (['block', 'list-item'].includes(String(parentDisplay)) && inFlow && ['auto', 'scroll'].includes(String(style['overflow-y'])) && style.$sources?.['overflow-y'] && String(style['block-size']) === 'auto' && String(style['max-block-size']) === 'none' && box.tag !== 'html' && box.tag !== 'body' && !layoutWarnings.some(w => w.code === 'W_LAYOUT_SCROLL_NEVER' && w.path === box.path))
             layoutWarnings.push({ code: 'W_LAYOUT_SCROLL_NEVER', severity: 'warning', box: box.label, path: box.path, css: [{ property: 'overflow-y', file: style.$sources['overflow-y'].file, line: style.$sources['overflow-y'].line, selector: style.$sources['overflow-y'].selector }],
                 message: `${box.label} is overflow-y: ${style['overflow-y']} with an auto height and no max-height in block flow: it grows with its content, so it never scrolls (the page does instead). Give it a max-height (or a height)`, ...ranges(region) });
-        // text-overflow marks the overflow of the box's own lines; a flex or grid container has none (its text is in its
-        // items, anonymous ones included, whose text-overflow is the initial clip; measured: no ellipsis is drawn).
-        if (set('text-overflow', 'clip') && ['flex', 'inline-flex', 'grid', 'inline-grid'].includes(String(style.display)) && !style.$blockFlow)
+        // In Chromium/Firefox text-overflow on a grid container with anonymous text
+        // leaves its items unclipped; WebKit 27.2 paints an ellipsis there. This is a
+        // browser-dependent paint outcome, not a universally inert declaration.
+        const textOverflowSet = Boolean(set('text-overflow', 'clip'));
+        const clippedText = ['hidden', 'clip', 'auto', 'scroll'].includes(String(style['overflow-x']));
+        const gridText = ['grid', 'inline-grid'].includes(String(style.display)) && !style.$blockFlow;
+        if (textOverflowSet && gridText && clippedText)
+            unknown('U_LAYOUT_TEXT_OVERFLOW_BROWSER', `${box.label}: text-overflow on a clipped grid container paints differently in WebKit and Chromium/Firefox; the inertness of the declaration cannot be verified across browsers`, undefined, box);
+        else if (textOverflowSet && (['flex', 'inline-flex'].includes(String(style.display)) || gridText) && !style.$blockFlow)
             reasons.push(['text-overflow', `it is display: ${style.display}, whose text is laid out in its items: put text-overflow (with overflow: hidden and white-space: nowrap) on the item that holds the text`]);
         else if (set('text-overflow', 'clip') && !['hidden', 'clip', 'auto', 'scroll'].includes(String(style['overflow-x'])))
             reasons.push(['text-overflow', `its overflow-x is ${style['overflow-x']}, so nothing is clipped to mark`]);
