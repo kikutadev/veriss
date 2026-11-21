@@ -78,7 +78,7 @@ const compoundLength=(v:string)=>{
 // No font-relative units, external variables, intrinsic sizing, anchoring,
 // CSS-wide resets, containment, transforms or animation in a dependency.
 const geometry=/^(?:position|display|(?:min-|max-)?(?:width|height)|top|right|bottom|left|inset|box-sizing|(?:margin|padding)(?:-(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end))?|border(?:-(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end))?(?:-(?:width|style))?|overflow(?:-[xy])?|flex(?:-(?:direction|wrap|flow|grow|shrink|basis))?|align-(?:items|content|self)|justify-(?:items|content|self)|gap|row-gap|column-gap|visibility|direction|writing-mode)$/;
-const paint=/^(?:--[\w-]+|background(?:-[\w-]+)?|color|color-scheme|border(?:-(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end))?-color|border-radius|box-shadow|text-shadow|opacity|cursor|pointer-events|touch-action|user-select|-webkit-user-select|-webkit-touch-callout|-webkit-tap-highlight-color|isolation|z-index|image-rendering|font(?:-(?:family|size|weight|style|stretch|variant|synthesis|feature-settings|variation-settings))?|line-height|letter-spacing|word-spacing|text-align|text-decoration(?:-[\w-]+)?|-webkit-text-size-adjust|text-size-adjust)$/;
+const paint=/^(?:--[\w-]+|background(?:-[\w-]+)?|color|color-scheme|border(?:-(?:top|right|bottom|left|inline|block|inline-start|inline-end|block-start|block-end))?-color|border-radius|box-shadow|text-shadow|opacity|cursor|pointer-events|touch-action|user-select|-webkit-user-select|-webkit-touch-callout|-webkit-tap-highlight-color|isolation|z-index|image-rendering|font(?:-(?:family|size|weight|style|stretch|variant|synthesis|feature-settings|variation-settings))?|line-height|letter-spacing|word-spacing|outline(?:-(?:color|offset|style|width))?|-webkit-font-smoothing|-moz-osx-font-smoothing|text-align|text-decoration(?:-[\w-]+)?|-webkit-text-size-adjust|text-size-adjust)$/;
 // Three-valued selector matching. Unsupported tests are possible matches,
 // never evidence of non-match. A known false compound/ancestor can eliminate
 // a rule even if another test in it is not implemented.
@@ -195,7 +195,9 @@ function paintTransition(d:Declaration):boolean{
   });
  }catch{return false}
 }
-const ignorable=(d:Declaration)=>paintTransition(d)||/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
+// Inactive animation timing and focus/paint-only styles do not allocate layout geometry.
+// Named active animations and relevant geometry changes still fail closed.
+const ignorable=(d:Declaration)=>paintTransition(d)||/^(?:scroll-behavior|overscroll-behavior(?:-[xy]|-inline|-block)?)$/i.test(d.prop)||paint.test(d.prop.toLowerCase())||/^(?:animation|transition)-(?:duration|delay|timing-function)$/i.test(d.prop)||/^animation-(?:iteration-count|direction|play-state|fill-mode|timeline)$/i.test(d.prop)||/^(?:animation|animation-name|transition|transition-property)$/i.test(d.prop)&&d.value.trim().toLowerCase()==='none';
 function validateDecl(d:Declaration){
   const p=d.prop.toLowerCase(),v=d.value.trim();
   if(ignorable(d))return false;

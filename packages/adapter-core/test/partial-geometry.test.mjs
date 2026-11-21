@@ -193,3 +193,13 @@ test('explicit media features are preserved through independent geometry and rej
     const { profileKey, ...unbound } = e;
     assert.throws(() => verifyUI({ model, evidence: [unbound] }), /profile mismatch/);
 });
+test('focus outlines, font rasterization and inactive animation timing do not affect a font-independent account form', () => {
+    const source = '<!doctype html><html lang="en"><head><title>Account</title></head><body><header><kbd>native</kbd></header><main id="account"><section id="settings"><kbd>unknown height</kbd></section></main></body></html>';
+    const base = '*{box-sizing:border-box;margin:0;padding:0}#account{max-width:640px;margin:auto;padding-inline:24px}#settings{width:100%}';
+    const paint = 'body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}:focus-visible{outline:3px solid orange;outline-offset:4px}@media(prefers-reduced-motion:reduce){*{animation-iteration-count:1!important;animation-duration:.01ms!important;animation-fill-mode:none;transition-duration:.01ms!important}}';
+    const r = first(check(source, base + paint, ['settings']));
+    assert.deepEqual(r.axes, ['inline'], JSON.stringify(r));
+    for (const extra of [':focus-visible{width:200vw}', '#account{animation-name:grow}@keyframes grow{to{width:200vw}}', '#settings{animation:grow 1s}@keyframes grow{to{width:200vw}}', '#settings{width:40ch}']) {
+        assert.ok(!first(check(source, base + paint + extra, ['settings'])).rows?.length, extra);
+    }
+});
