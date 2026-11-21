@@ -289,3 +289,7 @@ main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して
   `tools/gate.sh` exit 0、ルートと5パッケージのテスト失敗0、component-lint
   eval 4回変化なし、必須の3ブラウザE2E 411/411成功。終了後の
   Playwright Chrome 残留は検査対象プロジェクトで0。
+
+### Browser quality follow-up (2026-11-21)
+
+Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discrepancies left by the previous migration, without changing verdicts to Verified on unsupported evidence or relaxing assertions. Work against the newest TypeScript main, classify each difference with exact browser measurements and an independent prior-commit comparison, then change implementation or test-oracle assumptions only where the model is demonstrably wrong. Red → Green → refactor; keep .mts as canonical source and regenerate .mjs; run targeted three-browser checks, unit tests, MoonBit oracle if relevant, and tools/gate.sh before publishing. Outstanding browser-specific variance must remain explicit and Unknown if proof coverage differs. Do not overwrite concurrently advanced main without first syncing.
