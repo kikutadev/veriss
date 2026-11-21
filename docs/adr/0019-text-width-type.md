@@ -61,11 +61,28 @@ min が basis を超えうるので、伸び縮みを一般の形にする(ど�
 これで Z3 は、コンテナの幅 W と文字幅(どのフォントで描かれるか)を同時に探す。「どのフォントでも並びがはみ出さない」は、はみ出す
 `(W, tmin)` がなければ UNSAT。
 
+### 記録のない OS の近似(安全な側)
+
+記録のない OS(この環境では Windows・macOS・iOS・Android)の既定のフォントは、幅を合わせて作られた互換フォントで近似し、区間を
+広げる。Arial → Liberation Sans、Times New Roman → Liberation Serif、Courier New → Liberation Mono、Calibri → Carlito、Cambria →
+Caladea は advance の幅が同じに作られている(kerning とその OS の組み方は違いうるので 2% + 0.5px 広げる)。Helvetica・Times・Courier
+(macOS)は Arial・Times New Roman・Courier New に近いが同じではないので 4% + 1px 広げる。互換フォントのない Segoe UI・SF Pro・
+Consolas・Menlo は、記録するまで Unknown(何も主張しない)。
+
+### Windows と macOS の記録(GitHub Actions)
+
+`.github/workflows/text-widths.yml` を手動で回す(Actions → text-widths → Run workflow、runner は windows-latest・macos-latest・両方)。
+各 runner は、文字幅を記録し(`tools/text-widths.mjs`)、モデルと照らし合わせる(`tools/check-text-widths.mjs`: 既定のフォント、
+MoonBit と各ブラウザー、互換フォントと本物、近似のモデルの区間に描いた幅が入るか)。結果は job の summary に出て、合わなければ job が
+失敗する。記録(`<platform>-widths.json`)は artifact になるので、モデルに使うときはそれを `models/text/` に commit する(そうすると、
+その OS では近似ではなく記録が使われる)。Windows の WebKit(Playwright)は Safari ではないので、記録はするが数えない。
+
 ## 検証
 
+- `tests/check-text-widths.test.mjs`: 互換フォントどおりに描く見せかけの Windows の記録で確認が通り、Arial を 5% 広げた記録や解決先の違う記録で落ちる
 - `tests/text-width.test.mjs`: MoonBit の幅と E2E で記録したブラウザーの幅の差が許容の中、system font の区間が表のとおり、文字を
   含む Flex の仕様で「フォントによってはみ出す」が SAT になり、その反例のフォントで実際にはみ出す
-- `e2e/text-width.spec.mjs`: 3 ブラウザーで、文字を含む Flex の項目の大きさが、そのブラウザーが解決したフォントの幅で解いた仕様と一致
+- `e2e/layout-text-width.spec.mjs`: 3 ブラウザーで、文字を含む Flex の項目の大きさが、そのブラウザーが解決したフォントの幅で解いた仕様と一致
 
 ## 第二段以降
 

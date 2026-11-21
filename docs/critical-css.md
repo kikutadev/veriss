@@ -57,7 +57,7 @@ const r = extractCriticalCSS(html, {css, textMetrics: await loadTextMetrics({fon
 
 - `packages/veriss/test/critical.test.mjs`: 外れる規則と残る規則、Unknown・flex・グラデーション・隠れたメニュー・読めないセレクタ・
   `vw` で残すこと
-- `e2e/critical-css.spec.mjs`: 文字のない 3 つのページと、フォントで測る文のページ・自由な文のページ(空・短い・長い文に差し替えて描く)を、スマートフォンと PC の 8 つの大きさで、すべての CSS と抜き出した CSS だけで描き、
+- `e2e/layout-critical-css.spec.mjs`: 文字のない 3 つのページと、フォントで測る文のページ・自由な文のページ(空・短い・長い文に差し替えて描く)を、スマートフォンと PC の 8 つの大きさで、すべての CSS と抜き出した CSS だけで描き、
   Chromium・Firefox・WebKit で、ファーストビューに入る要素の箱と、画面の画素が同じ。どのページでも規則が外れる(空振りでない)。
   抜き出した CSS からファーストビューの規則を 1 つ消すと、画素が変わる
 

@@ -1,0 +1,52 @@
+# Records text widths on Windows (and macOS) and checks the text-width model against them (docs/adr/0019-text-width-type.md).
+# Run it by hand: Actions → text-widths → Run workflow. Each runner:
+#   1. records its browsers' widths of the corpus in its default fonts, and which font each generic family resolves to
+#      (tools/text-widths.mjs → models/text/<platform>-widths.json, uploaded as an artifact)
+#   2. checks the model against the record (tools/check-text-widths.mjs: the expected default fonts, MoonBit against the
+#      browsers, the metric-compatible clones against the real fonts, the approximate model containing every drawn width);
+#      the report is in the job summary
+#   3. lays Flex text items out in its browsers and compares them with the L1 reference solved with that platform's widths
+#      (e2e/layout-text-width.spec.mjs with TEXT_PLATFORM)
+# To use a record in the model, download the artifact and commit models/text/<platform>-widths.json.
+name: text-widths
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Runner to record on
+        type: choice
+        options: [windows-latest, macos-latest, both]
+        default: windows-latest
+permissions:
+  contents: read
+jobs:
+  record:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os == 'both' && '["windows-latest","macos-latest"]' || format('["{0}"]', inputs.os)) }}
+    runs-on: ${{ matrix.os }}
+    env:
+      TEXT_PLATFORM: ${{ startsWith(matrix.os, 'windows') && 'windows' || 'macos' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npx playwright install chromium firefox webkit
+      - name: Record the browsers' text widths
+        run: node tools/text-widths.mjs
+      - name: Check the text-width model against the record
+        run: node tools/check-text-widths.mjs
+      - name: Flex text items match the L1 reference with this platform's widths
+        if: always()
+        run: npx playwright test -c playwright.layout.config.mjs e2e/layout-text-width.spec.mjs --trace off
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: text-widths-${{ env.TEXT_PLATFORM }}
+          path: models/text/*-widths.json
+          if-no-files-found: error

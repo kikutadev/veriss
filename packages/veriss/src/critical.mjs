@@ -15,7 +15,7 @@
 // content, align-content, is not plain block flow: there a longer text moves what is before it up).
 //
 // The first view drawn with the critical CSS alone
-// is then the first view drawn with all of it (e2e/critical-css.spec.mjs checks it in Chromium, Firefox and WebKit).
+// is then the first view drawn with all of it (e2e/layout-critical-css.spec.mjs checks it in Chromium, Firefox and WebKit).
 import postcss from 'postcss';
 import {parse, serialize} from 'parse5';
 import {analyzeHTML, htmlBoxTree} from './html.mjs';
