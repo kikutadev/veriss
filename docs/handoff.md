@@ -295,3 +295,23 @@ main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して
 - User-facing acceptance condition: the fork URL must expose the fork verifier's **real behavior**, not only reuse the original site's static tables/screenshots with a fork badge. The previous published version did the latter and was not an adequate implementation of the request.
 - Implemented a browser-bundled static verifier on the first screen with editable HTML/CSS, warnings/Unknown status, NG/OK presets (including upstream F116/F129/F133), and sandboxed visual preview. Original 13-category table and 15 representative images remain as reference. TypeScript migration and Lean checker descriptions are separate from actual runtime diagnostics.
 - Site generation now requires the `esbuild` dev dependency to emit `demo.js` alongside `index.html` and images. The Pages `gh-pages` branch is manually published: no GitHub Actions. Before declaring done, test actual browser interactions on the **public URL**, including repair eliminating a finding, an unresolved/Unknown case, and a narrow mobile viewport.
+
+## 残存ブランチ統合（2026-11-22、進行中）
+
+目的: fork/main の strict TypeScript 正本と既存検証の健全性を維持して、
+残存の幅遷移・汎用幾何レビュー・TS 条件境界修正・検証基盤再利用調査、および
+型移行ブランチで完成したブラウザ品質改善を集約する。
+`gh-pages` は公開物のみを持つ独立履歴なので main にマージしない。
+
+完了条件: 取り込み対象の機能・テスト・文書が main の現行型契約に適合、
+旧 `.mjs` の直接移植で `.mts` 正本を壊さず、単体・ブラウザ差分・
+`tools/gate.sh` と `pnpm check:ts` が成功する。最新 main に対して
+非強制 Push、リモート SHA と未統合一覧を再確認。
+
+手順: (1) ブランチ祖先・機能差分・既存実装の重複を監査。
+(2) 完了済み TypeScript ブラウザ品質修正を取り込み。
+(3) 未導入の幅遷移検査を閉じた CSS 文法＋厳格な Unknown として
+型付きで移植し、回帰テスト/3 UA の比較を追加。
+(4) 条件分岐・レビュー系の差分は中身が現行 main にあるかを照合して
+必要なものだけ採用。旧枝の履歴を解決する際も検証済みの現行実装を
+戻さない。(5) 完全 gate/リモート確認。
