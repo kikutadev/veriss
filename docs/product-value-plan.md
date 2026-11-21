@@ -93,12 +93,12 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 
 ### 今回の到達条件
 
-- [ ] 公開サイトの初画面でURL入力→検査ボタン→実際の結果を表示。入力したURLのHTML・外部CSS・styleタグを実際に取得する (架空の診断は使わない)
+- [x] 公開サイトの初画面でURL入力→検査ボタン→実際の結果を表示。入力したURLのHTML・外部CSS・styleタグを実際に取得する (架空の診断は使わない)
 - [x] GitHub PagesはブラウザCORSを越えられないので、小さな公開HTTP取得Workerを用意。Workerは「公開ページの静的ソース収集」だけを担当し、verissの解析は既存ブラウザエンジンを再利用
 - [x] URL入力→レスポンス→HTML/CSS解析で、完全にモデル化できていないケースは `UNKNOWN` と説明する。script、CSS未取得、@import、容量上限は被覆不足と表示。検出された具体的エラーはUnknownと併記し、成功とはみなさない
 - [x] URLのpublic HTTP(S)・標準ポートを対象。内部アドレス、明示的認証情報、非標準ポート、巨大レスポンスを拒否。リダイレクト先・CSSの個別URLも同じ検査を通す。短時間で打ち切る
 - [x] 実Webサイト複数種とNG/OKの固定フィクスチャで検証し、スマホでの操作・ブラウザでの入力状態・公開エンドポイントのHTTPレスポンスを確認してから公開
-- [ ] 既存のゲートに加えて新しい収集層・UIの回帰テストを通す。公開先、対応範囲、利用制限をREADMEとサイトに記載する
+- [x] 既存のゲートに加えて新しい収集層・UIの回帰テストを通す。公開先、対応範囲、利用制限をREADMEとサイトに記載する
 
 ### v1の線引き
 
@@ -112,3 +112,10 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - Cloudflare Worker https://veriss-url-source.kikutadev.workers.dev/scan を公開し、example.com、kikuta.dev と kikuta.dev/about のHTML/CSS取得に成功。動的画面のUnknownを保持。
 - Browser Worker でモデル分析を分離。実ページの複数rootで一度エラーになり、html/body rootを正しく保持して修正。画面からURL入力→結果まで実動作を確認。
 - 収集器の6単体テスト、URLフォームのChromium/Firefox/WebKit 12 E2E成功。残りの全体ゲート・main・GitHub Pages公開前はリリース済みと扱わない。
+
+### URL検査の正式公開と受入（2026-11-22）
+
+- tools/gate.sh を独立監視ランナーから実行しexit 0。root+5パッケージの単体テスト fail=0、component-lint eval差分なし、Chromium/Firefox/WebKitの既存+追加E2E **564 passed**（10.6分）。新URL経路の単独3ブラウザーE2Eは **15/15 passed**。追加単体含む対象12/12通過、TypeScript生成一致。Chrome残留なし。
+- fork main にURL機能の 1707313 をfast-forward統合。gh-pages は 878cf46 に静的ビルド（index.html、demo.js、worker.js）のみ公開。GitHub Actionsは使用していない。
+- 実公開URL https://kikutadev.github.io/veriss/#live-check で https://kikuta.dev/about/ を入力し、静的HTML 4957文字、CSS 45818文字を取得。UNKNOWN / エラー1件 / 警告7件 / Unknown4件 と検証不完全部分を表示することを確認。Cloudflare Worker: https://veriss-url-source.kikutadev.workers.dev/scan 。公開サイトのサンプルNG→OK→Unknownと、390px画面で横はみ出しなしも確認。
+- **これはURLから取得した静的ソースの検証**であり、JS実行後の全DOM状態やサイト全体の正しさの保証ではない。Phase2（3つ以上の異種UIの価値検証）とPhase3（Lean統合）は未完了。

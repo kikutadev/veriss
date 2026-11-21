@@ -436,3 +436,5 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - URLフォームからの解析は専用Web Workerに分離し18秒上限。取得HTMLをプレビューiframeで描画・実行しない。ユーザーはHTML/CSSエディタで編集後再検査可能。NG→OKサンプルとCLIは維持。
 - 実サイトHTMLは複数rootの断片として扱うと検証器に拒否されたため、html/body rootとmeta viewportを保持する収集に修正。URL E2Eの初回期待値誤りは、テスト用HTMLのlang欠落をverissが正しく違反検出したため。修正後のChromium・Firefox・WebKit合計12件成功。
 - https://kikuta.dev/ と https://kikuta.dev/about/ を実ブラウザーで検査し、実CSS回収と診断表示を確認。JavaScript由来のUnknownも保持。GitHub Pages公開確認は反映後に追記。
+
+- 2026-11-22 URL release acceptance: guarded tools/gate.sh exit 0、root＋全5 package fail=0、component-lint eval一致、3ブラウザー **564 passed**（URL追加15件を含む）。fork main に 1707313、gh-pages に 878cf46 をpush。公開URLの実ブラウザーで kikuta.dev/about/ のURL入力→HTML+CSS解析→ UNKNOWN / エラー1 / 警告7 / Unknown4、既存NG/OK/Unknown、390pxでoverflowなしを確認。Workerは veriss-url-source.kikutadev.workers.dev。静的ソースの検査のみでJS実行後のサイト全体保証ではない。
