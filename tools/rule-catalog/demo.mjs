@@ -1,6 +1,7 @@
 // Static-site demo: execute the same TypeScript-origin veriss core used by the
 // example generator, bundled into a browser ESM module during page build.
 import { run } from './run.mjs';
+import { extractCriticalCSS } from '../../packages/veriss/src/critical.mjs';
 import { examples, sides } from './examples.mjs';
 const node = (id) => {
     const el = document.getElementById(id);
@@ -18,9 +19,15 @@ const preview = node('demo-preview');
 const ng = node('demo-ng');
 const ok = node('demo-ok');
 const runButton = node('demo-run');
+const criticalButton = node('demo-critical');
+const criticalStatus = node('demo-critical-status');
+const criticalCSS = node('demo-critical-css');
 // A few of the F116–F133 rules added in the upstream sync. Unlike the
 // image gallery, these are fed directly into the current TypeScript verifier.
 const recent = [
+    { id: 'first-view', html: '<main><header class="top"></header><section class="tail"></section></main>', css: '*{margin:0}.top{height:1500px;background:lightblue}', shot: 375, mark: '.top', accessibility: false,
+        ng: { css: '.tail{height:150px;background:tomato}', caption: '初期表示を超える .tail のCSSを、初期表示用CSSから分離できます。「初期表示CSSを抽出」を押して確認。' },
+        ok: { css: '.tail{height:150px;background:tomato}.top{height:600px}', caption: '先頭が短くなると .tail はファーストビューに入り得るため、同じCSSでも除外できなくなります。' } },
     { id: 'f116', html: '<main><div class="x"></div></main>', css: '.x{height:30px;background:#cce0ff}', shot: 375, mark: '.x', accessibility: false,
         ng: { css: '.x{will-change:transform opacity}', caption: 'F116: カンマのない will-change は無効。ブラウザーはその宣言を捨てます。' },
         ok: { css: '.x{will-change:transform, opacity}', caption: 'F116: カンマ区切りにすると警告はなくなります。' } },
@@ -32,7 +39,7 @@ const recent = [
         ok: { css: '.a{width:50svw}', caption: 'F133: ビューポート幅を意図するなら50svwと書けば明示できます。' } },
 ];
 const allExamples = [...recent, ...examples];
-const labels = { f116: 'F116 · will-change', f129: 'F129 · dialogの中央寄せ', f133: 'F133 · コンテナ単位', syntax: 'CSSの書き間違い', inert: '効かない宣言', atrule: '@media構文', selector: 'セレクタとDOM', state: 'フォーカス', html: 'HTMLの組み替え', overflow: '画面のはみ出し', occluded: 'ボタンの覆い', contrast: '文字のコントラスト', focus: 'フォーカス表示', target: 'タップ領域', shift: 'hoverによるレイアウトシフト', browser: 'ブラウザー差', unknown: 'Unknownの扱い', aria: 'ARIA属性' };
+const labels = { 'first-view': 'NEW · 初期表示CSSの抽出', f116: 'F116 · will-change', f129: 'F129 · dialogの中央寄せ', f133: 'F133 · コンテナ単位', syntax: 'CSSの書き間違い', inert: '効かない宣言', atrule: '@media構文', selector: 'セレクタとDOM', state: 'フォーカス', html: 'HTMLの組み替え', overflow: '画面のはみ出し', occluded: 'ボタンの覆い', contrast: '文字のコントラスト', focus: 'フォーカス表示', target: 'タップ領域', shift: 'hoverによるレイアウトシフト', browser: 'ブラウザー差', unknown: 'Unknownの扱い', aria: 'ARIA属性' };
 for (const example of allExamples) {
     const option = document.createElement('option');
     option.value = example.id;
@@ -47,6 +54,8 @@ function markStale() {
     status.textContent = '未検査の変更があります';
     status.dataset.status = 'unknown';
     findings.replaceChildren();
+    criticalStatus.textContent = 'HTML/CSSが変更されました。もう一度抽出してください。';
+    criticalCSS.textContent = '';
 }
 function renderPreview() {
     const html = htmlEditor.value;
@@ -54,6 +63,8 @@ function renderPreview() {
     preview.srcdoc = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}html,body{margin:0}${css}</style><body>${html}</body></html>`;
 }
 function inspect() {
+    criticalStatus.textContent = '';
+    criticalCSS.textContent = '';
     status.textContent = '解析中…';
     status.dataset.status = '';
     findings.replaceChildren();
@@ -95,6 +106,23 @@ function inspect() {
         findings.append(li);
     }
 }
+function extractFirstView() {
+    criticalStatus.textContent = '解析中…';
+    criticalCSS.textContent = '';
+    try {
+        if (htmlEditor.value.length > 25000 || cssEditor.value.length > 25000)
+            throw new Error('ブラウザデモの入力上限はHTML/CSSそれぞれ25,000文字です');
+        const result = extractCriticalCSS(htmlEditor.value, { css: cssEditor.value });
+        const uncertain = result.profiles.filter(p => p.status === 'unknown');
+        criticalStatus.textContent = uncertain.length
+            ? `Unknown: ${uncertain.map(p => p.name).join(', ')}の配置が未確定。必要な規則は削除しません。 ${result.kept}規則を保持 / ${result.dropped}規則を分離`
+            : `解析完了: ${result.kept}規則を保持 / ${result.dropped}規則を分離（スマートフォン・PC）`;
+        criticalCSS.textContent = `/* 初期表示に必要なCSS */\n${result.css || '/* 空 */'}\n\n/* 初期表示以降に分離できるCSS */\n${result.rest || '/* なし */'}`;
+    }
+    catch (err) {
+        criticalStatus.textContent = err instanceof Error ? err.message : String(err);
+    }
+}
 function loadPreset() {
     const ex = allExamples.find(e => e.id === picker.value);
     if (!ex)
@@ -116,5 +144,6 @@ ok.addEventListener('click', () => { side = 'ok'; loadPreset(); });
 htmlEditor.addEventListener('input', markStale);
 cssEditor.addEventListener('input', markStale);
 runButton.addEventListener('click', inspect);
+criticalButton.addEventListener('click', extractFirstView);
 picker.value = 'f116';
 loadPreset();

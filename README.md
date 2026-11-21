@@ -6,6 +6,12 @@ Unknown is never turned into success: what the model does not cover is reported 
 
 **What it checks**: [the fork rule catalog](https://kikutadev.github.io/veriss/) (Japanese) groups every check by role, says what can and cannot be checked, and shows each role with a detected (NG) and a corrected (OK) example as veriss judges them. Adapted from the [upstream rule catalog](https://mizchi.github.io/veriss/); the fork site runs the bundled TypeScript-origin verifier in-browser on editable HTML/CSS (including F116/F129/F133 presets), and documents the experimental Lean work separately.
 
+## Expanded verification targets (upstream 2026-11-22)
+
+- `@mizchi/veriss/critical`: extract first-view CSS for phone/desktop viewport ranges, conservatively keeping unknown rules; browser demo is on the [fork site](https://kikutadev.github.io/veriss/#first-view).
+- Independent L1 Grid/Flex Z3 reference, state-shift counterexamples and three-browser comparisons (`models/layout/`, `docs/adr/0018-coordinate-subset.md`).
+- Cross-font and cross-platform text-width reference (`models/text/`, `docs/adr/0019-text-width-type.md`); Linux recorded widths, with unrecorded platform/font data explicitly Unknown. These are distinct from the F116–F133 CSS warning rules.
+
 ## Packages
 
 | Package | Directory | |
@@ -48,8 +54,11 @@ and generated ESM in `packages/` remain the ordinary veriss runtime.
 
 ## Docs
 
-- [Fork rule catalog](https://kikutadev.github.io/veriss/) (`docs/rule-catalog.md`) — checks by role, NG / OK examples, and fork changes
-- [Original catalog](https://mizchi.github.io/veriss/) — upstream project and source examples
+- [Fork rule catalog + live checker](https://kikutadev.github.io/veriss/) (`docs/rule-catalog.md`) — checks by role, browser demo, and fork changes
+- [Original catalog](https://mizchi.github.io/veriss/) — upstream source examples
+- `docs/critical-css.md` — initial-view CSS for phones and PCs (`@mizchi/veriss/critical`)
+- `docs/adr/0018-coordinate-subset.md` — independent Grid/Flex L1 Z3 model (`models/layout/`)
+- `docs/adr/0019-text-width-type.md` — font/platform text-width reasoning (`models/text/`)
 - `docs/static-check-checklist.md` — every CSS×DOM pattern, how it was measured
 - `docs/layout-checking.md` — the layout model and its subset
 - `docs/adr/` — design decisions

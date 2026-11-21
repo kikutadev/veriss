@@ -22,9 +22,13 @@ verified で指摘なしになる。フォーク版 Web: https://kikutadev.githu
 | TypeScript 基盤 | ランタイム・各アダプター・検証ツールのソースをTypeScriptへ移行。従来のESMパッケージは生成物として維持 | 型チェック、生成コードの一致検査を実行できる。型付けだけでCSS全域が証明されるわけではない | [移行・検証ログ](handoff.md) |
 | 状態依存CSS | hover時のCSS変数・依存先のレイアウトを追跡し、独立した状態として再検証 | 対応した有限状態は検証。依存が解析できない操作や上限超過は `Unknown` | [状態検証の設計](interactive-state-and-motion-design.md) |
 | Lean 4（研究） | 幾何モデル・到達状態・有限分岐・コンポーネント間の条件・限定的なCSSカスケードについて、独立チェッカーと証明書を実装 | **入力された閉じたモデルの証明書を検算する研究機能**。任意のHTML/CSS/JSから完全自動で証明する機能ではなく、通常のveriss実行にも自動接続されない | [Lean研究の境界と使い方](../experiments/lean/README.md) |
+| 初期表示に必要なCSS | [スマートフォン・PCの画面範囲](critical-css.md)を静的解析し、ファーストビュー内の要素へ影響しないと証明できたCSS規則だけを遅延読み込み側に分離 | HTML、CSS、viewportプロファイルを対象。位置がUnknown、文字サイズが未計測、状態が未確定なら規則を保持。ブラウザで実画像比較するE2E付き | [検証と制約](critical-css.md) |
+| 独立Grid/Flexモデル（L1） | [独立したZ3座標モデル](adr/0018-coordinate-subset.md)でGrid/Flexの部分集合を検算。ランダム80構成の境界幅・領域で本体と比較 | 対応サブセットの証拠のみ。任意CSSの完全証明ではない | [L1検算](../models/layout/README.md) |
+| 状態変化による配置シフト（L1） | 状態前後のGrid/Flex座標から移動する箱と反例幅を導き、ブラウザ実測と比較 | L1の範囲内。複雑なアニメーション全域や任意JavaScript遷移は対象外 | [独立シフトモデル](../models/layout/shift.mjs) |
+| フォント・プラットフォーム別文字幅 | [複数ブラウザーとフォント](adr/0019-text-width-type.md)の実測幅を参照し、同じFlex要素でも文字幅で配置が変わる条件をZ3で検討 | Linux実測値を収録。macOS/Windowsで記録がない場合は既知の代替とUnknownを区別。未収録の文字列は対応するフォントファイルが必要 | [モデルと測定](../models/text/width.mjs) |
 | 上流の新規検査 | F116〜F133（`will-change`、`preserve-3d`、`text-wrap`、`dialog`、ブラウザー別CSS、container query unitなど）をTypeScript正本とテストへ取り込み | 3ブラウザー照合を維持。挙動が異なる箇所はブラウザー差と `Unknown` を区別 | [CSS実測一覧](static-check-checklist.md) |
 
-進行中の別ブランチの実験は、この `main` に統合された機能として数えていない。
+進行中の別ブランチの実験は、この `main` に統合された機能として数えていない。 **追加した4領域は従来のFコードとは別の検証機能で、F134以降の新規CSSミス判定を追加したという意味ではない。** Web版には上記の「初期表示CSS抽出」を操作できる入力欄がある。
 
 ## 全体の表
 

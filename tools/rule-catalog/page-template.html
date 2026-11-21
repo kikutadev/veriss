@@ -98,6 +98,13 @@ tr[hidden]{display:none}
 .demo-preview-wrap{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px}
 .demo-preview-wrap iframe{box-sizing:border-box;border:1px solid var(--line);border-radius:5px;background:white;height:224px;max-width:100%;width:100%;display:block}
 .demo-note{font-size:12px;color:var(--muted);margin:10px 0 0;max-width:none}
+.demo-critical{margin:20px 0 0;padding:14px;border:1px solid var(--line);background:var(--surface);border-radius:8px}
+.demo-critical h3{font-size:16px;margin:0 0 6px}
+.demo-critical .demo-intro{margin-bottom:10px}
+#demo-critical{padding:8px 14px;font:600 13px var(--sans);border:1px solid var(--accent);border-radius:6px;color:var(--accent);background:transparent;cursor:pointer}
+#demo-critical-status{display:block;margin:10px 0;color:var(--fg);font-size:13px}
+#demo-critical-css{font:12px/1.5 var(--mono);white-space:pre;overflow-x:auto;max-height:270px;max-width:100%;margin:0;padding:0 8px;background:var(--code-bg);border-radius:6px}
+#demo-critical-css:not(:empty){padding:12px}
 @media(max-width:700px){.demo-editor-grid,.demo-output{grid-template-columns:minmax(0,1fr)}.demo-toolbar button#demo-run{margin-left:0;width:100%}.demo-preview-wrap iframe{height:180px}}
 </style>
 </head>
@@ -129,6 +136,11 @@ tr[hidden]{display:none}
     <div class="demo-preview-wrap"><h3>描画プレビュー（現在幅）</h3><iframe id="demo-preview" title="HTML/CSSの表示プレビュー" sandbox="" loading="lazy"></iframe></div>
   </div>
   <p class="demo-note">VERIFIEDは対応する配置条件についての判定で、警告が0件という意味ではありません。右のブラウザ表示は別の参考プレビューです。対応できない入力はUnknownとして扱います。JavaScriptは実行しません。Lean検証は別の研究用チェッカーで、ここで自動実行するものではありません。</p>
+  <div class="demo-critical" id="first-view"><h3>NEW · 初期表示に必要なCSSを抽出</h3>
+    <p class="demo-intro">上のHTML/CSSを使い、スマホ・PCのファーストビューに必要な規則を残します。配置がUnknownなら削らずに保持します。「NEW · 初期表示CSSの抽出」の例を選択すると違いを確認できます。</p>
+    <button id="demo-critical" type="button">初期表示CSSを抽出</button>
+    <output id="demo-critical-status" aria-live="polite"></output><pre id="demo-critical-css"></pre>
+  </div>
 </section>
 <div class="catalog-controls"><p class="catalog-label">RULE REFERENCE · 420+ CHECK CODES</p><div class="legend" id="legend"></div><div class="tools"><label for="q" class="hits">コードや語で絞り込む</label><input id="q" type="search" placeholder="例: CONTRAST、表、Unknown" autocomplete="off"><span class="hits" id="hits"></span></div></div><!--BODY--></main>
 </div>

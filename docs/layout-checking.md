@@ -202,6 +202,8 @@ ancestor 入力は継承用であり、host の寸法を再計算する入力で
 
 ## 保証する範囲
 
+Grid と Flex(row・nowrap)の座標の計算は、engine から独立した参照仕様 [ADR-0018](adr/0018-coordinate-subset.md)(`models/layout/`)でも定義し、engine と幅の範囲全体で照合している。
+
 各条件領域で cascade / specificity / source order / `!important` を計算し、親の content box から子の grid area へ渡す幅と高さを求める。物理・論理プロパティの対応は horizontal-tb / ltr に固定する。
 
 - 子 element を配置する container は Grid か下記の flex サブセットを要求する。block container が子を持つ場合、effective な non-none float、意図を宣言していない重なり、明示列の外への配置は違反にする。
