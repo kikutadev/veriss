@@ -1,5 +1,5 @@
 // Critical CSS (src/critical.mjs): the rules a page's first view needs in the smartphone and PC ranges. Everything not
-// proven to stay out of the first view is kept; e2e/critical-css.spec.mjs checks the first views in three browsers.
+// proven to stay out of the first view is kept; e2e/layout-critical-css.spec.mjs checks the first views in three browsers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {extractCriticalCSS, firstViewProfiles} from '../src/critical.mjs';

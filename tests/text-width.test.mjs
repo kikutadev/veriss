@@ -32,8 +32,13 @@ test('a generic family spans the fonts the browsers resolve it to', () => {
   // A string outside the recorded corpus is measured with MoonBit and widened by the allowance.
   const free = textWidth('Newsletter', {family: 'sans-serif', size: 16}, {metrics});
   assert.ok(free.combos.every(c => c.source === 'moonbit') && free.max[0] < free.max[1]);
-  // Platforms not measured here are Unknown, not guessed.
-  assert.match(textWidth('Home', {family: 'sans-serif', size: 16}, {platforms: ['linux', 'windows']}).unknown, /Arial.*not measured/);
+  // A platform with no record: a default font with a metric-compatible clone is approximated by the clone, widened (the
+  // safe side); one with no clone is Unknown, not guessed.
+  const windows = textWidth('Home', {family: 'sans-serif', size: 16}, {platforms: ['windows']});
+  assert.deepEqual(windows.combos.map(c => `${c.browser}:${c.font}:${c.source}`), ['chromium:Arial:clone Liberation Sans (recorded)', 'firefox:Arial:clone Liberation Sans (recorded)']);
+  const liberation = linuxWidths.browsers.chromium.named['Liberation Sans'][linuxWidths.corpus.indexOf('Home')];
+  assert.ok(windows.max[0] < liberation && windows.max[1] > liberation);
+  assert.match(textWidth('Home', {family: 'system-ui', size: 16}, {platforms: ['windows']}).unknown, /Segoe UI.*no metric-compatible clone/);
   // min-content is the widest word, max-content the whole string.
   const two = textWidth('Sign in', {family: 'serif', size: 16}, {metrics});
   assert.ok(two.min[1] < two.max[0]);
