@@ -66,6 +66,8 @@ e2e(Chromium で 390 件)のうち、Firefox で 34 件、WebKit で 43 件が C
 - `ua: { base: 'webkit', button: { padding: ['0px', '10px', '0px', '10px'] } }`: profile の一部を置き換えた初期条件(社内の基準のブラウザー、独自の UA の想定など)。
 - 省略したとき: これまでどおり。ボタンと range は Chromium の値、ほかの部品の UA の padding・border・margin は Unknown。
 
+**プラットフォーム差（macOS の Playwright WebKit 27.2 で実測）:** `webkit` の既定 profile は上記の Linux 測定値であり、macOS では同じ名前でも UA CSS が異なります。macOS では text input の padding が上/右/下/左 = `2px 5px 2px 5px`、textarea も同じ、button は `0px 6px 1px 6px` です。3ブラウザの矩形照合は `ua: {base: 'webkit', textField: {padding: [...]}, textarea: {padding: [...]}, button: {padding: [...]}}` という既存の明示オーバーライド機能を使い、Mac版WebKitでも15件の比較が成立することを確認しました。`ua: 'webkit'` が実行環境を自動判別するわけではありません。未測定のOS/バージョンはその値を証明済みの前提として扱わず、実測値やCSS resetを渡してください。
+
 `ua` を指定すると、作者が padding と border を書いていない入力欄も、その profile の値で解析できます。各ブラウザーで、何も指定していない部品(content-box の入力欄と textarea、ボタン、チェックボックスと radio の margin)の位置と大きさが、そのブラウザーの profile のモデルと一致することを確かめました(`e2e/layout-ua-profiles.spec.mjs`)。CLI では `css-lint --ua webkit`。
 
 ## 最小の CSS Reset の提案
@@ -137,6 +139,14 @@ e2e(Chromium で 390 件)のうち、Firefox で 34 件、WebKit で 43 件が C
 ```
 
 確かめ方: この reset を当てて 3 つのブラウザーでベースラインを測り直すと(`node tools/css-baseline.mjs --reset reset.css`)、違う項目は 25 から 13 に減り、profile の値はボタンの色を除いてすべて揃いました。残った 13 項目は、ページの既定のフォント(名前の違いと、それによるボタンの幅)、見出しの大きさの丸め、入力欄と range の既定の大きさ、ボタンの色、フォーカスの枠で、どれも注記に挙げたものです。また、reset を当てた何も指定していない部品は、3 つのブラウザーとも `ua: 'chromium'` のモデルどおりの位置と大きさになりました(`e2e/layout-ua-profiles.spec.mjs`、33 件)。
+
+## macOS の実測に基づくブラウザー差分（2026-11-21）
+
+- **キーボード操作**: macOS の WebKit では通常の `Tab` がリンクを飛ばす設定で、`Option+Tab` がリンクを含めた順送りになる。リンクのフォーカス移動を検証するときはこの操作を使う（Chromium/Firefox は `Tab`）。操作の違いで発生していた6つのアクセシビリティE2Eの差は、同じ要素のフォーカス・読み上げ名・位置で測り直し、3ブラウザの18ケースで一致した。
+- **`font-display:swap` と CLS**: Chromium は2pxだけ下を動かすフォント差では Layout Instability API に shift を報告しなかった。フォント交換を実測する陽性例を、44pxほど動く `monospace` フォールバックに差し替えた。陰性例（px行高と1行、`optional`）はそのまま、陽性シフト値は約0.00733。静的 `W_LAYOUT_FONT_SWAP` の条件は変えていない。
+- **スクロールバー**: macOS headless のChromium/Firefox/WebKitは、`--hide-scrollbars` を外しても実測ガター0pxのオーバーレイ式（`scrollbar-gutter:stable`を指定しても同じ）。`100vw` の比較では実測ガターをモデルに渡し、0pxならオーバーレイ、正ならクラシックとして照合する。Mac上でクラシック型が存在すると見せかけず、正のガターの影響は既存のユニットテストで確かめる。
+- **`transition-behavior:allow-discrete`**: Chromium/WebKitは消えるときも `display:block` を遷移中に保持し、Firefox 157 は `CSS.supports` と computed style が受理していても即座に `display:none` になった（実行中の CSSTransition 0本）。E2Eは宣言の検査と、エンジン固有の実挙動を区別する。Firefoxでも遷移するとは証明しない。
+- **`text-overflow:ellipsis` とGrid**: `overflow:hidden; white-space:nowrap` を持つgrid容器の匿名テキストは、Chromium/Firefoxでは省略記号を描かず、WebKit 27.2では右端に描いた。前後スクリーンショットの画素差はそれぞれ0/0/151画素。このため、宣言が一律に無効であるという `W_LAYOUT_DECLARATION_INERT` はGridについて撤回し、`U_LAYOUT_TEXT_OVERFLOW_BROWSER`（Unknown）にした。Flexの警告は3ブラウザで画素差0だったため維持した。
 
 ## 検査をほかのブラウザーに広げるには
 

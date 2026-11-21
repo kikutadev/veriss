@@ -22,6 +22,8 @@
   解けるようになったので、高さの行き過ぎで下の箱が動くのを報告できる。3 つのブラウザーで、1ms ごとの高さが極値の範囲に入り、
   0.25px 以内で届くことを確かめた。flex の項目の幅の `max(0px, calc(…))` も D2 で解けるようになった。
 
+**差分修正（2026-11-21）:** `text-overflow:ellipsis` を指定したクリップ付きGridは3ブラウザ共通の「無効な宣言」ではない（Chromium・Firefoxの画素差0、WebKitは151画素）。モデルの全ブラウザ共通警告を取り消し、`U_LAYOUT_TEXT_OVERFLOW_BROWSER` にして「検証成功」を避ける。Flexとクリップなしのケースは以前どおり。`packages/veriss/test/inert-declarations.test.mts` と `e2e/layout-cls-facts.spec.mts` で確認する。
+
 ## B. transform
 
 - [x] **B1. 奥行きのない 3D の書き方**: `translateZ(0)`・`translate3d(x, y, 0)`・`scale3d(x, y, 1)`・`rotateZ()`・

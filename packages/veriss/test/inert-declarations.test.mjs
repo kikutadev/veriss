@@ -38,6 +38,16 @@ test('paint declarations that need another declaration: text-overflow, -webkit-l
     assert.deepEqual(inert(run(`${p}.c{height:10px;-webkit-line-clamp:2;overflow:hidden}`)), [['.c', 'line-clamp']]);
     assert.deepEqual(inert(run(`${p}.c{height:10px;-webkit-line-clamp:none}`)), []);
 });
+test('text-overflow on a clipped grid box is browser-dependent, not universally inert', () => {
+    const css = '.p{display:grid;grid-template-columns:minmax(0,1fr)}.c{display:grid;grid-template-columns:minmax(0,1fr);width:120px;height:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
+    const report = run(css);
+    assert.equal(report.status, 'unknown');
+    assert.ok(report.diagnostics.some(d => d.code === 'U_LAYOUT_TEXT_OVERFLOW_BROWSER' && d.box === '.c'));
+    assert.ok(!inert(report).some(row => row[0] === '.c' && row[1]?.includes('text-overflow')));
+    // A flex container stays inert across the three browser engines (measured separately).
+    const flex = run(css.replace('.c{display:grid;grid-template-columns:minmax(0,1fr);', '.c{display:flex;'));
+    assert.ok(inert(flex).some(row => row[0] === '.c' && row[1]?.includes('text-overflow')));
+});
 test('justify-self / justify-items in flex do nothing; in grid a px-wide item is aligned, an auto-width box (not a text leaf) stays Unknown', () => {
     assert.deepEqual(inert(run('.p{display:flex}.c{width:100px;height:10px;justify-self:end}')), [['.c', 'justify-self']]);
     assert.deepEqual(inert(run('.p{display:flex;justify-items:center}.c{width:100px;height:10px}')), [['.p', 'justify-items']]);
@@ -201,7 +211,9 @@ test('text-overflow on a flex or grid container does nothing (its text is in its
     const run = (d) => analyzeHTML('<html lang="en"><body><div class="r"><span class="s"></span></div></body></html>', { name: 'P', css: `*{margin:0}html,body{${g}}.r{width:150px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;${d}}.s{display:block;width:300px;height:20px}`, viewport: { min: 400, max: 400, height: { min: 300, max: 300 } } });
     const inertTO = (r) => (r.layoutWarnings ?? []).some(w => w.code === 'W_LAYOUT_DECLARATION_INERT' && w.properties.includes('text-overflow'));
     assert.equal(inertTO(run('display:flex')), true);
-    assert.equal(inertTO(run('display:grid;grid-template-columns:minmax(0,1fr)')), true);
+    const grid = run('display:grid;grid-template-columns:minmax(0,1fr)');
+    assert.equal(inertTO(grid), false);
+    assert.ok(grid.diagnostics.some(d => d.code === 'U_LAYOUT_TEXT_OVERFLOW_BROWSER'));
     assert.equal(inertTO(run('display:block')), false);
 });
 test('sizes and vertical margins on a display: inline span do nothing', () => {

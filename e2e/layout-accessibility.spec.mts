@@ -24,6 +24,9 @@ test.beforeEach(({}, testInfo) => applyBrowserBaseline(testInfo));
 // Measured widths as contracts: up to the 1/64 px the engine counts in (Firefox reports 1/60 px fractions).
 const up64 = (v: number) => Math.ceil(v * 64 - 1e-9) / 64;
 const chromiumOnly = (page: Page) => { test.skip(test.info().project.name !== 'chromium', 'uses the Chrome DevTools Protocol (Chromium only)'); return page.context().newCDPSession(page); };
+// Safari on macOS uses Option+Tab to include links in sequential keyboard focus.
+// A plain Tab there focuses form controls only; testing links with it is not equivalent input.
+const nextLinkTab = (page:Page) => page.keyboard.press(test.info().project.name === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
 
 
 const results = new URL('../evals/results/layout-accessibility/', import.meta.url);
@@ -743,7 +746,8 @@ async function runtime(page: Page, sample: Sample) {
       const sides = {top: [[cx, r.top + 0.5], [cx, r.top - 3]], bottom: [[cx, r.bottom - 0.5], [cx, r.bottom + 3]], left: [[r.left + 0.5, cy], [r.left - 3, cy]], right: [[r.right - 0.5, cy], [r.right + 3, cy]]};
       // An outside sample off the viewport falls back to another side's outside sample (the same backdrop).
       const onScreen = ([x, y]: number[]) => x! >= 0 && y! >= 0 && x! < innerWidth && y! < innerHeight;
-      const around = Object.values(sides).map(([, out]) => out!).find(onScreen);
+      // Prefer the outside of a vertical edge: the next grid row can contain unrelated text.
+      const around = [sides.right[1]!, sides.left[1]!, sides.top[1]!, sides.bottom[1]!].find(onScreen);
       if (!around) return null;
       const pair = ([edge, out]: number[][]): number[][] => [edge!, onScreen(out!) ? out! : around];
       return {fill: [[r.left + 4 + parseFloat(s.borderLeftWidth), cy], around], sides: Object.entries(sides).filter(([side]) => parseFloat(s.getPropertyValue("border-" + side + "-width")) >= 1).map(([, p]) => pair(p))};
@@ -1687,7 +1691,7 @@ test('contents-focus: where the static rule reports, Tab never lands on the elem
     await page.setViewportSize({width: 400, height: 600});
     await page.setContent(`<!doctype html><html lang="en"><head><style>${base}${extra}</style></head><body>${html}</body></html>`);
     let reached = false;
-    for (let i = 0; i < 4; i++) { await page.keyboard.press('Tab'); if (await page.evaluate(() => document.activeElement?.classList.contains('l'))) reached = true; }
+    for (let i = 0; i < 4; i++) { await nextLinkTab(page); if (await page.evaluate(() => document.activeElement?.classList.contains('l'))) reached = true; }
     expect(reached, `${inner} ${extra}: Tab reaches it`).toBe(!warn);
   }
 });
@@ -1725,7 +1729,7 @@ test('grid areas out of DOM order: where W_A11Y_ORDER warns, Chromium tabs to a 
     const warned = report.accessibility!.warnings.some(w => w.code === 'W_A11Y_ORDER');
     await page.setContent(`<!doctype html><html lang="en"><head><style>${css}</style></head><body>${html}</body></html>`);
     const tops = [];
-    for (let i = 0; i < 2; i++) { await page.keyboard.press('Tab'); tops.push(await page.evaluate(() => document.activeElement!.getBoundingClientRect().top)); }
+    for (let i = 0; i < 2; i++) { await nextLinkTab(page); tops.push(await page.evaluate(() => document.activeElement!.getBoundingClientRect().top)); }
     expect(warned, `${areas}: focus visits tops ${tops}`).toBe(tops[1]! < tops[0]!);
   }
 });
@@ -1779,7 +1783,7 @@ test('focus shift: where W_LAYOUT_FOCUS_SHIFT warns, focusing the link moves the
     const warning = (report.layoutWarnings ?? []).find(w => w.code === 'W_LAYOUT_FOCUS_SHIFT' && w.box === '.next');
     await page.setContent(`<!doctype html><html lang="en"><head><style>${base}${focus}</style></head><body>${html}</body></html>`);
     const before = await page.evaluate(() => document.querySelector('.next')!.getBoundingClientRect().top);
-    await page.keyboard.press('Tab');
+    await nextLinkTab(page);
     const after = await page.evaluate(() => document.querySelector('.next')!.getBoundingClientRect().top);
     expect(Boolean(warning), `${focus}: Chromium moves .next by ${after - before}px`).toBe(after !== before);
     if (warning) expect(Number(warning.delta)).toBe(after - before);
@@ -1856,9 +1860,10 @@ test('a link that is the only child of a paragraph: Tab reaches it and Chromium 
   const report = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}, accessibility: true, boxes: {'.l': {minInlineSize: 0, intrinsicBlockSize: 24}}});
   expect(report.status, report.diagnostics.map(d => d.message).join(' | ')).toBe('verified');
   await page.setContent(`<!doctype html><html lang="en"><head><style>${css}</style></head><body>${html}</body></html>`);
-  await page.keyboard.press('Tab');
+  await nextLinkTab(page);
   expect(await page.evaluate(() => document.activeElement!.className)).toBe('l');
-  expect(await axName(page, '.l')).toBe('Pricing');
+  await expect(page.getByRole('link', {name:'Pricing', exact:true})).toHaveCount(1);
+  if(test.info().project.name==='chromium') expect(await axName(page,'.l')).toBe('Pricing');
   expect(await page.evaluate(() => document.querySelector('.t')!.getBoundingClientRect().height)).toBe(24);
 });
 
@@ -1881,9 +1886,10 @@ test('a paragraph of a link and a span: Tab reaches the link and Chromium’s tr
   const report = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, {name: 'P', css, viewport: {min: 320, max: 800, height: {min: 600, max: 900}}, accessibility: true, boxes: {'.t': {minInlineSize: 0, intrinsicBlockSize: 24}, '.l': {minInlineSize: 0, intrinsicBlockSize: 24}, '.d': {minInlineSize: 0, intrinsicBlockSize: 24}}});
   expect(report.status, report.diagnostics.map(d => d.message).join(' | ')).toBe('verified');
   await page.setContent(`<!doctype html><html lang="en"><head><style>${css}</style></head><body>${html}</body></html>`);
-  await page.keyboard.press('Tab');
+  await nextLinkTab(page);
   expect(await page.evaluate(() => document.activeElement!.className)).toBe('l');
-  expect(await axName(page, '.l')).toBe('Alex');
+  await expect(page.getByRole('link', {name:'Alex', exact:true})).toHaveCount(1);
+  if(test.info().project.name==='chromium') expect(await axName(page,'.l')).toBe('Alex');
   expect(await page.evaluate(() => document.querySelector('.t')!.getBoundingClientRect().height)).toBe(24);
 });
 
@@ -1961,7 +1967,7 @@ test('focus-offscreen: Tab focuses each link of a drawer moved off screen by a t
       await page.setViewportSize({width, height: 600});
       await page.setContent(`<!doctype html>${html.replace('<body>', `<head><style>${css(shift)}</style></head><body>`)}`);
       for (const cls of ['.link', '.link2']) {
-        await page.keyboard.press('Tab');
+        await nextLinkTab(page);
         const seen = await page.evaluate(cls => { const e = document.activeElement, r = e!.getBoundingClientRect(); return {focused: e!.matches(cls), visible: r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight}; }, cls);
         expect(seen.focused, `${shift} ${cls}`).toBe(true);
         expect(seen.visible, `${shift} ${cls} at ${width}`).toBe(!offscreen);

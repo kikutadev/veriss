@@ -290,6 +290,23 @@ main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して
   eval 4回変化なし、必須の3ブラウザE2E 411/411成功。終了後の
   Playwright Chrome 残留は検査対象プロジェクトで0。
 
+### Browser quality follow-up (2026-11-21)
+
+Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discrepancies left by the previous migration, without changing verdicts to Verified on unsupported evidence or relaxing assertions. Work against the newest TypeScript main, classify each difference with exact browser measurements and an independent prior-commit comparison, then change implementation or test-oracle assumptions only where the model is demonstrably wrong. Red → Green → refactor; keep .mts as canonical source and regenerate .mjs; run targeted three-browser checks, unit tests, MoonBit oracle if relevant, and tools/gate.sh before publishing. Outstanding browser-specific variance must remain explicit and Unknown if proof coverage differs. Do not overwrite concurrently advanced main without first syncing.
+
+#### Browser quality first corrections (2026-11-21)
+
+- The Chromium accessibility E2E `invalid-fields-and-messages` failure was a faulty pixel oracle: sampling immediately below the topmost input also sampled text from the following row. The oracle now prefers a vertical edge's outside backdrop; the unchanged static E_A11Y_FIELD_BOUNDARY verdict matches Chromium (1/1) without changing a warning threshold.
+- The three WebKit UA-profile mismatches were OS-specific defaults, not a failure of the geometry solver. Playwright WebKit 27.2/macOS reported text input padding (2,5,2,5), textarea (2,5,2,5), button (0,6,1,6), unlike the existing Linux WebKit profile. Retained the Linux profile unchanged and used the already supported explicit `ua` overrides for macOS. The 15 standard control geometry E2E cases across three browsers passed (15/15). See docs/css-baseline.md.
+- Still pending: remaining WebKit accessibility navigation/AX differences, CLS font loading/overlay scrollbar/discrete display/text-overflow differences; do not count the current partial corrections as completion of those suites.
+
+#### Browser quality follow-up, second checkpoint (2026-11-21)
+
+- Full correction of the **7 formerly failing accessibility E2E cases**, individually remeasured: one Chromium screenshot pixel oracle sampled another row's error text, and six WebKit failures were macOS Safari's Tab/Option+Tab navigation policy (links are focused by Option+Tab). Kept the static findings and bounds intact, and also cross-checked accessible names through Playwright's cross-browser role oracle plus Chromium CDP. The six link/navigation cases passed 18/18 across Chromium, Firefox and WebKit. Full 414-case accessibility suite still pending rerun.
+- **CLS differences**: Chromium's original `Roboto,sans-serif` fallback shifted by only 2px, below Layout Instability's event threshold, so replaced only the test fixture with measured `Roboto,monospace` (44px movement, score 0.0073333); the sound negative cases stayed zero (1/1). The native scrollbar test now uses the measured gutter: Mac headless Chrome/Firefox/WebKit all report zero (overlay). Three browsers passed; positive classic gutter remains covered by existing unit tests and not falsely claimed as browser-verified on Mac.
+- **Remaining browser-specific behavior** measured explicitly: Firefox 157 does not run a display transition even with `allow-discrete` (other two engines do); WebKit 27.2 paints ellipsis on a clipped grid container, Chromium/Firefox do not. Changed the latter from an unsound universal W_LAYOUT_DECLARATION_INERT to `U_LAYOUT_TEXT_OVERFLOW_BROWSER` (Unknown). Added fail-first unit regression; the full targeted inert-declarations suite passes 46/46 and both browser differential cases pass 6/6. Static unsupported cases are not silently Verified. See docs/css-baseline.md for measurements.
+- Still required before publishing: full accessibility and CLS suites, all ordinary package tests, existing gate on frozen HEAD, clean generated reports, and comparison against latest concurrent origin/main.
+
 ### Fork site correction (2026-11-21)
 
 - User-facing acceptance condition: the fork URL must expose the fork verifier's **real behavior**, not only reuse the original site's static tables/screenshots with a fork badge. The previous published version did the latter and was not an adequate implementation of the request.
@@ -315,3 +332,9 @@ main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して
 (4) 条件分岐・レビュー系の差分は中身が現行 main にあるかを照合して
 必要なものだけ採用。旧枝の履歴を解決する際も検証済みの現行実装を
 戻さない。(5) 完全 gate/リモート確認。
+
+#### Full browser acceptance and main synchronization (2026-11-21)
+
+- Complete focused Playwright suite across Chromium, Firefox, WebKit on 7715427: **663 total, 453 passed / 210 existing baseline skips, zero unexpected failures**; supervised exit 0, 992 process records tracked / zero remaining. Includes complete accessibility, CLS facts and UA-profile suites. The previously failing 7 accessibility, 6 CLS and 3 WebKit UA-profile cases now pass or have explicit Unknown for the WebKit grid-text-overflow case; known browser variation was not silently reclassified as verified.
+- Full ordinary unit suite on 7715427: root 33, veriss 782, adapter-core 66, React 12, Vue 6, Svelte 12 — **911 passed, zero failures**. Strict TypeScript compile/build-output parity check passed; independent MoonBit CSS oracle with 5000 seeds passed 18/18.
+- d36d974 merges the concurrently advanced origin/main rule-catalog demo into this TypeScript branch. The sole conflict was the handoff document; preserved both the catalog publication notes and this browser-quality record; library source/test files did not conflict. Working tree clean. Re-run the full mandatory gate on the merged HEAD before pushing either branch; fetch again to preserve later main changes. This checkpoint does not claim native classic scrollbars were measured on a Mac, or that Firefox implements display transitions with allow-discrete.

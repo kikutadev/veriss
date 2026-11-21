@@ -11,7 +11,7 @@ interface Ancestor {
     box: Box;
     style: EngineStyle;
 }
-export declare function checkSettledStyle({ box, style, region, parents, emit, cover, options, metaViewport, fontFaces, rules, layoutWarnings, ranges }: {
+export declare function checkSettledStyle({ box, style, region, parents, emit, cover, options, metaViewport, fontFaces, rules, layoutWarnings, ranges, unknown }: {
     box: Box;
     style: EngineStyle;
     region: Region;
@@ -28,5 +28,6 @@ export declare function checkSettledStyle({ box, style, region, parents, emit, c
         heightRange?: LayoutRange;
         region?: LayoutRegion;
     };
+    unknown: (code: string, message: string, line: undefined, box: Box) => unknown;
 }): void;
 export {};
