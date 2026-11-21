@@ -454,6 +454,15 @@ CSS/JS/browser の全域同値性、実 source parser/cascade 全体、X4
 S5/C3–C5 も実 exporter/interface と整合をとって進める。
 TypeScript の作業ツリーは変更しない。
 
+統合依頼（2026-11-21）: TypeScript 移行済み fork/main を基点として
+Lean の既存コミットを取り込み、Lean の import・検証入口と TS 化した
+実装の相違を明示。main へ push する前に正式ゲート（全パッケージ単体、
+eval、Chromium/Firefox/WebKit）と Lean smoke/regression を通す。
+Firefox の profile-folder 起動障害は独立して再現、原因と修正方法を確認し、
+実ブラウザで成功まで確認。作業中の別 worktree を変更・巻き戻ししない。
+全ゲートが成功した統合コミットを fast-forward/非強制で origin/main
+へ反映し、リモート SHA まで確認することが本依頼の完了条件。
+
 | 順序 | 作業束 | 入力依存 | 完了成果 |
 |---|---|---|---|
 | 3A | S1–S4、全ケース checker | 現 M | graph + cases + cross-state + path witness の定理と実測レポート再生 |
