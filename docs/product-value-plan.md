@@ -1,6 +1,6 @@
 # veriss フォーク版 — 製品価値から逆算した開発計画
 
-Status: **実装中** (2026-11-22)。現行のフォーク `main` (`ad2f316`) を起点にした製品化の計画。技術研究の進捗率とは分離する。
+Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現行のフォーク `main` (`ad2f316`) を起点にした製品化の計画。技術研究の進捗率とは分離する。
 
 ## 1. ユーザーが買う／採用する価値
 
@@ -33,7 +33,7 @@ Status: **実装中** (2026-11-22)。現行のフォーク `main` (`ad2f316`) �
 - [x] デモの初期サンプルを **固定トラックでのはみ出し→可変トラックで修正** にする。既存サンプル・F116等は残す。第一画面に「何が・どの幅で・なぜ壊れるか」を表示する。ブラウザ上で実際のverissエンジンを呼び、硬い文字列で判定を演出しない。
 - [x] UI結果は `エラーN / 警告N / UnknownN` を正しく表示。失敗状況と `verified / violated / unknown` を明瞭に分ける。無警告でも error がある場合は成功と表示しない。
 - [x] ペーストしたHTML/CSSについては明示的な制約（フラグメント・外部スタイルシート・JS実行なし）を短く提示。例の内在的な box 契約は自由入力に使わない。
-- [ ] スマホ幅の UI と 3つの判定（NG／OK／Unknown）、critical CSS 抽出を公開 URL で操作確認してから Pages を更新。
+- [x] スマホ幅の UI と 3つの判定（NG／OK／Unknown）、critical CSS 抽出を公開 URL で操作確認してから Pages を更新。
 
 ### Phase 1: プロジェクトで試せる CLI（高）
 
@@ -71,11 +71,18 @@ Status: **実装中** (2026-11-22)。現行のフォーク `main` (`ad2f316`) �
 
 - デモ初期例を固定幅 Grid のオーバーフローに変更。反例443.5px（375–512px、上限は含まない）、修正後は0件、未対応疑似要素はUnknown。表示のエラー・警告・Unknown件数を独立させ、320–5000px内の任意範囲指定を追加。390px実ブラウザーでページの横はみ出しがないことを確認。
 - CLIを `packages/veriss/bin/veriss.mts` として実装。静的 HTML/CSS ファイル、JSON、反例幅・区間、Z3検算、statusごとの終了コードを提供。4 CLI + 2 demo の回帰テスト成功。
-- package tarballを別のクリーンな利用側へ `pnpm add` して `pnpm exec veriss` 成功。GitHubのコミット指定によるインストールは公開コミット後に再確認する。
-- このチェックポイントは **正式 gate・最新main統合・公開Pages実地確認前**。それらの完了を推測で記入しない。
+- package tarballを別のクリーンな利用側へ `pnpm add` して `pnpm exec veriss` 成功。GitHubのコミット指定によるインストールは後続の公開・導入検証で成功した。
+- このチェックポイントでは正式gate・最新main統合・公開Pages実地確認は未実施。後続の記録が最終結果。
 
 ### Full release gate (2026-11-22)
 
 - `pnpm run build:ts` と `pnpm check:ts` 成功。CLI/デモの6件の回帰テスト成功。
 - `node tools/gate-guarded.mjs` からの正式 `tools/gate.sh` は **exit 0**。rootと全5 packageのunit fail=0、component-lint eval 4回の結果差分なし、Chromium・Firefox・WebKitの必須E2E **549 passed**。検証後の作業対象Chrome残留0。
-- 公開Pages反映・Git-pinned依存の実体験は後続の公開確認に依存。
+- 公開Pages反映・Git-pinned依存の実体験は後続の公開・導入検証で成功した。
+
+### 公開・導入検証 (2026-11-22)
+
+- fork `main` `93bacf0`、`gh-pages` `50dde81` にプッシュ（ブランチは fast-forward、GitHub Actions 不使用）。
+- <https://kikutadev.github.io/veriss/> の実ブラウザーで初期 NG→修正後OK、443.5px反例、Unknown、初期表示CSS 2規則保持・1規則分離、390px viewport で横はみ出しなしを確認。
+- 別の空プロジェクトに `pnpm add github:kikutadev/veriss#93bacf0&path:packages/veriss` でGitコミット指定インストール成功し、`pnpm exec veriss check` で `VERIFIED`。これにより tarball に加えてGit依存の配布も確認。
+- **Phase2未着手**: 3つの異種実UIでの有効検出・誤検知・Unknownの実証はこのリリースに含まない。

@@ -425,3 +425,5 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - 完成境界: 正式gate成功、fork main へのfast-forward統合、gh-pages静的公開、公開URLでのNG→OK・Unknown・スマホ検証は別途完了結果を記録する。3種類以上の実UI評価とフレームワーク・Leanの自動連携は次段階。
 
 - 2026-11-22 release gate: `pnpm build:ts`, `pnpm check:ts`、新規CLI/デモ6件成功。guarded `tools/gate.sh` はexit 0、root＋全5 package fail=0、component-lint eval4回差分なし、3ブラウザーの対象E2E **549 passed**（7.7分）、作業プロジェクトのChrome残留0。公開ページのQAは別に記録する。
+
+- 2026-11-22 publication acceptance: fork `main` `93bacf0`, Pages `gh-pages` `50dde81` へfast-forward push。実公開URLでNGのエラー1+警告1・443.5px反例、修正後0件、Unknown1件、critical CSS 2保持/1分離、390pxでページ横溢れ0を確認。別プロジェクトへのGit-pinned installとCLIのZ3 VERIFIEDも成功。現行リリースの範囲はPhase 0/1で、実アプリ3件評価・Leanの自動結合は未完了。
