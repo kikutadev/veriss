@@ -132,6 +132,13 @@ export function flexSpec(c) {
 
 export const spec = c => c.display === 'grid' ? gridSpec(c) : flexSpec(c);
 
+/** The same reference with every name but W prefixed (`a.x_0`), so two states share one width in one query. */
+export function namespaced(s, prefix) {
+  const names = [...new Set([...s.smt.matchAll(/\(declare-const (\S+) /g)].map(m => m[1]).filter(n => n !== 'W'))];
+  const rename = text => names.reduce((t, n) => t.replace(new RegExp(`(?<=[\\s(])${n}(?=[\\s)])`, 'g'), `${prefix}.${n}`), text);
+  return { ...s, prefix, smt: rename(s.smt).replace('(declare-const W Real)\n', ''), facts: s.facts.map(rename), name: n => `${prefix}.${n}` };
+}
+
 // The CSS a configuration means (for the browsers and the engine). Items carry the classes i0, i1, …
 export function toCSS(c) {
   const len = v => `${v}px`;
@@ -144,4 +151,5 @@ export function toCSS(c) {
   c.items.forEach((it, k) => css.push(`.i${k}{flex:${it.grow ?? 0} ${it.shrink ?? 1} ${len(it.basis)};min-width:${len(it.min ?? 0)}${it.align ? `;align-self:${it.align}` : ''}${it.height !== undefined && it.height !== 'auto' ? `;height:${len(it.height)}` : ''}}`));
   return css.join('');
 }
-export const toHTML = c => `<div class="c">${c.items.map((_, k) => `<div class="i${k}"></div>`).join('')}</div>`;
+// data-id names an item across two states (an item inserted before it changes its index, not its id).
+export const toHTML = c => `<div class="c">${c.items.map((it, k) => `<div class="i${k}" data-id="${it.id ?? k}"></div>`).join('')}</div>`;
