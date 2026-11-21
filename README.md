@@ -6,6 +6,29 @@ Unknown is never turned into success: what the model does not cover is reported 
 
 **What it checks**: [the fork rule catalog](https://kikutadev.github.io/veriss/) (Japanese) groups every check by role, says what can and cannot be checked, and shows each role with a detected (NG) and a corrected (OK) example as veriss judges them. Adapted from the [upstream rule catalog](https://mizchi.github.io/veriss/); the fork site runs the bundled TypeScript-origin verifier in-browser on editable HTML/CSS (including F116/F129/F133 presets), and documents the experimental Lean work separately.
 
+## Try the product
+
+**[Try the live responsive verifier](https://kikutadev.github.io/veriss/#live-check)**: the first example intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS and change the viewport width range.
+
+**Use it with files** (Node 24+, pnpm 12; this fork is not published to npm):
+
+```sh
+pnpm add 'github:kikutadev/veriss#<commit>&path:packages/veriss'
+pnpm exec veriss check --html page.html --css styles.css --min-width 320 --max-width 1280
+pnpm exec veriss check --html page.html --css styles.css --json
+```
+
+To try directly in the repository without installing the package into another project:
+
+```sh
+node packages/veriss/bin/veriss.mjs check --html tests/fixtures/veriss-cli/grid.html --css tests/fixtures/veriss-cli/grid-broken.css
+node packages/veriss/bin/veriss.mjs check --html tests/fixtures/veriss-cli/grid.html --css tests/fixtures/veriss-cli/grid-fixed.css
+```
+
+The first command reports a failing viewport (416px in this fixture), the second reports **VERIFIED**. The CLI checks a **static HTML fragment** plus the **complete author CSS** that you provide, running the analyzer and the independent Z3 layout proof. It does **not** fetch external stylesheets or run JS. Unsupported cases return **UNKNOWN**, not success. Exit codes: 0 verified, 1 violated, 2 unknown, 3 invalid input/runtime failure. Errors/warnings/Unknown are separate counts; `--json` includes the failing width interval and witness when available.
+
+[Product-value plan and release acceptance](docs/product-value-plan.md).
+
 ## Expanded verification targets (upstream 2026-11-22)
 
 - `@mizchi/veriss/critical`: extract first-view CSS for phone/desktop viewport ranges, conservatively keeping unknown rules; browser demo is on the [fork site](https://kikutadev.github.io/veriss/#first-view).

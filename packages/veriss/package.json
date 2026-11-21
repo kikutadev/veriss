@@ -53,6 +53,8 @@
     "./text-metrics/fixtures/*": "./text-metrics/fixtures/*"
   },
   "files": [
+    "bin/*.mjs",
+    "bin/*.d.mts",
     "src/**/*.mjs",
     "src/**/*.js",
     "src/**/*.d.mts",
@@ -78,5 +80,8 @@
     "type": "git",
     "url": "git+https://github.com/mizchi/veriss.git",
     "directory": "packages/veriss"
+  },
+  "bin": {
+    "veriss": "./bin/veriss.mjs"
   }
 }

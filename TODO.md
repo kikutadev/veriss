@@ -1,5 +1,7 @@
 # TODO
 
+**フォーク版の現行製品リリース優先順位**は [製品価値計画](docs/product-value-plan.md) を正とする。以下は検証エンジンの研究課題一覧であり、当面の製品化タスクの優先順位ではない。
+
 CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。実装したものは [docs/static-check-checklist.md](docs/static-check-checklist.md) に F 番号で移す。
 モジュール分割の計画は [ADR-0016](docs/adr/0016-module-decomposition.md)(下の「構成の作業」)。
 

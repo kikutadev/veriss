@@ -9,5 +9,16 @@ export declare function run({ html, css, boxes, vw, accessibility }: Pick<Catalo
         severity?: string;
         box?: string;
         message?: string;
+        range?: {
+            min: number;
+            max: number;
+            minExact?: string;
+            maxExact?: string;
+            maxInclusive?: boolean;
+        };
+        witness?: {
+            viewport: number;
+            viewportHeight?: number;
+        };
     }[];
 };

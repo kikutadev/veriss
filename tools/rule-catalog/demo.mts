@@ -13,6 +13,9 @@ const node = <T extends HTMLElement>(id:string):T => {
 const picker=node<HTMLSelectElement>('demo-case');
 const htmlEditor=node<HTMLTextAreaElement>('demo-html');
 const cssEditor=node<HTMLTextAreaElement>('demo-css');
+const widthMin=node<HTMLInputElement>('demo-width-min');
+const widthMax=node<HTMLInputElement>('demo-width-max');
+const rangeLabel=node<HTMLElement>('demo-range');
 const caption=node<HTMLElement>('demo-caption');
 const status=node<HTMLOutputElement>('demo-status');
 const findings=node<HTMLUListElement>('demo-findings');
@@ -73,12 +76,17 @@ function inspect():void{
   findings.replaceChildren();
   renderPreview();
   try {
-    const result=run({html:htmlEditor.value,css:cssEditor.value,vw:[375,1280],accessibility:modified ? true : selected?.accessibility ?? true,...(!modified && selected?.boxes ? {boxes:selected.boxes} : {})});
+    const min=Number(widthMin.value),max=Number(widthMax.value);
+    if(!Number.isSafeInteger(min)||!Number.isSafeInteger(max)||min<1||max>5000||min>max) throw new Error('検証幅は1–5000pxで、最小幅は最大幅以下にしてください');
+    if(htmlEditor.value.length>25000||cssEditor.value.length>25000)throw new Error('ブラウザデモはHTML/CSSそれぞれ25,000文字までです');
+    rangeLabel.textContent=`viewport ${min}–${max}px`;
+    const result=run({html:htmlEditor.value,css:cssEditor.value,vw:[min,max],accessibility:modified ? true : selected?.accessibility ?? true,...(!modified && selected?.boxes ? {boxes:selected.boxes} : {})});
     const count=result.findings.length;
+    const errors=result.findings.filter(d=>d.code.startsWith('E_')).length;
     const warnings=result.findings.filter(d=>d.code.startsWith('W_')).length;
     const unknowns=result.findings.filter(d=>d.code.startsWith('U_')).length;
     status.dataset.status=result.status==='verified' && warnings>0 ? 'warning' : result.status;
-    status.textContent=`${result.status.toUpperCase()} · 警告${warnings}件 / Unknown${unknowns}件`;
+    status.textContent=`${result.status.toUpperCase()} · エラー${errors}件 / 警告${warnings}件 / Unknown${unknowns}件`;
     if(count===0){
       const li=document.createElement('li');
       li.textContent='この入力で報告する診断はありません。';
@@ -93,6 +101,13 @@ function inspect():void{
       explanation.className='desc';
       explanation.textContent=issue.message ?? '';
       li.append(code,explanation);
+      if(issue.witness && Number.isFinite(issue.witness.viewport)){
+        const evidence=document.createElement('span'); evidence.className='desc';
+        evidence.textContent=`反例の画面幅: ${issue.witness.viewport}px`; li.append(evidence);
+      } else if(issue.range && issue.code.startsWith('E_')) {
+        const evidence=document.createElement('span'); evidence.className='desc';
+        evidence.textContent=`影響する画面幅: ${issue.range.minExact??issue.range.min}–${issue.range.maxExact??issue.range.max}px${issue.range.maxInclusive===false?'（上限を含まない）':''}`; li.append(evidence);
+      }
       findings.append(li);
     }
     if(count>35){
@@ -141,7 +156,9 @@ ng.addEventListener('click',()=>{side='ng';loadPreset();});
 ok.addEventListener('click',()=>{side='ok';loadPreset();});
 htmlEditor.addEventListener('input',markStale);
 cssEditor.addEventListener('input',markStale);
+widthMin.addEventListener('input',markStale);
+widthMax.addEventListener('input',markStale);
 runButton.addEventListener('click',inspect);
 criticalButton.addEventListener('click',extractFirstView);
-picker.value='f116';
+picker.value='overflow';
 loadPreset();

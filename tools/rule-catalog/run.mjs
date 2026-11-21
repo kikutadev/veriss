@@ -17,7 +17,7 @@ export function run({ html, css, boxes, vw = [375, 1280], accessibility = true }
         if (typeof code === 'string' && /^[EWU]_/.test(code) && (typeof o.message === 'string' || typeof o.severity === 'string')) {
             const key = code + (typeof box === 'string' ? box : '');
             if (!seen.has(key))
-                seen.set(key, { code, ...(typeof o.severity === 'string' ? { severity: o.severity } : {}), ...(typeof box === 'string' ? { box } : {}), ...(typeof o.message === 'string' ? { message: o.message } : {}) });
+                seen.set(key, { code, ...(typeof o.severity === 'string' ? { severity: o.severity } : {}), ...(typeof box === 'string' ? { box } : {}), ...(typeof o.message === 'string' ? { message: o.message } : {}), ...(o.range && typeof o.range === 'object' ? { range: o.range } : {}), ...(o.witness && typeof o.witness === 'object' ? { witness: o.witness } : {}) });
         }
         for (const v of Object.values(o))
             walk(v, depth + 1);

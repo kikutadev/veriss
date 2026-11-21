@@ -8,10 +8,22 @@ on the Isle compiler, its syntax, or a browser renderer.
 The package is `@mizchi/veriss`. It is not published to npm; depend on it from git (pnpm), pinned to a commit:
 
 ```json
-{ "dependencies": { "@mizchi/veriss": "github:mizchi/veriss#<commit>&path:packages/veriss" } }
+{ "dependencies": { "@mizchi/veriss": "github:kikutadev/veriss#<commit>&path:packages/veriss" } }
 ```
 
 The built text-metrics module (`text-metrics/_build/.../font_ffi.js`) is committed, so a consumer needs no MoonBit toolchain.
+
+## CLI: check a real HTML/CSS file pair
+
+The fork ships a `veriss` executable for the first useful workflow:
+
+```sh
+pnpm add 'github:kikutadev/veriss#<commit>&path:packages/veriss'
+pnpm exec veriss check --html page.html --css styles.css --min-width 320 --max-width 1280
+pnpm exec veriss check --html page.html --css styles.css --json
+```
+
+The CLI uses the existing `analyzeHTML` engine and the Z3 layout checker. A failing width and range are included when the model supplies them. It accepts a static HTML fragment and its **complete author stylesheet**; no JavaScript or external CSS is loaded. Return codes are 0 (verified), 1 (violated), 2 (unknown/unproven), 3 (invalid input or runtime failure). The modeled viewport height is 600–1000px for this first CLI version.
 
 ## Verify static HTML
 

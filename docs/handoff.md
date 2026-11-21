@@ -415,3 +415,13 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
   GitHub Actionsを使わずに別途公開を管理する。旧hash固定の
   ポートフォリオ島監査実行器は古いスナップショットに依存し、
   元ブランチの履歴に残すが現行の汎用TS経路へは組み込まない。
+
+
+## veriss 製品化：初回で価値が分かるWeb体験＋CLI（2026-11-22、作業中）
+
+- 製品価値とPhase 0–3、明示的な完了条件の正本は [product-value-plan.md](product-value-plan.md)。420ルールの増加より、狭い画面幅だけの反例発見と修正確認、利用側ファイルによるCLI利用を優先する。
+- 既存のTypeScriptエンジンとZ3をそのまま使用。公開サイトの初期例を固定幅Gridオーバーフローへ変更し、反例幅/エラー件数とNG→OKを表示。検証幅の変更、Unknown/critical CSS、390px画面、編集後再検査をegoブラウザで実測。
+- `packages/veriss/bin/veriss.mts` に `veriss check --html --css --min-width --max-width --json` を実装。exit: verified=0、violated=1、unknown=2、input/runtime=3。6本の追加回帰テスト成功。別プロジェクトへのpnpm pack tarball導入後の実行も成功。
+- 完成境界: 正式gate成功、fork main へのfast-forward統合、gh-pages静的公開、公開URLでのNG→OK・Unknown・スマホ検証は別途完了結果を記録する。3種類以上の実UI評価とフレームワーク・Leanの自動連携は次段階。
+
+- 2026-11-22 release gate: `pnpm build:ts`, `pnpm check:ts`、新規CLI/デモ6件成功。guarded `tools/gate.sh` はexit 0、root＋全5 package fail=0、component-lint eval4回差分なし、3ブラウザーの対象E2E **549 passed**（7.7分）、作業プロジェクトのChrome残留0。公開ページのQAは別に記録する。
