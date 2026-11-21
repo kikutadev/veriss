@@ -21,6 +21,11 @@ isle から切り出した CSS 検証器(veriss)を、別のマシンで続け�
 - **座標計算サブセット L1**: [ADR-0018](adr/0018-coordinate-subset.md)。Grid と Flex(row・nowrap)の座標を、engine から独立した
   Z3 の仕様(`models/layout/spec.mjs`)として定義し直した。engine の領域ごとの式と幅の範囲全体で一致(`tests/layout-spec.test.mjs`)、
   3 ブラウザーとランダムな設定で一致(`e2e/layout-spec.spec.mjs`)。次の段は TODO.md の「座標計算サブセット L1」
+- **CLS の壊れた例**: `models/layout/shift-cases.mjs`(壊れた 12、正しい 6)。2 つの状態を同じ幅で Z3 に解かせ(`shift.mjs`)、
+  3 ブラウザーで確かめた(`e2e/layout-shift.spec.mjs`)
+- **クリティカル CSS**: `packages/veriss/src/critical.mjs`([docs/critical-css.md](critical-css.md))。engine の `sizes` の行に `display`
+  と `float` を足した(block コンテナは内部で 1 列の grid として配置するが、行には block と書く)
+- **Lean**: この環境で Lean を入れる操作(インストール用のスクリプトの実行)が安全確認で止められた。L1 の Lean 版は未着手
 - **検査ルール一覧**: [docs/rule-catalog.md](rule-catalog.md)(Web 版 https://mizchi.github.io/veriss/、README からリンク)。約 420 のコードを
   13 の役割に分け、「検査可 / 一部 / 仕様のみ / 差を報告 / Unknown」を表にし、役割ごとに NG / OK の実例の画像(`docs/rule-catalog/*.png`)を付けた
   - 実例は `tools/rule-catalog/examples.mjs`。`run.mjs all` で判定、`shoot.mjs` で画像、`build-page.mjs <出力先>` で Web 版

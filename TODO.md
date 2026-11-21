@@ -202,6 +202,15 @@ engine から独立した Z3 の仕様で、engine(範囲全体で UNSAT)と 3 �
 - [ ] 性質(はみ出さない、重ならない、W に対して単調)を仕様の上で Z3 に確かめさせる。Lean で定理にするかは未決
 - [ ] engine を仕様から作り直すか(今は照合だけ)
 
+## 壊れた状態変化の CLS と、クリティカル CSS
+
+- [x] 壊れた状態変化(12)と正しい版(6)を `models/layout/shift-cases.mjs` に。2 つの状態を同じ幅で Z3 に解かせ、動く幅を探す
+  (`models/layout/shift.mjs`)。3 ブラウザーで反例の幅の動きと Chromium の layout-shift を確かめ、engine の `E_LAYOUT_HOVER_SHIFT` とも一致
+- [x] クリティカル CSS の抽出(`packages/veriss/src/critical.mjs`、[docs/critical-css.md](docs/critical-css.md))。3 ブラウザーでファーストビューが同じ
+- [ ] Lean: L1 の定義と性質の証明、Lean の実行形を oracle にした engine との差分テスト(この環境で Lean を入れる操作が止められた。利用者の判断待ち)
+- [ ] クリティカル CSS: 文字を含むページ(文字の契約か、フォントからの測り方)、`%` の長さで Unknown にならないように
+- [ ] engine の誤りを入れた版(mutant)を作り、L1 の仕様との照合で捕まることを示す
+
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
 - [x] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
@@ -242,6 +251,8 @@ engine から独立した Z3 の仕様で、engine(範囲全体で UNSAT)と 3 �
 
 ## 実装済み(最近)
 
+- クリティカル CSS の抽出(`@mizchi/veriss/critical`)
+- 壊れた状態変化の CLS を L1 の仕様の上で Z3 が検出(SAT の反例)、正しい版は UNSAT
 - 座標計算サブセット L1 の参照仕様(ADR-0018、`models/layout/`): engine と幅の範囲全体で一致、3 ブラウザーとランダムな設定で一致
 - eval の基準を Chromium 156 で記録し直した。結果に `browser`(記録したブラウザーの版)を書き、gate は eval が変わったときに記録と今回の版を並べて出す
 - F133. container のない軸の container query の単位(`cqw` / `cqh` が `svw` / `svh` になる)

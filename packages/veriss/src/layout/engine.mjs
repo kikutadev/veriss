@@ -1992,7 +1992,7 @@ export function analyzeBoxTree(root, options, scrollbarProfile, budget, inlineSh
       if (box.inline?.length) inlineContent(box, style, region, [...parents, { box, style }], geometry.at(-1).chain, geometry.at(-1));
       const shown = scaled(style, parents.some(p => p.clipScope) ? null : origin, inline, blockSize);
       const rect=shown.origin && shown.block ? {inlineStart:affine(shown.origin.inline),blockStart:affine(shown.origin.block),inlineSize:affine(shown.inline),blockSize:affine(shown.block)} : null;
-      const sizeRow = { box: box.label, path: box.path, position:style.position, ...positioned,...(rect ? {rect} : {}), boxSizing: style['box-sizing'], boxSizingSource: style.$sources['box-sizing'],
+      const sizeRow = { box: box.label, path: box.path, position:style.position, display: style.$blockFlow ? 'block' : String(style.$inlineDisplay ?? style.display), float: style.float, ...positioned,...(rect ? {rect} : {}), boxSizing: style['box-sizing'], boxSizingSource: style.$sources['box-sizing'],
         paddingInlineSize:affine(diff(inline,scalar(add(px(style['border-left']),px(style['border-right']))))),
         ...(blockSize ? {paddingBlockSize:affine(diff(blockSize,scalar(add(px(style['border-top']),px(style['border-bottom'])))))} : {}),
         // Explicit absolute sizing determines its public allocation independently
