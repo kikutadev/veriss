@@ -210,7 +210,10 @@ engine から独立した Z3 の仕様で、engine(範囲全体で UNSAT)と 3 �
 - [ ] Lean: L1 の定義と性質の証明、Lean の実行形を oracle にした engine との差分テスト(この環境で Lean を入れる操作が止められた。利用者の判断待ち)
 - [x] クリティカル CSS の文字: フォントで測った大きさで配置し、自由な文字列は空(いくらでも伸びうる)として配置する
 - [ ] クリティカル CSS: 文字と要素が混ざった段落、`%` の長さで Unknown にならないように
-- [ ] L1 の仕様に文字を含む項目を足す(フォントで測った min-content を項目の自動の最小幅に、自由な文字列は上限なし)
+- [x] 文字幅の型(ADR-0019、`models/text/`): OS × ブラウザーのフォントの組み合わせの区間。L1 の Flex の項目の自動の最小幅に入れ、
+  Z3 が幅とフォントを同時に探す。Linux の 3 ブラウザーの E2E の記録、MoonBit、parley の三つを照合
+- [ ] Windows・macOS・iOS・Android の既定のフォントの幅を記録する(その OS のブラウザーで `tools/text-widths.mjs` を回す)
+- [ ] 文字幅の型を engine とクリティカル CSS に入れる(今は L1 の仕様だけ)。`flex-basis: auto`(max-content)と折り返す文字
 - [ ] engine の誤りを入れた版(mutant)を作り、L1 の仕様との照合で捕まることを示す
 
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))

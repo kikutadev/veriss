@@ -25,6 +25,9 @@ isle から切り出した CSS 検証器(veriss)を、別のマシンで続け�
   3 ブラウザーで確かめた(`e2e/layout-shift.spec.mjs`)
 - **クリティカル CSS**: `packages/veriss/src/critical.mjs`([docs/critical-css.md](critical-css.md))。engine の `sizes` の行に `display`
   と `float` を足した(block コンテナは内部で 1 列の grid として配置するが、行には block と書く)
+- **文字幅の型**: [ADR-0019](adr/0019-text-width-type.md)。`models/text/width.mjs` の `textWidth` が、総称の family を OS × ブラウザーの
+  表(`system-fonts.mjs`)で解決し、E2E の記録(`linux-widths.json`、`tools/text-widths.mjs`)か MoonBit の値 ± 許容で区間にする。
+  L1 の Flex の仕様で、文字の min-content を区間の中の変数にした。parley(`tools/parley-widths`、Rust)は MoonBit と同じ値を出した
 - **Lean**: この環境で Lean を入れる操作(インストール用のスクリプトの実行)が安全確認で止められた。L1 の Lean 版は未着手
 - **検査ルール一覧**: [docs/rule-catalog.md](rule-catalog.md)(Web 版 https://mizchi.github.io/veriss/、README からリンク)。約 420 のコードを
   13 の役割に分け、「検査可 / 一部 / 仕様のみ / 差を報告 / Unknown」を表にし、役割ごとに NG / OK の実例の画像(`docs/rule-catalog/*.png`)を付けた
