@@ -1,0 +1,175 @@
+{
+  "model": {
+    "version": 1,
+    "initial": "loaded",
+    "states": [
+      "loaded"
+    ],
+    "transitions": [],
+    "profiles": [
+      {
+        "id": "chromium-overlay",
+        "ua": "chromium",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      },
+      {
+        "id": "firefox-overlay",
+        "ua": "firefox",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      },
+      {
+        "id": "webkit-overlay",
+        "ua": "webkit",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      }
+    ],
+    "contracts": [
+      {
+        "id": "stage-horizontal-fit",
+        "kind": "predicate",
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "stage",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "stage",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "demo-horizontal-fit",
+        "kind": "predicate",
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "demo",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "demo",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "tabs-horizontal-fit",
+        "kind": "predicate",
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "tabs",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "tabs",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "points": [
+    [
+      320,
+      568
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      768,
+      1024
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "screens": [
+    {
+      "state": "loaded",
+      "wait": "#stage",
+      "targets": {
+        "stage": "#stage",
+        "demo": ".demo",
+        "tabs": ".tab-shell"
+      }
+    }
+  ]
+}

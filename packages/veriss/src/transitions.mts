@@ -1,4 +1,12 @@
 import type {LayoutSummary,LayoutRectangle,LayoutAffine,LayoutDiagnostic,LayoutRange} from './layout-contracts.d.ts';
+import type {EnvironmentProfile,GeometryEvidence,RelationalProof} from './relational-contract.mjs';
+import type {ExpandedPredicate} from './layout/relational-predicate.mjs';
+import type {WidthBranch,WidthTransitionSourceInput} from './layout/width-transition.mjs';
+import {verifyUI,layoutGeometry} from './relational-contract.mjs';
+import {deriveWidthTransition} from './layout/width-transition.mjs';
+import {analyzeHTML} from './html.mjs';
+import {expandPredicate} from './layout/relational-predicate.mjs';
+import {easingRange,overshoots} from './layout/easing.mjs';
 import type {LayoutIR,LayoutIRBox} from './layout-contract.mjs';
 import type {LayoutModel,LayoutProof,LayoutSolverAPI,LayoutObligation} from './layout-z3.mjs';
 type Frozen<T>=T extends object ? {readonly [K in keyof T]:Frozen<T[K]>} : T;
@@ -168,4 +176,105 @@ export async function verifyTransitionObligation(obligation:TransitionObligation
     delta:{value:number(sub(rational(witness.requiredExact),rational(witness.availableExact))),exact:exact(sub(rational(witness.requiredExact),rational(witness.availableExact)))},
   } : null;
   return {version:1,status:proof.status,contract:obligation.contract,coverage,proof,...(change ? {change} : {})};
+}
+
+
+/** Exact endpoint invariants under a *declared* shared bounded affine progress.
+ * This alone does not prove JavaScript/CSS implements that progress model. */
+export interface SharedAffineInput {
+  profile: EnvironmentProfile;
+  from: string;
+  to: string;
+  evidence: readonly GeometryEvidence[];
+  predicate: unknown;
+  interpolation: {kind:string;easing:string;assumptions:readonly string[]};
+}
+export interface SharedAffineProof {
+  status:'verified'|'violated'|'unknown';
+  reason?:string;
+  assumptions:string[];
+  endpoints?:RelationalProof;
+  progress?:{min:string;max:string};
+}
+const errorText=(e:unknown):string=>e instanceof Error?e.message:String(e);
+export function verifyInterpolatedPredicate(input:SharedAffineInput):SharedAffineProof {
+  const assumptions=input.interpolation?.assumptions;
+  const unknown=(reason:string):SharedAffineProof=>({
+    status:'unknown',reason,assumptions:Array.isArray(assumptions)?[...assumptions]:[],
+  });
+  if(input.interpolation?.kind!=='shared-affine'||!Array.isArray(assumptions)||
+     !assumptions.length||!assumptions.every(a=>typeof a==='string'&&a.trim()))
+    return unknown('Explicit shared affine interpolation assumptions required');
+  const timing=typeof input.interpolation.easing==='string'
+    ?input.interpolation.easing.trim().toLowerCase():'';
+  const curve=/^cubic-bezier\(([^()]*)\)$/.exec(timing);
+  // A cubic Bezier stays in its control point convex hull. Finite decimal
+  // coordinates between 0 and 1 bound the output without numerical root finding.
+  const unitDecimal=/^(?:0(?:\.\d{1,6})?|1(?:\.0{1,6})?|\.\d{1,6})$/;
+  const guaranteed=curve
+    ?curve[1]!.split(',').length===4&&curve[1]!.split(',').every(v=>unitDecimal.test(v.trim()))
+    :['linear','ease','ease-in','ease-out','ease-in-out'].includes(timing);
+  const range=guaranteed?easingRange(timing):undefined;
+  if(!range||overshoots(range))return unknown('Unknown or unproved bounded easing progress');
+  if(input.from===input.to)return unknown('Distinct endpoint states required');
+  try {
+    const expanded=expandPredicate(input.predicate);
+    const convex=(p:ExpandedPredicate):boolean=>p.op==='all'
+      ?p.items.every(convex):p.op==='compare'&&p.relation!=='ne';
+    if(!convex(expanded))return unknown('Predicate is not in the supported convex conjunction subset');
+    const endpoints=verifyUI({
+      model:{version:1,initial:input.from,states:[input.from,input.to],
+        transitions:[{from:input.from,event:'interpolate',to:input.to}],
+        profiles:[input.profile],
+        contracts:[{id:'invariant',kind:'predicate',predicate:expanded}]},
+      evidence:input.evidence,
+    });
+    return {
+      status:endpoints.status,endpoints,
+      assumptions:[...new Set([...assumptions,...endpoints.assumptions,
+        'All referenced coordinates are a shared affine combination of the corresponding endpoint coordinates at the same fixed viewport; progress is bounded in [0,1]. CSS implementation correspondence is not established by this proof.'])],
+      progress:{min:range.min,max:range.max},
+    };
+  }catch(e){return unknown(errorText(e))}
+}
+
+/** Independent CSS-source derivation, restricted to the closed fixed-width
+ * component subset validated by deriveWidthTransition. No supplied geometry
+ * facts or invented progress assumptions are accepted. */
+export interface CSSWidthTransitionInput extends WidthTransitionSourceInput {predicate:unknown}
+export interface CSSWidthTransitionProof extends SharedAffineProof {
+  derivation?:{kind:'fixed-width-transition';groups:WidthBranch[];easing:string;targets:string[]};
+}
+export function verifyCSSWidthTransition(input:CSSWidthTransitionInput):CSSWidthTransitionProof {
+  try {
+    const {profile,predicate,from,to}=input;
+    const derived=deriveWidthTransition(input);
+    const assumptions=['Closed CSS component and supplied data-attribute event, fixed viewport, overlay scrollbar; no external CSS, runtime override or additional concurrent animation. The fixed border-box and normal block or stretched column flex child inline coordinates (column-reverse is projected onto column; block-axis coordinates are discarded) are affine in the sole changing width. Paired width branches share slopes and their offsets move in one direction.'];
+    const evidence:[string,string][]=[[from,derived.before],[to,derived.after]];
+    const rows=evidence.flatMap(([state,html])=>{
+      const layout=createLayoutIR(analyzeHTML(html,{
+        css:derived.css,viewport:profile.viewport,ua:profile.ua,
+        ...(profile.mediaFeatures!==undefined?{mediaFeatures:profile.mediaFeatures}:{}),
+        safeArea:profile.safeArea??{},scripting:'enabled',integrity:true,
+        scrollbars:[profile.scrollbar??{name:'overlay',inlineSize:0,blockSize:0}],
+        ...(profile.dpr?{devicePixelRatios:[profile.dpr]}:{}),
+      }));
+      return layoutGeometry({state,profile,layout,targets:derived.targets,local:{assumptions}})
+        .map(e=>!e.rows?.length?e:{
+          ...e,axes:['inline'] as const,
+          rows:e.rows.map(row=>({...row,rect:{
+            ...(row.rect.inlineStart!==undefined?{inlineStart:row.rect.inlineStart}:{}),
+            ...(row.rect.inlineSize!==undefined?{inlineSize:row.rect.inlineSize}:{}),
+          }})),
+        });
+    });
+    const result=verifyInterpolatedPredicate({
+      profile,from,to,evidence:rows,predicate,
+      interpolation:{kind:'shared-affine',easing:derived.easing,assumptions},
+    });
+    return {
+      ...result,
+      derivation:{kind:derived.kind,groups:derived.groups,easing:derived.easing,targets:derived.targets},
+    };
+  }catch(e){return {status:'unknown',reason:errorText(e),assumptions:[]}}
 }

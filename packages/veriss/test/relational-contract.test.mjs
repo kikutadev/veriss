@@ -128,3 +128,17 @@ test('geometry reports cannot be relabeled with a different fixed media environm
     // @ts-expect-error deliberate invalid media value
     assert.throws(() => createEnvironmentIR([{ ...p, mediaFeatures: { hover: true } }]), /mediaFeatures/);
 });
+test('convex transition invariants require both endpoints and an explicit shared progress model', async () => {
+    const { verifyInterpolatedPredicate } = await import('../src/transitions.mjs');
+    const predicate = { op: 'all', items: [cmp('ge', ref('submit', 'inlineStart'), '0'), cmp('le', ref('submit', 'inlineEnd'), { environment: 'width' })] };
+    const input = { profile, from: 'empty', to: 'loaded', evidence: evidence.entries, predicate, interpolation: { kind: 'shared-affine', easing: 'cubic-bezier(.3,.7,.2,1)', assumptions: ['Both coordinates use one bounded progress at a fixed viewport.'] } };
+    assert.equal(verifyInterpolatedPredicate(input).status, 'verified');
+    assert.equal(verifyInterpolatedPredicate({ ...input, evidence: [fact('empty', 'submit', 100)] }).status, 'unknown');
+    assert.equal(verifyInterpolatedPredicate({ ...input, evidence: [fact('empty', 'submit', 100), fact('loaded', 'submit', 400)] }).status, 'violated');
+    assert.equal(verifyInterpolatedPredicate({ ...input, interpolation: { ...input.interpolation, easing: 'cubic-bezier(.3,2,.2,1)' } }).status, 'unknown');
+    assert.equal(verifyInterpolatedPredicate({ ...input, interpolation: { ...input.interpolation, easing: 'cubic-bezier(.3,-.0000001,.2,1)' } }).status, 'unknown');
+    assert.equal(verifyInterpolatedPredicate({ ...input, interpolation: { ...input.interpolation, easing: 'steps(0)' } }).status, 'unknown');
+    assert.equal(verifyInterpolatedPredicate({ ...input, interpolation: { ...input.interpolation, assumptions: [] } }).status, 'unknown');
+    assert.equal(verifyInterpolatedPredicate({ ...input, predicate: { op: 'any', items: predicate.items } }).status, 'unknown');
+    assert.equal(verifyInterpolatedPredicate({ ...input, predicate: cmp('ne', ref('submit', 'inlineSize'), '150') }).status, 'unknown');
+});

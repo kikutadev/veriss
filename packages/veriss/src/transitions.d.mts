@@ -1,4 +1,6 @@
 import type { LayoutSummary } from './layout-contracts.d.ts';
+import type { EnvironmentProfile, GeometryEvidence, RelationalProof } from './relational-contract.mjs';
+import type { WidthBranch, WidthTransitionSourceInput } from './layout/width-transition.mjs';
 import type { LayoutIR } from './layout-contract.mjs';
 import type { LayoutModel, LayoutProof, LayoutSolverAPI, LayoutObligation } from './layout-z3.mjs';
 type Frozen<T> = T extends object ? {
@@ -84,4 +86,44 @@ export declare function createTransitionObligation(contract: NoShiftContract, tr
 export declare function verifyTransitionObligation(obligation: TransitionObligation, api: LayoutSolverAPI, options?: {
     timeoutMs?: number;
 }): Promise<NoShiftProof>;
+/** Exact endpoint invariants under a *declared* shared bounded affine progress.
+ * This alone does not prove JavaScript/CSS implements that progress model. */
+export interface SharedAffineInput {
+    profile: EnvironmentProfile;
+    from: string;
+    to: string;
+    evidence: readonly GeometryEvidence[];
+    predicate: unknown;
+    interpolation: {
+        kind: string;
+        easing: string;
+        assumptions: readonly string[];
+    };
+}
+export interface SharedAffineProof {
+    status: 'verified' | 'violated' | 'unknown';
+    reason?: string;
+    assumptions: string[];
+    endpoints?: RelationalProof;
+    progress?: {
+        min: string;
+        max: string;
+    };
+}
+export declare function verifyInterpolatedPredicate(input: SharedAffineInput): SharedAffineProof;
+/** Independent CSS-source derivation, restricted to the closed fixed-width
+ * component subset validated by deriveWidthTransition. No supplied geometry
+ * facts or invented progress assumptions are accepted. */
+export interface CSSWidthTransitionInput extends WidthTransitionSourceInput {
+    predicate: unknown;
+}
+export interface CSSWidthTransitionProof extends SharedAffineProof {
+    derivation?: {
+        kind: 'fixed-width-transition';
+        groups: WidthBranch[];
+        easing: string;
+        targets: string[];
+    };
+}
+export declare function verifyCSSWidthTransition(input: CSSWidthTransitionInput): CSSWidthTransitionProof;
 export {};

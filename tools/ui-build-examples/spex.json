@@ -1,0 +1,177 @@
+{
+  "model": {
+    "version": 1,
+    "initial": "loaded",
+    "states": [
+      "loaded"
+    ],
+    "transitions": [],
+    "profiles": [
+      {
+        "id": "chromium-overlay",
+        "ua": "chromium",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      },
+      {
+        "id": "firefox-overlay",
+        "ua": "firefox",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      },
+      {
+        "id": "webkit-overlay",
+        "ua": "webkit",
+        "viewport": {
+          "min": 320,
+          "max": 1920,
+          "height": {
+            "min": 320,
+            "max": 1080
+          }
+        },
+        "dpr": 1
+      }
+    ],
+    "contracts": [
+      {
+        "id": "main-horizontal-fit",
+        "kind": "predicate",
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "main",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "main",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "hero-horizontal-fit",
+        "kind": "predicate",
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "hero",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "hero",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "faq-horizontal-fit",
+        "kind": "predicate",
+        "predicate": {
+          "op": "all",
+          "items": [
+            {
+              "op": "compare",
+              "relation": "ge",
+              "left": {
+                "target": "faq",
+                "field": "inlineStart"
+              },
+              "right": {
+                "environment": "safeLeft"
+              }
+            },
+            {
+              "op": "compare",
+              "relation": "le",
+              "left": {
+                "target": "faq",
+                "field": "inlineEnd"
+              },
+              "right": {
+                "environment": "safeRight"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "points": [
+    [
+      320,
+      568
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      768,
+      1024
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "screens": [
+    {
+      "state": "loaded",
+      "wait": "#main",
+      "settle": 300,
+      "targets": {
+        "main": "#main",
+        "hero": "#top",
+        "faq": "#faq"
+      }
+    }
+  ],
+  "path": "/"
+}

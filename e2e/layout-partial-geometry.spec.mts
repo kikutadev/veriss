@@ -312,3 +312,153 @@ test('fixed block-axis projection preserves vertical coordinates without an intr
   }
  }
 });
+
+
+test('conditional convex transition proof agrees with a shared bounded width interpolation',async({page,browserName})=>{
+ const {verifyInterpolatedPredicate}=await import('../packages/veriss/src/transitions.mjs');
+ const {layoutGeometry,createLayoutIR}=await import('../packages/veriss/src/layout-contract.mjs');
+ const {analyzeHTML}=await import('../packages/veriss/src/html.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const source='<!doctype html><html lang="en"><head><title>QA</title></head><body><div id="outer"><div id="panel"></div></div></body></html>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}#outer{position:fixed;left:50%;top:0;transform:translateX(-50%);width:120px;height:80px;border:1px solid #123456}#panel{height:40px}';
+ const assumptions=['Fixed viewport; parent width changes between the two endpoints and all other inline coordinates depend affinely on it.'];
+ const evidence=['closed','open'].flatMap(state=>layoutGeometry({state,profile,layout:createLayoutIR(analyzeHTML(source,{css:css+(state==='open'?'#outer{width:300px}':''),viewport:profile.viewport,ua:browserName,integrity:true,scrollbars:[{name:'overlay',inlineSize:0,blockSize:0}]})),targets:['outer','panel'],local:{assumptions}}));
+ const predicate={op:'all',items:['outer','panel'].flatMap(target=>[{op:'compare',relation:'ge',left:{target,field:'inlineStart'},right:'0'},{op:'compare',relation:'le',left:{target,field:'inlineEnd'},right:{environment:'width'}}])};
+ const input={profile,from:'closed',to:'open',evidence,predicate,interpolation:{kind:'shared-affine',easing:'cubic-bezier(.3,.7,.2,1)',assumptions}};
+ expect(verifyInterpolatedPredicate(input).status).toBe('verified');
+ for(const width of [320,400,1000]){
+  await page.setViewportSize({width,height:600});
+  await page.setContent(source.replace('</head>','<style>'+css+'</style></head>'));
+  const frames=await page.evaluate(()=>{
+   const outer=document.querySelector<HTMLElement>('#outer'),panel=document.querySelector<HTMLElement>('#panel');
+   if(!outer||!panel)throw Error('Missing animated elements');
+   const animation=outer.animate([{width:'120px'},{width:'300px'}],{duration:540,easing:'cubic-bezier(.3,.7,.2,1)',fill:'both'});
+   animation.pause();
+   const frames=[];
+   for(const t of [0,1,27,81,135,270,405,539,540]){
+    animation.currentTime=t;
+    const a=outer.getBoundingClientRect(),b=panel.getBoundingClientRect();
+    frames.push({outer:{x:a.x,right:a.right,width:a.width},panel:{x:b.x,right:b.right,width:b.width}});
+   }
+   animation.cancel();return frames;
+  });
+  for(const {outer,panel} of frames){
+   expect(outer.x).toBeGreaterThanOrEqual(0);
+   expect(outer.right).toBeLessThanOrEqual(width);
+   expect(outer.width).toBeGreaterThanOrEqual(120);
+   expect(outer.width).toBeLessThanOrEqual(300);
+   expect(panel.x).toBeCloseTo(outer.x+1,1);
+   expect(panel.width).toBeCloseTo(outer.width-2,1);
+  }
+ }
+ expect(verifyInterpolatedPredicate({...input,interpolation:{...input.interpolation,easing:'cubic-bezier(.3,2,.2,1)'}}).status).toBe('unknown');
+});
+
+test('font-independent form width ignores focus paint and inactive animation metadata',async({page,browserName})=>{
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const html='<!doctype html><html lang="en"><head><title>Account settings</title></head><body><header><kbd>native</kbd></header><main id="account"><section tabindex="0" id="settings"><kbd>unknown height</kbd></section></main></body></html>';
+ const base='*{box-sizing:border-box;margin:0;padding:0}#account{max-width:640px;margin:auto;padding-inline:24px}#settings{width:100%}';
+ // Explicit tabindex is not yet admitted by the conservative projection;
+ // test the same focus-paint cascade with an independently sized container.
+ const source=html.replace(' tabindex="0"','');
+ const paint='body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}:focus-visible{outline:3px solid orange;outline-offset:4px}@media(prefers-reduced-motion:reduce){*{animation-iteration-count:1!important;animation-duration:.01ms!important;animation-fill-mode:none;transition-duration:.01ms!important}}';
+ const css=base+paint;
+ const e=required(domGeometry({state:'screen',profile,html:source,css,targets:['settings']})[0],'Missing settings geometry');
+ expect(e.axes,JSON.stringify(e)).toEqual(['inline']);
+ for(const reducedMotion of ['reduce','no-preference'] as const){
+  await page.emulateMedia({reducedMotion});
+  for(const width of [320,639,640,641,1000]){
+   const height=600;await page.setViewportSize({width,height});
+   await page.setContent(source.replace('</head>','<style>'+css+'</style></head>'));
+   const actual=await page.locator('#settings').evaluate(n=>{const r=n.getBoundingClientRect();return [r.x,r.width]});
+   const rows=required(e.rows,'Missing settings geometry rows').filter(r=>required(r.constraints,'Missing geometry constraints').every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+   expect(rows.length).toBeGreaterThan(0);
+   for(const r of rows){
+    expect(actual[0]).toBeCloseTo(value(required(r.rect.inlineStart,'Missing inlineStart'),width,height),1);
+    expect(actual[1]).toBeCloseTo(value(required(r.rect.inlineSize,'Missing inlineSize'),width,height),1);
+   }
+  }
+ }
+ for(const extra of [':focus-visible{width:200vw}','#account{animation-name:grow}@keyframes grow{to{width:200vw}}']){
+  expect(domGeometry({state:'screen',profile,html:source,css:css+extra,targets:['settings']})[0]?.rows).toBeUndefined();
+ }
+});
+
+test('shared progress can prove clearance of two moving workspace panes, not just a navigation width',async({page,browserName})=>{
+ const {verifyInterpolatedPredicate}=await import('../packages/veriss/src/transitions.mjs');
+ const {layoutGeometry,createLayoutIR}=await import('../packages/veriss/src/layout-contract.mjs');
+ const {analyzeHTML}=await import('../packages/veriss/src/html.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1000,height:{min:320,max:900}}};
+ const source='<!doctype html><html lang="en"><head><title>Workspace</title></head><body><aside id="palette"></aside><main id="workspace"></main></body></html>';
+ const base='*{margin:0;padding:0;box-sizing:border-box}#palette{position:fixed;top:0;left:0;width:48px;height:80px}#workspace{position:fixed;left:56px;right:0;top:16px;height:80px}';
+ const expanded='#palette{width:136px}#workspace{left:144px;height:120px}';
+ const assumptions=['Both panes share the same interpolation progress at a fixed viewport.'];
+ const extract=(state:string,css:string)=>layoutGeometry({state,profile,layout:createLayoutIR(analyzeHTML(source,{css,viewport:profile.viewport,ua:browserName,integrity:true,scrollbars:[{name:'overlay',inlineSize:0,blockSize:0}]})),targets:['palette','workspace'],local:{assumptions}});
+ const before=extract('compact',base),after=extract('editing',base+expanded);
+ const predicate={op:'all',items:[
+  {op:'compare',relation:'le',left:{op:'add',items:[{target:'palette',field:'inlineEnd'},'8']},right:{target:'workspace',field:'inlineStart'}},
+  {op:'compare',relation:'le',left:{target:'workspace',field:'inlineEnd'},right:{environment:'width'}},
+  {op:'compare',relation:'le',left:{target:'workspace',field:'blockEnd'},right:{environment:'height'}}
+ ]};
+ const input={profile,from:'compact',to:'editing',evidence:[...before,...after],predicate,interpolation:{kind:'shared-affine',easing:'linear',assumptions}};
+ expect(verifyInterpolatedPredicate(input).status).toBe('verified');
+ expect(verifyInterpolatedPredicate({...input,evidence:[...before,...extract('editing',base+expanded+'#workspace{left:120px}')] }).status).toBe('violated');
+ for(const width of [320,480,1000]) {
+  await page.setViewportSize({width,height:480});
+  await page.setContent(source.replace('</head>','<style>'+base+'</style></head>'));
+  const samples=await page.evaluate(()=>{
+   const p=document.querySelector<HTMLElement>('#palette'),w=document.querySelector<HTMLElement>('#workspace');
+   if(!p||!w)throw Error('Missing workspace panes');
+   const a=p.animate([{width:'48px'},{width:'136px'}],{duration:400,fill:'both',easing:'linear'});
+   const b=w.animate([{left:'56px',height:'80px'},{left:'144px',height:'120px'}],{duration:400,fill:'both',easing:'linear'});
+   a.pause();b.pause();
+   const result=[];
+   for(const t of [0,1,80,160,240,320,399,400]) {
+    a.currentTime=b.currentTime=t;
+    const x=p.getBoundingClientRect(),y=w.getBoundingClientRect();result.push({clearance:y.x-x.right,right:y.right,bottom:y.bottom});
+   }
+   // Moving only the palette proves why common progress must be an assumption.
+   a.currentTime=400;b.currentTime=0;
+   const asynchronous=w.getBoundingClientRect().x-p.getBoundingClientRect().right;
+   a.cancel();b.cancel();return {result,asynchronous};
+  });
+  for(const r of samples.result){expect(r.clearance).toBeCloseTo(8,1);expect(r.right).toBeCloseTo(width,1);expect(r.bottom).toBeLessThanOrEqual(480.05)}
+  expect(samples.asynchronous).toBeLessThan(0);
+ }
+});
+
+test('closed CSS width transition derivation covers responsive intermediate geometry',async({page,browserName})=>{
+ const {verifyCSSWidthTransition}=await import('../packages/veriss/src/transitions.mjs');
+ const profile={id:'web',ua:browserName,viewport:{min:320,max:1920,height:{min:320,max:1080}}};
+ const html='<!doctype html><html lang="en"><head><title>QA</title></head><body><section id="tray" data-open="false"><div id="contents"></div><div id="toolbar"></div></section></body></html>';
+ const css='*{box-sizing:border-box;margin:0;padding:0}#tray{display:flex;flex-direction:column-reverse;position:fixed;left:50%;top:0;height:100px;transform:translateX(-50%);width:min(230px,100vw - 24px);transition:width .54s cubic-bezier(.3,.7,.2,1),opacity .2s ease;border:1px solid #333}#tray[data-open=true]{width:min(344px,100vw - 22px);opacity:.9}#contents{height:20px;min-width:0;flex:none}#toolbar{height:40px;min-width:0;flex:none}@media(width>=1025px){#tray{width:258px}#tray[data-open=true]{width:358px}}';
+ const predicate={op:'all',items:['tray','contents','toolbar'].flatMap(target=>[{op:'compare',relation:'ge',left:{target,field:'inlineStart'},right:'0'},{op:'compare',relation:'le',left:{target,field:'inlineEnd'},right:{environment:'width'}}])};
+ const input={html,css,profile,target:'tray',stateAttribute:'data-open',from:'false',to:'true',predicate};
+ const proof=verifyCSSWidthTransition(input);
+ expect(proof.status,JSON.stringify(proof)).toBe('verified');
+ expect(verifyCSSWidthTransition({...input,css:css.replace('translateX(-50%)','none')}).status).toBe('violated');
+ expect(verifyCSSWidthTransition({...input,css:css.replace('.3,.7,.2,1','.3,2,.2,1')}).status).toBe('unknown');
+ for(const width of [320,365,366,367,1024,1025,1920]){
+  await page.setViewportSize({width,height:600});
+  await page.setContent(html.replace('</head>','<style>'+css+'</style></head>'));
+  const frames=await page.evaluate(()=>{
+   const tray=document.querySelector<HTMLElement>('#tray'),read=()=>['tray','contents','toolbar'].map(id=>{const element=document.getElementById(id);if(!element)throw Error('Missing '+id);const r=element.getBoundingClientRect();return {x:r.x,right:r.right,width:r.width}});
+   if(!tray)throw Error('Missing tray');
+   const before=read();tray.dataset.open='true';void tray.offsetWidth;
+   const animation=tray.getAnimations().find(a=>'transitionProperty' in a&&a.transitionProperty==='width');
+   if(!animation)throw Error('Expected authored width transition');
+   animation.pause();const frames=[];
+   for(const t of [0,1,27,81,135,270,405,539,540]){animation.currentTime=t;frames.push(read())}
+   return {before,frames};
+  });
+  const end=required(required(frames.frames.at(-1),'Missing final frame')[0],'Missing final tray');
+  const initial=required(frames.before[0],'Missing initial tray');
+  for(const f of frames.frames){
+   const root=required(f[0],'Missing animated tray');
+   expect(root.width).toBeGreaterThanOrEqual(initial.width-.1);
+   expect(root.width).toBeLessThanOrEqual(end.width+.1);
+   for(const r of f){expect(r.x).toBeGreaterThanOrEqual(0);expect(r.right).toBeLessThanOrEqual(width)}
+   for(const child of f.slice(1)){expect(child.x).toBeCloseTo(root.x+1,1);expect(child.width).toBeCloseTo(root.width-2,1)}
+  }
+ }
+});

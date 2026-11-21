@@ -338,3 +338,16 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - Complete focused Playwright suite across Chromium, Firefox, WebKit on 7715427: **663 total, 453 passed / 210 existing baseline skips, zero unexpected failures**; supervised exit 0, 992 process records tracked / zero remaining. Includes complete accessibility, CLS facts and UA-profile suites. The previously failing 7 accessibility, 6 CLS and 3 WebKit UA-profile cases now pass or have explicit Unknown for the WebKit grid-text-overflow case; known browser variation was not silently reclassified as verified.
 - Full ordinary unit suite on 7715427: root 33, veriss 782, adapter-core 66, React 12, Vue 6, Svelte 12 — **911 passed, zero failures**. Strict TypeScript compile/build-output parity check passed; independent MoonBit CSS oracle with 5000 seeds passed 18/18.
 - d36d974 merges the concurrently advanced origin/main rule-catalog demo into this TypeScript branch. The sole conflict was the handoff document; preserved both the catalog publication notes and this browser-quality record; library source/test files did not conflict. Working tree clean. Re-run the full mandatory gate on the merged HEAD before pushing either branch; fetch again to preserve later main changes. This checkpoint does not claim native classic scrollbars were measured on a Mac, or that Firefox implements display transitions with allow-discrete.
+
+### 幅遷移の型付き移植（実装中、2026-11-22）
+
+- 旧 JavaScript の \`verifyInterpolatedPredicate\` と CSS から閉じた幅遷移を導出する
+  \`verifyCSSWidthTransition\` を現行の \`.mts\` に実装し、生成 \`.mjs\` と公開型も再生成。
+  既存の relational/1、幾何抽出、CSS lexer、easing 領域判定を再利用する。
+- 固定 viewport、単一の data-attribute 変化、全枝の単調な幅、同一 bounded progress、
+  非幾何 CSS の固定、overlay gutter などを守れない入力は Unknown。
+  任意 JS・コンテナ依存・異なる timing・複数アニメーションは証明外。
+- 旧枝のアプリ別 hash 固定の island audit runner は、旧スナップショット/ビルドに
+  依存する研究用再生プログラムとして履歴に保存する。新 main の汎用 API に
+  依存させず、各プロジェクトが現行ビルドで再監査する。横幅の汎用
+  モデルと複数アプリの JSON 契約例は移植対象。
