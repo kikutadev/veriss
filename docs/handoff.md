@@ -289,3 +289,9 @@ main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して
   `tools/gate.sh` exit 0、ルートと5パッケージのテスト失敗0、component-lint
   eval 4回変化なし、必須の3ブラウザE2E 411/411成功。終了後の
   Playwright Chrome 残留は検査対象プロジェクトで0。
+
+### Fork site correction (2026-11-21)
+
+- User-facing acceptance condition: the fork URL must expose the fork verifier's **real behavior**, not only reuse the original site's static tables/screenshots with a fork badge. The previous published version did the latter and was not an adequate implementation of the request.
+- Implemented a browser-bundled static verifier on the first screen with editable HTML/CSS, warnings/Unknown status, NG/OK presets (including upstream F116/F129/F133), and sandboxed visual preview. Original 13-category table and 15 representative images remain as reference. TypeScript migration and Lean checker descriptions are separate from actual runtime diagnostics.
+- Site generation now requires the `esbuild` dev dependency to emit `demo.js` alongside `index.html` and images. The Pages `gh-pages` branch is manually published: no GitHub Actions. Before declaring done, test actual browser interactions on the **public URL**, including repair eliminating a finding, an unresolved/Unknown case, and a narrow mobile viewport.

@@ -4,6 +4,7 @@
 import {readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
+import {buildSync} from 'esbuild';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const docs = fileURLToPath(new URL('../../docs/', import.meta.url));
@@ -82,4 +83,5 @@ for(const filename of readdirSync(join(docs,'rule-catalog')))
 const nav=sections.map(({id,title})=>`<a href="#${id}">${inline(title)}</a>`).join('');
 const page=template.replace('<!--NAV-->',nav).replace('<!--BODY-->',out.join('\n'));
 writeFileSync(join(outDir,'index.html'),page);
+buildSync({entryPoints:[join(here,'demo.mjs')],outfile:join(outDir,'demo.js'),bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true,logLevel:'silent'});
 console.log(`${outDir}/index.html: ${sections.length} sections, ${readdirSync(join(outDir,'img')).length} images`);
