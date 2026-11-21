@@ -8,11 +8,7 @@ Unknown is never turned into success: what the model does not cover is reported 
 
 ## Try the product
 
-**[Check a public site URL](https://kikutadev.github.io/veriss/#live-check)**: paste an HTTP(S) URL into the first field, click **URLを検査**, and inspect layout diagnostics and their viewport witnesses. A small Cloudflare Worker fetches the server-rendered HTML, linked CSS (up to eight sheets) and inline styles; the existing TypeScript veriss engine verifies the captured source in a separate browser Worker. The site itself is not executed.
-
-This URL mode is **static source analysis, not full live-page verification**. JavaScript-generated DOM/CSS, stylesheets that could not be fetched, and unexpanded CSS @import cause a **partial/Unknown** result; actual detected errors are still listed. The URL endpoint rejects local/private-network URL syntax, credentials and nonstandard ports and caps HTML at 240 KB, individual CSS at 220 KB and total CSS at 300 KB. Pages that need login and browser-rendered interactions are not supported. In the result, **VERIFIED** only applies to the declared static model, not the visual site as a whole.
-
-**[Try the editable responsive example](https://kikutadev.github.io/veriss/#live-check)**: the preset intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS and change the viewport width range.
+**[Try the live responsive verifier](https://kikutadev.github.io/veriss/#live-check)**: the first example intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS and change the viewport width range.
 
 **Use it with files** (Node 24+, pnpm 12; this fork is not published to npm):
 
@@ -67,9 +63,6 @@ pnpm build:text-metrics   # MoonBit (moon), only after changing text-metrics/; t
 pnpm build:oracle         # MoonBit, the differential cascade oracle used by tests
 pnpm test                 # node --test, every package
 pnpm test:e2e -- --project chromium   # browser checks (also firefox, webkit)
-pnpm run build:ts                  # regenerate the TypeScript-origin Worker and browser modules
-node tools/rule-catalog/build-page.mjs _site  # build GitHub Pages, including worker.js
-pnpm dlx wrangler deploy --config tools/url-check/wrangler.toml  # publish the source collector
 ```
 
 ## Independent proof checker (opt-in research)

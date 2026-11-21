@@ -427,14 +427,3 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - 2026-11-22 release gate: `pnpm build:ts`, `pnpm check:ts`、新規CLI/デモ6件成功。guarded `tools/gate.sh` はexit 0、root＋全5 package fail=0、component-lint eval4回差分なし、3ブラウザーの対象E2E **549 passed**（7.7分）、作業プロジェクトのChrome残留0。公開ページのQAは別に記録する。
 
 - 2026-11-22 publication acceptance: fork `main` `93bacf0`, Pages `gh-pages` `50dde81` へfast-forward push。実公開URLでNGのエラー1+警告1・443.5px反例、修正後0件、Unknown1件、critical CSS 2保持/1分離、390pxでページ横溢れ0を確認。別プロジェクトへのGit-pinned installとCLIのZ3 VERIFIEDも成功。現行リリースの範囲はPhase 0/1で、実アプリ3件評価・Leanの自動結合は未完了。
-
-
-### 公開URLからの検査 — 次の製品入口 (2026-11-22)
-
-- GitHub Pages上のURLフォーム → Cloudflare Worker (veriss-url-source) → 静的HTML/CSS収集 → verissブラウザーWorker。コア解析器は新規作成せず既存のrun()を再利用。HTTP取得先は https://veriss-url-source.kikutadev.workers.dev/scan （収集のみ、認証とJS実行なし）。
-- 公開ホスト名のHTTP(S)・標準ポートのみ、リダイレクトも同様に検査。HTML 240KB、CSS各220KB/合計300KB、最大8シート、最大3リダイレクト。Cloudflareの global_fetch_strictly_public を使用。取得不足・JS・CSS @import はUnknownの理由に出し、検査範囲を成功に格上げしない。
-- URLフォームからの解析は専用Web Workerに分離し18秒上限。取得HTMLをプレビューiframeで描画・実行しない。ユーザーはHTML/CSSエディタで編集後再検査可能。NG→OKサンプルとCLIは維持。
-- 実サイトHTMLは複数rootの断片として扱うと検証器に拒否されたため、html/body rootとmeta viewportを保持する収集に修正。URL E2Eの初回期待値誤りは、テスト用HTMLのlang欠落をverissが正しく違反検出したため。修正後のChromium・Firefox・WebKit合計12件成功。
-- https://kikuta.dev/ と https://kikuta.dev/about/ を実ブラウザーで検査し、実CSS回収と診断表示を確認。JavaScript由来のUnknownも保持。GitHub Pages公開確認は反映後に追記。
-
-- 2026-11-22 URL release acceptance: guarded tools/gate.sh exit 0、root＋全5 package fail=0、component-lint eval一致、3ブラウザー **564 passed**（URL追加15件を含む）。fork main に 1707313、gh-pages に 878cf46 をpush。公開URLの実ブラウザーで kikuta.dev/about/ のURL入力→HTML+CSS解析→ UNKNOWN / エラー1 / 警告7 / Unknown4、既存NG/OK/Unknown、390pxでoverflowなしを確認。Workerは veriss-url-source.kikutadev.workers.dev。静的ソースの検査のみでJS実行後のサイト全体保証ではない。

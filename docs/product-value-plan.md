@@ -63,6 +63,10 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - リリース条件: 型チェック・単体テスト・既存 `tools/gate.sh` と3ブラウザーE2Eの成功／残差の明示、配布対象でのCLIのエンドツーエンド、公開した Pages で NG→OK→Unknown の実操作。作業中ブランチの変更は触らない。
 - 未達の Phase を「完了」と表示しない。変更内容を `docs/handoff.md` に記録する。
 
+### URL検証の非採用（2026-11-22）
+
+任意の公開URLをブラウザ上の静的GitHub Pagesだけで取得することはCORSにより一般には不可能。Cloudflare Workerはリクエスト枠を消費するため、ユーザーの判断でURL入力と取得Workerを公開・コードともに撤回した。Workerは削除し、URL機能導入前のデモ（HTML/CSS直接入力、NG→OK、CLI）へ戻した。実装記録はGit履歴と `url-first-site-check` ブランチに残るが現行の製品機能には含めない。
+
 ## 5. 作業状況
 
 - 2026-11-22: Phase 0・1に着手。ベースは `ad2f316`。別担当の `axis-independent-proof` ワークツリーに未コミット変更があるため、独立 `product-value-mvp` で実装。
@@ -86,36 +90,3 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - <https://kikutadev.github.io/veriss/> の実ブラウザーで初期 NG→修正後OK、443.5px反例、Unknown、初期表示CSS 2規則保持・1規則分離、390px viewport で横はみ出しなしを確認。
 - 別の空プロジェクトに `pnpm add github:kikutadev/veriss#93bacf0&path:packages/veriss` でGitコミット指定インストール成功し、`pnpm exec veriss check` で `VERIFIED`。これにより tarball に加えてGit依存の配布も確認。
 - **Phase2未着手**: 3つの異種実UIでの有効検出・誤検知・Unknownの実証はこのリリースに含まない。
-
-## 6. 追加優先機能: URLを貼って検証 (2026-11-22)
-
-ユーザーからの要望により、P2の評価対象に入る前に **URL入力を最短の導入経路** として追加する。既存のHTML/CSS貼り付け・CLI・初期NG→OKデモは残す。
-
-### 今回の到達条件
-
-- [x] 公開サイトの初画面でURL入力→検査ボタン→実際の結果を表示。入力したURLのHTML・外部CSS・styleタグを実際に取得する (架空の診断は使わない)
-- [x] GitHub PagesはブラウザCORSを越えられないので、小さな公開HTTP取得Workerを用意。Workerは「公開ページの静的ソース収集」だけを担当し、verissの解析は既存ブラウザエンジンを再利用
-- [x] URL入力→レスポンス→HTML/CSS解析で、完全にモデル化できていないケースは `UNKNOWN` と説明する。script、CSS未取得、@import、容量上限は被覆不足と表示。検出された具体的エラーはUnknownと併記し、成功とはみなさない
-- [x] URLのpublic HTTP(S)・標準ポートを対象。内部アドレス、明示的認証情報、非標準ポート、巨大レスポンスを拒否。リダイレクト先・CSSの個別URLも同じ検査を通す。短時間で打ち切る
-- [x] 実Webサイト複数種とNG/OKの固定フィクスチャで検証し、スマホでの操作・ブラウザでの入力状態・公開エンドポイントのHTTPレスポンスを確認してから公開
-- [x] 既存のゲートに加えて新しい収集層・UIの回帰テストを通す。公開先、対応範囲、利用制限をREADMEとサイトに記載する
-
-### v1の線引き
-
-**ページをレンダリングして実行時DOMを証明する機能ではない**。まず静的HTTPレスポンスのHTML/CSS取得を提供する。JSによるDOM生成、ページ遷移、CSS-in-JS、外部フォント・画像の実測、認証サイト等は検査範囲外。ブラウザ再現モードは独立した拡張として、ユーザーに価値のある報告ができた後に判断する。Web用に別のレイアウト検証器を作らない。
-
-この追加は以前の「URLクロールは将来」の段階的優先順位を、ユーザーの最短導入ニーズに合わせて修正したもの。
-
-
-### 実装後の確認（公開前）
-
-- Cloudflare Worker https://veriss-url-source.kikutadev.workers.dev/scan を公開し、example.com、kikuta.dev と kikuta.dev/about のHTML/CSS取得に成功。動的画面のUnknownを保持。
-- Browser Worker でモデル分析を分離。実ページの複数rootで一度エラーになり、html/body rootを正しく保持して修正。画面からURL入力→結果まで実動作を確認。
-- 収集器の6単体テスト、URLフォームのChromium/Firefox/WebKit 12 E2E成功。残りの全体ゲート・main・GitHub Pages公開前はリリース済みと扱わない。
-
-### URL検査の正式公開と受入（2026-11-22）
-
-- tools/gate.sh を独立監視ランナーから実行しexit 0。root+5パッケージの単体テスト fail=0、component-lint eval差分なし、Chromium/Firefox/WebKitの既存+追加E2E **564 passed**（10.6分）。新URL経路の単独3ブラウザーE2Eは **15/15 passed**。追加単体含む対象12/12通過、TypeScript生成一致。Chrome残留なし。
-- fork main にURL機能の 1707313 をfast-forward統合。gh-pages は 878cf46 に静的ビルド（index.html、demo.js、worker.js）のみ公開。GitHub Actionsは使用していない。
-- 実公開URL https://kikutadev.github.io/veriss/#live-check で https://kikuta.dev/about/ を入力し、静的HTML 4957文字、CSS 45818文字を取得。UNKNOWN / エラー1件 / 警告7件 / Unknown4件 と検証不完全部分を表示することを確認。Cloudflare Worker: https://veriss-url-source.kikutadev.workers.dev/scan 。公開サイトのサンプルNG→OK→Unknownと、390px画面で横はみ出しなしも確認。
-- **これはURLから取得した静的ソースの検証**であり、JS実行後の全DOM状態やサイト全体の正しさの保証ではない。Phase2（3つ以上の異種UIの価値検証）とPhase3（Lean統合）は未完了。

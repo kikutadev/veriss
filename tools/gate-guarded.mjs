@@ -135,16 +135,14 @@ else {
     setInterval(() => browser.isConnected(), 1000);
   `;
     const transitionE2E = process.argv[2] === '--transition-e2e';
-    const urlE2E = process.argv[2] === '--url-e2e';
-    const command = (transitionE2E || urlE2E) ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
-    const args = urlE2E ? ['exec', 'playwright', 'test', '-c', 'playwright.layout.config.mjs', '--trace', 'off', 'e2e/layout-url-first-site.spec.mjs', '--reporter=line']
-        : transitionE2E
-            ? ['exec', 'playwright', 'test', '-c', 'playwright.layout.config.mjs', '--trace', 'off',
-                'e2e/layout-partial-geometry.spec.mjs', '-g',
-                'conditional convex|font-independent form|shared progress can|closed CSS width',
-                '--reporter=line']
-            : browserProbe ? ['--input-type=module', '-e', browserScript]
-                : probe ? ['-c', 'sleep 60'] : ['tools/gate.sh'];
+    const command = transitionE2E ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
+    const args = transitionE2E
+        ? ['exec', 'playwright', 'test', '-c', 'playwright.layout.config.mjs', '--trace', 'off',
+            'e2e/layout-partial-geometry.spec.mjs', '-g',
+            'conditional convex|font-independent form|shared progress can|closed CSS width',
+            '--reporter=line']
+        : browserProbe ? ['--input-type=module', '-e', browserScript]
+            : probe ? ['-c', 'sleep 60'] : ['tools/gate.sh'];
     const gate = spawn(command, args, {
         cwd: root,
         env: process.env,
