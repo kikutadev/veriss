@@ -1044,7 +1044,8 @@ async function runtime(page, sample) {
             const sides = { top: [[cx, r.top + 0.5], [cx, r.top - 3]], bottom: [[cx, r.bottom - 0.5], [cx, r.bottom + 3]], left: [[r.left + 0.5, cy], [r.left - 3, cy]], right: [[r.right - 0.5, cy], [r.right + 3, cy]] };
             // An outside sample off the viewport falls back to another side's outside sample (the same backdrop).
             const onScreen = ([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight;
-            const around = Object.values(sides).map(([, out]) => out).find(onScreen);
+            // Prefer the outside of a vertical edge: the next grid row can contain unrelated text.
+            const around = [sides.right[1], sides.left[1], sides.top[1], sides.bottom[1]].find(onScreen);
             if (!around)
                 return null;
             const pair = ([edge, out]) => [edge, onScreen(out) ? out : around];

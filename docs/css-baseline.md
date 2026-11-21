@@ -66,6 +66,8 @@ e2e(Chromium で 390 件)のうち、Firefox で 34 件、WebKit で 43 件が C
 - `ua: { base: 'webkit', button: { padding: ['0px', '10px', '0px', '10px'] } }`: profile の一部を置き換えた初期条件(社内の基準のブラウザー、独自の UA の想定など)。
 - 省略したとき: これまでどおり。ボタンと range は Chromium の値、ほかの部品の UA の padding・border・margin は Unknown。
 
+**プラットフォーム差（macOS の Playwright WebKit 27.2 で実測）:** `webkit` の既定 profile は上記の Linux 測定値であり、macOS では同じ名前でも UA CSS が異なります。macOS では text input の padding が上/右/下/左 = `2px 5px 2px 5px`、textarea も同じ、button は `0px 6px 1px 6px` です。3ブラウザの矩形照合は `ua: {base: 'webkit', textField: {padding: [...]}, textarea: {padding: [...]}, button: {padding: [...]}}` という既存の明示オーバーライド機能を使い、Mac版WebKitでも15件の比較が成立することを確認しました。`ua: 'webkit'` が実行環境を自動判別するわけではありません。未測定のOS/バージョンはその値を証明済みの前提として扱わず、実測値やCSS resetを渡してください。
+
 `ua` を指定すると、作者が padding と border を書いていない入力欄も、その profile の値で解析できます。各ブラウザーで、何も指定していない部品(content-box の入力欄と textarea、ボタン、チェックボックスと radio の margin)の位置と大きさが、そのブラウザーの profile のモデルと一致することを確かめました(`e2e/layout-ua-profiles.spec.mjs`)。CLI では `css-lint --ua webkit`。
 
 ## 最小の CSS Reset の提案

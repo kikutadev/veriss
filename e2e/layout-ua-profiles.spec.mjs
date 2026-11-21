@@ -17,13 +17,23 @@ const cases = [
 ];
 const common = '.g{display:grid;grid-template-columns:minmax(0,1fr);justify-items:start;align-content:start}.after{inline-size:40px;block-size:10px}';
 const value = (a) => evaluateAffine(a, 400, 300);
+// Playwright WebKit 27.2 on macOS has different UA control paddings from the
+// measured Linux WebKit profile. The contract accepts explicit platform overrides;
+// test them without silently changing the Linux baseline used by consumers.
+const macWebkit = {
+    base: 'webkit',
+    textField: { padding: ['2px', '5px', '2px', '5px'] },
+    textarea: { padding: ['2px', '5px', '2px', '5px'] },
+    button: { padding: ['0px', '6px', '1px', '6px'] },
+};
+const browserUA = (engine) => engine === 'webkit' && process.platform === 'darwin' ? macWebkit : engine;
 for (const [name, html, css] of cases) {
     test(`${name}: the browser's UA profile places the control and the box after it as the browser does`, async ({ page }, testInfo) => {
         const ua = testInfo.project.name;
         if (ua !== 'chromium' && ua !== 'firefox' && ua !== 'webkit')
             throw new Error('Unknown browser profile: ' + ua);
         const sheet = reset + common + css;
-        const report = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, { name: 'P', css: sheet, viewport: { min: 400, max: 400, height: { min: 300, max: 300 } }, ua });
+        const report = analyzeHTML(`<html lang="en"><body>${html}</body></html>`, { name: 'P', css: sheet, viewport: { min: 400, max: 400, height: { min: 300, max: 300 } }, ua: browserUA(ua) });
         expect(report.status === 'unknown', `${ua}: ${JSON.stringify(report.diagnostics.map(d => d.message))}`).toBe(false);
         await page.setViewportSize({ width: 400, height: 300 });
         await page.setContent(`<!doctype html><html lang="en"><head><style>${sheet}</style></head><body>${html}</body></html>`);
