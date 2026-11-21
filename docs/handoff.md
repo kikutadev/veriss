@@ -254,3 +254,38 @@ main側の回帰テストと3ブラウザE2Eを TypeScript から再生成して
 **完了条件**: 上流コミットの取り込み、上流新規テストの TypeScript 化、生成 JS 一致、検証ゲート、最新 fork `main` への統合、GitHub Actions を使用しない静的ページ配布、公開 URL で表示・検索・リンク・スマホ幅を確認すること。
 **方針**: ルールデータ・NG/OK 画像・ページ生成器は上流の実装を活用。追加機能は独立したフォーク拡張を明示し、未検証の Lean の範囲は証明済みと表示しない。公開ファイルは `gh-pages` ブランチに生成物のみを置き、CI / GitHub Actions は追加しない。
 **現在**: 変更の一次移植とブラウザー差の復元が完了。上流・並行 `main` の統合、Webページのフォーク向け調整、三ブラウザー検証と公開作業が残る。
+
+## Lean独立証明チェッカーのTypeScript mainへの統合とFirefox修復（2026-11-21）
+
+- main の TypeScript 移行完了コミット `0c2e0c5` を第1親として、
+  `lean-certificate-checker` の研究成果を競合なく統合。研究コードは
+  `experiments/lean/` にあり、証明/仕様/検証手順の正本は
+  [README](../experiments/lean/README.md) と DESIGN.md。既存
+  TypeScript runtime の判定を Lean 経由へ勝手に置き換えていない。
+- macOS 27 / Playwright Firefox 157 が headless で
+  `Could not find profile folder` となる問題を再現。作業用
+  `-profile` の欠落ではなく、OSに保護される共有 Firefox app-data
+  への依存だった。個別 `MOZ_APP_DATA` と
+  `MOZ_LOCAL_APP_DATA` を `tools/firefox-app-data.mts` で作成し、
+  `playwright.layout.config.mts` と Lean のブラウザ試験から適用。
+  終了時に作業用領域を回収し、ユーザーのFirefoxプロファイルを触らない。
+  `.mts` を正本、`.mjs` / `.d.mts` を生成して追跡する。
+- 連続性の保証は分離: Lean の定理は閉じたCSS文法/正規化された
+  幾何モデルに対するものであり、全CSS・任意JS・描画結果そのものの
+  完全証明ではない。TypeScript本体とのIR自動連携、多子証明合成など
+  は元の研究計画の未完了項目として残す。
+- Chromeを含む長時間 gate の実行には `node tools/gate-guarded.mjs`
+  を使い、専用プロセスグループと独立監視でrunner強制終了時にも
+  そのgateだけを回収する。ChromeはPlaywrightによってさらに別の
+  プロセスグループで起動されるため、監視側で **gateの子孫だった
+  Chrome本体のPID** を別途記録する。プロセス名による一括停止は禁止し、
+  PID・起動オプションを再検証してからそのChromeグループだけ停止する。
+  実際のChromiumを起動したrunnerをSIGKILLした試験で、
+  Chrome本体＋子プロセスの回収成功・別プロセスへの作用なしを確認した。
+- 統合後の受入（2026-11-21）: `pnpm build:ts` と `pnpm run check:ts`
+  成功。Lean既存/新規177件成功、独立カーネルで具体的証明書38件成功。
+  形式CSSとの実測はChromium 49/49、Firefox 49/49、WebKit 49/49
+  （誤差は各々0.0125、0.00000611、0.0125 CSS px、許容差0.03125px）。
+  `tools/gate.sh` exit 0、ルートと5パッケージのテスト失敗0、component-lint
+  eval 4回変化なし、必須の3ブラウザE2E 411/411成功。終了後の
+  Playwright Chrome 残留は検査対象プロジェクトで0。

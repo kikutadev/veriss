@@ -36,6 +36,16 @@ pnpm test                 # node --test, every package
 pnpm test:e2e -- --project chromium   # browser checks (also firefox, webkit)
 ```
 
+## Independent proof checker (opt-in research)
+
+[experiments/lean/README.md](experiments/lean/README.md) documents the
+separate Lean 4 checker for exact geometry certificates, declared state
+reachability, finite dispatch, affine parent/child composition, restricted
+CSS source/cascade binding, and shared-progress motion models. Its checker
+does not run automatically in the packages or claim browser-wide correctness;
+unsupported CSS/JS remains outside its proven subset. The TypeScript sources
+and generated ESM in `packages/` remain the ordinary veriss runtime.
+
 ## Docs
 
 - [Rule catalog](https://mizchi.github.io/veriss/) (`docs/rule-catalog.md`) — the checks by role, with NG / OK examples
