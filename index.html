@@ -76,16 +76,6 @@ tr[hidden]{display:none}
 #live-check{padding:16px 0 20px;margin-bottom:38px;border-bottom:2px solid var(--line)}
 #live-check h2{font-size:clamp(23px,3vw,29px);border:0;padding:0;margin-bottom:4px}
 .demo-intro{color:var(--muted);font-size:13px;margin:4px 0 18px}
-.url-check{margin:16px 0 22px;padding:0 0 20px;border-bottom:1px solid var(--line)}
-.url-check>label{display:block;font-size:14px;font-weight:700;margin-bottom:8px}
-.url-check .url-row{display:flex;gap:8px;min-width:0}
-.url-check input{box-sizing:border-box;flex:1;min-width:0;padding:12px 13px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:7px;font:15px var(--mono)}
-.url-check button{border:1px solid var(--fg);background:var(--fg);color:var(--bg);border-radius:7px;font:700 14px var(--sans);padding:9px 18px;cursor:pointer;white-space:nowrap}
-.url-check button:disabled{opacity:.55;cursor:wait}
-.url-check .url-status{display:block;font-size:12px;color:var(--muted);margin-top:7px;overflow-wrap:anywhere}
-.url-check .url-status[data-status=error]{color:#d44141}
-.url-check .url-status[data-status=ok]{color:var(--ok)}
-.demo-divider{color:var(--muted);font:600 11px var(--mono);letter-spacing:.04em;margin:0 0 10px}
 .demo-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
 .demo-toolbar label,.demo-input label{font-size:13px;font-weight:700}
 .demo-toolbar select,.demo-toolbar button,.demo-input textarea{font:13px/1.6 var(--mono);border:1px solid var(--line);border-radius:6px;color:var(--fg);background:var(--surface)}
@@ -117,31 +107,22 @@ tr[hidden]{display:none}
 #demo-critical-status{display:block;margin:10px 0;color:var(--fg);font-size:13px}
 #demo-critical-css{font:12px/1.5 var(--mono);white-space:pre;overflow-x:auto;max-height:270px;max-width:100%;margin:0;padding:0 8px;background:var(--code-bg);border-radius:6px}
 #demo-critical-css:not(:empty){padding:12px}
-@media(max-width:700px){.url-check .url-row{flex-direction:column}.url-check button{width:100%}.demo-editor-grid,.demo-output{grid-template-columns:minmax(0,1fr)}.demo-toolbar button#demo-run{margin-left:0;width:100%}.demo-preview-wrap iframe{height:180px}}
+@media(max-width:700px){.demo-editor-grid,.demo-output{grid-template-columns:minmax(0,1fr)}.demo-toolbar button#demo-run{margin-left:0;width:100%}.demo-preview-wrap iframe{height:180px}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <div class="topline"><div class="eyebrow">kikutadev / veriss · static CSS × DOM</div><div class="links"><a href="#live-check">検査を試す</a><a href="https://github.com/kikutadev/veriss">フォークのコード</a><a href="https://mizchi.github.io/veriss/">元のカタログ</a></div></div>
-  <h1>veriss — URLから壊れる画面幅を探す <span class="fork">FORK EDITION</span></h1>
-  <p>公開ページのURLを貼り付けると、HTMLとCSSを取得してレスポンシブな配置を静的検査します。まずはURLを入力するか、下のサンプルでNG→OKを試してください。</p>
+  <h1>veriss — 狭い画面だけで壊れるCSSを見つける <span class="fork">FORK EDITION</span></h1>
+  <p>たとえば幅375pxで3列のカードがはみ出す。verissは幅の範囲を解析し、壊れる条件と直した結果を確認できます。まず「修正後 OK」を押して違いを見てください。</p>
 
 </header>
 <nav aria-label="役割"><a href="#フォークで追加統合したこと">フォークで追加・統合したこと</a><a href="#全体の表">全体の表</a><a href="#1-css-の構文宣言ごと捨てられる値">1. CSS の構文(宣言ごと捨てられる値)</a><a href="#2-at-rule-とカスケード">2. at-rule とカスケード</a><a href="#3-文脈で効かない宣言">3. 文脈で効かない宣言</a><a href="#4-セレクタ--dom">4. セレクタ × DOM</a><a href="#5-html-の構造と属性">5. HTML の構造と属性</a><a href="#6-配置収まりはみ出し重なり">6. 配置(収まり・はみ出し・重なり)</a><a href="#7-画像とメディア">7. 画像とメディア</a><a href="#8-レイアウトシフトとアニメーション">8. レイアウトシフトとアニメーション</a><a href="#9-アクセシビリティ見え方と幾何">9. アクセシビリティ(見え方と幾何)</a><a href="#10-アクセシビリティ意味と構造">10. アクセシビリティ(意味と構造)</a><a href="#11-ブラウザーで結果が違うもの">11. ブラウザーで結果が違うもの</a><a href="#12-コンポーネントの境界">12. コンポーネントの境界</a><a href="#13-検査しないものunknown">13. 検査しないもの(Unknown)</a><a href="#画像の作り方">画像の作り方</a></nav>
 <main>
 <section id="live-check" aria-labelledby="live-title">
   <h2 id="live-title">RESPONSIVE CHECK <span style="font:600 11px var(--mono);vertical-align:middle;color:var(--accent)">FORK RUNTIME</span></h2>
-  <p class="demo-intro">URLから静的HTMLとCSSを取得し、verissで画面幅375–1280pxを検査します。実行時のJavaScriptや未取得のスタイルはUnknownとして区別します。</p>
-  <form class="url-check" id="url-form">
-    <label for="site-url">検査したい公開サイトのURL</label>
-    <div class="url-row">
-      <input id="site-url" type="url" placeholder="https://example.com/" autocomplete="url" inputmode="url" spellcheck="false" required aria-label="検査する公開サイトのURL">
-      <button id="site-scan" type="submit">URLを検査</button>
-    </div>
-    <output id="site-status" class="url-status" aria-live="polite">公開HTML・外部CSS・styleタグを取得します。ログインやJavaScript実行後の画面は対象外です。</output>
-  </form>
-  <p class="demo-divider">または、サンプル・HTML/CSSを直接編集</p>
+  <p class="demo-intro">実際の検証エンジンで幅375–1280pxを検査します。NG→「修正後 OK」で結果が変わります。自分のHTMLと完全なCSSを貼り付けても試せます（JS・外部CSSは実行しません）。</p>
   <div class="demo-toolbar">
     <label for="demo-case">例を選択</label><select id="demo-case"></select>
     <button id="demo-ng" type="button" aria-pressed="true">NG</button><button id="demo-ok" type="button" aria-pressed="false">修正後 OK</button>
