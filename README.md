@@ -39,6 +39,8 @@ pnpm test:e2e -- --project chromium   # browser checks (also firefox, webkit)
 ## Docs
 
 - [Rule catalog](https://mizchi.github.io/veriss/) (`docs/rule-catalog.md`) — the checks by role, with NG / OK examples
+- `docs/critical-css.md` — critical CSS: the rules the first view needs on usual phones and PCs (`@mizchi/veriss/critical`)
+- `docs/adr/0018-coordinate-subset.md` — the coordinate subset L1 of Grid and Flex as an independent Z3 reference (`models/layout/`)
 - `docs/static-check-checklist.md` — every CSS×DOM pattern, how it was measured
 - `docs/layout-checking.md` — the layout model and its subset
 - `docs/adr/` — design decisions

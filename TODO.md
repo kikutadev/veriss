@@ -14,9 +14,6 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 パターンの一覧(カテゴリ 1〜13)は F95 を除いて済み(89 / 90)。次は次の順で進める。
 
-0. **eval の基準を Chromium 156 で記録し直すか決める**: `tools/eval-component-lint.mjs` の結果(`evals/results/component-lint/`)は古い Chromium で
-   記録されている。Playwright 1.64.1 が使う Chromium 156 では文字の組み方が 0.4px ほど違い、`before` と `run-1` が変わる(320〜375px の
-   はみ出しの判定が「確かめられない」になる。見逃しではない)。基準を記録し直すか、eval をブラウザーの版に結びつけるかを決める
 1. **パターンの追加を続ける**(新しい観点を足すときはカテゴリの表と一覧の両方に足す。[検査ルール一覧](docs/rule-catalog.md) の該当する役割の表にも行を足す)。まだ調べていない候補:
    - `:focus-visible` とキーボード / マウスでの見え方の差、`:has()` の重さと無効な引数
    - (済)`@container` の単位(`cqw` / `cqh`)を container のない要素で使う(F133)。`container-type: size` で高さが 0 になるのは既存の配置の検査(`E_LAYOUT_TRACKS`)で捕まる
@@ -192,6 +189,35 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 - [x] セレクタリストの中の `-moz-` / `-ms-` の擬似で規則全体が捨てられる(F132)
 - 確かめて既存で足りていたもの: flex / grid コンテナの `text-overflow`(効かない宣言として報告済み)、中身のある `aspect-ratio`(理由付きの Unknown)
 
+## 座標計算サブセット L1 の参照仕様([ADR-0018](docs/adr/0018-coordinate-subset.md)、`models/layout/`)
+
+engine から独立した Z3 の仕様で、engine(範囲全体で UNSAT)と 3 ブラウザー(ランダムな設定)に照合する。第一段は済み。
+
+- [x] 第一段: Grid(px・`minmax(0, fr)` のトラック、gap、線での配置、self の揃え)と Flex row・nowrap(basis・grow・shrink・min、
+  justify-content、align)。中身のない項目、padding・border・margin なし
+- [ ] はみ出す center・end の揃え(既定の overflow alignment)を 3 ブラウザーで測り、L1 に入れるか決める(今は位置を比べない)
+- [ ] 第二段: padding・border・margin、`%` と `calc()`、文字を含む項目(ADR-0010 の幅の区間)
+- [ ] `flex-wrap: wrap`(行の分け方が W の区間で変わる)、column、`max-width`(伸びるときの凍結)
+- [ ] Grid の auto-placement、名前つきの線と領域、暗黙のトラック、`auto` の行、subgrid
+- [ ] 性質(はみ出さない、重ならない、W に対して単調)を仕様の上で Z3 に確かめさせる。Lean で定理にするかは未決
+- [ ] engine を仕様から作り直すか(今は照合だけ)
+
+## 壊れた状態変化の CLS と、クリティカル CSS
+
+- [x] 壊れた状態変化(12)と正しい版(6)を `models/layout/shift-cases.mjs` に。2 つの状態を同じ幅で Z3 に解かせ、動く幅を探す
+  (`models/layout/shift.mjs`)。3 ブラウザーで反例の幅の動きと Chromium の layout-shift を確かめ、engine の `E_LAYOUT_HOVER_SHIFT` とも一致
+- [x] クリティカル CSS の抽出(`packages/veriss/src/critical.mjs`、[docs/critical-css.md](docs/critical-css.md))。3 ブラウザーでファーストビューが同じ
+- [ ] Lean: L1 の定義と性質の証明、Lean の実行形を oracle にした engine との差分テスト(この環境で Lean を入れる操作が止められた。利用者の判断待ち)
+- [x] クリティカル CSS の文字: フォントで測った大きさで配置し、自由な文字列は空(いくらでも伸びうる)として配置する
+- [ ] クリティカル CSS: 文字と要素が混ざった段落、`%` の長さで Unknown にならないように
+- [x] 文字幅の型(ADR-0019、`models/text/`): OS × ブラウザーのフォントの組み合わせの区間。L1 の Flex の項目の自動の最小幅に入れ、
+  Z3 が幅とフォントを同時に探す。Linux の 3 ブラウザーの E2E の記録、MoonBit、parley の三つを照合
+- [ ] Windows・macOS の記録: workflow `text-widths` を手動で回し(main に入ってから)、job の summary を確かめ、artifact の `<platform>-widths.json` を commit する。
+  記録のないうちは互換フォントで近似(安全な側に広げる)、Segoe UI・SF Pro・Consolas・Menlo は Unknown
+- [ ] iOS・Android の記録(GitHub の runner にない。実機か、その OS のブラウザーで `tools/text-widths.mjs` を回す)
+- [ ] 文字幅の型を engine とクリティカル CSS に入れる(今は L1 の仕様だけ)。`flex-basis: auto`(max-content)と折り返す文字
+- [ ] engine の誤りを入れた版(mutant)を作り、L1 の仕様との照合で捕まることを示す
+
 ## 構成の作業([ADR-0016](docs/adr/0016-module-decomposition.md))
 
 - [x] M1. `color/` を切り出す(色の解析・重ね合わせ・輝度・比・`backdrop`)
@@ -232,6 +258,10 @@ CSS × DOM の静的検査パターンを、**カテゴリごとに洗う**。�
 
 ## 実装済み(最近)
 
+- クリティカル CSS の抽出(`@mizchi/veriss/critical`)
+- 壊れた状態変化の CLS を L1 の仕様の上で Z3 が検出(SAT の反例)、正しい版は UNSAT
+- 座標計算サブセット L1 の参照仕様(ADR-0018、`models/layout/`): engine と幅の範囲全体で一致、3 ブラウザーとランダムな設定で一致
+- eval の基準を Chromium 156 で記録し直した。結果に `browser`(記録したブラウザーの版)を書き、gate は eval が変わったときに記録と今回の版を並べて出す
 - F133. container のない軸の container query の単位(`cqw` / `cqh` が `svw` / `svh` になる)
 - F126 の健全性の修正: `clip` の横のスクロール値で `clip` を `hidden` にするのは Firefox と WebKit だけ(Chromium 156 は `clip` のまま)。`browsers` を付けて報告し、解析は Unknown
 - F26 の 3 ブラウザー照合(Firefox・WebKit でも通った)
