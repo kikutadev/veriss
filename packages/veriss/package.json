@@ -13,6 +13,10 @@
       "types": "./src/html.d.mts",
       "import": "./src/html.mjs"
     },
+    "./critical": {
+      "types": "./src/critical.d.mts",
+      "import": "./src/critical.mjs"
+    },
     "./z3": {
       "types": "./src/layout-z3.d.mts",
       "import": "./src/layout-z3.mjs"

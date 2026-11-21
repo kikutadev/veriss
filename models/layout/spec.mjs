@@ -1,0 +1,194 @@
+// The coordinate subset L1 (docs/adr/0018-coordinate-subset.md) as SMT-LIB2 (QF_LRA): an independent reference for the
+// border boxes of Grid and Flex (row, nowrap) items, written from the CSS specifications and not from the engine.
+//
+// A configuration (JSON) is turned into definitions over one variable W, the container's content-box inline size:
+//   x_k, y_k, w_k, h_k   the border box of item k (origin: the container's content box)
+//   ok_k                 true where item k's position is inside L1 (an alignment that would overflow is not)
+// Each is a declared constant fixed by an equality (assert (= x_k …)), so a model gives every value at a W. `facts` are
+// further assertions (the shrink level t). Outside L1 the generator throws (the caller treats it as Unknown).
+
+const num = v => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`not a finite number: ${v}`);
+  if (v < 0) return `(- ${num(-v)})`;
+  // A finite decimal as an exact rational.
+  const [i, f = ''] = String(v).includes('e') ? [v.toFixed(20).replace(/0+$/, '')] : String(v).split('.');
+  return f ? `(/ ${i}${f} 1${'0'.repeat(f.length)})` : `${i}.0`;
+};
+// Whether a sum of finite decimals is at least 1, exactly (the choice between two formulas must not round).
+const decimals = v => (String(v).split('.')[1] ?? '').length;
+export const sumAtLeastOne = values => {
+  const d = Math.max(0, ...values.map(decimals)), scale = 10n ** BigInt(d);
+  const scaled = v => { const [i, f = ''] = String(v).split('.'); return BigInt(i) * scale + BigInt((f + '0'.repeat(d)).slice(0, d) || '0'); };
+  return values.reduce((a, v) => a + scaled(v), 0n) >= scale;
+};
+const sum = terms => terms.length === 0 ? '0.0' : terms.length === 1 ? terms[0] : `(+ ${terms.join(' ')})`;
+const max = (a, b) => `(ite (>= ${a} ${b}) ${a} ${b})`;
+const times = (k, v) => `(* ${num(k)} ${num(v)})`;
+// All arithmetic on the inputs is done in SMT (exact rationals); JavaScript only chooses the formula.
+const outOfSubset = message => { throw Object.assign(new Error(`outside L1: ${message}`), { code: 'OUTSIDE_L1' }); };
+const px = (v, what) => { if (typeof v !== 'number' || v < 0) outOfSubset(`${what} must be a px length`); return v; };
+
+// Grid. config: { columns: [{px}|{fr}], rows: [{px}], columnGap, rowGap,
+//   items: [{ column: [a, b], row: [a, b], width: 'auto'|px, height: 'auto'|px, justify, align }] }
+export function gridSpec(c) {
+  const lines = [];
+  const def = (name, body) => lines.push(`(declare-const ${name} Real)`, `(assert (= ${name} ${body}))`);
+  const defB = (name, body) => lines.push(`(declare-const ${name} Bool)`, `(assert (= ${name} ${body}))`);
+  const cols = c.columns, rows = c.rows, cg = px(c.columnGap ?? 0, 'column-gap'), rg = px(c.rowGap ?? 0, 'row-gap');
+  if (!cols?.length || !rows?.length) outOfSubset('explicit columns and rows');
+  for (const t of cols) if (!(('px' in t && t.px >= 0) || ('fr' in t && t.fr > 0))) outOfSubset('a column is <px> or minmax(0, <n>fr)');
+  for (const t of rows) if (!('px' in t && t.px >= 0)) outOfSubset('a row is <px>');
+  const frs = cols.filter(t => 'fr' in t).map(t => t.fr), frAtLeastOne = sumAtLeastOne(frs);
+  def('F', `(- W ${sum(cols.filter(t => 'px' in t).map(t => num(t.px)))} ${times(cols.length - 1, cg)})`);
+  def('Fpos', max('F', '0.0'));
+  // CSS Grid §12.7.1: with a flex factor sum below 1 the tracks take that share of the free space, not all of it.
+  def('frUnit', frAtLeastOne ? `(/ Fpos ${sum(cols.filter(t => 'fr' in t).map(t => num(t.fr)))})` : 'Fpos');
+  cols.forEach((t, i) => def(`col_${i}`, 'px' in t ? num(t.px) : `(* ${num(t.fr)} frUnit)`));
+  cols.forEach((_, i) => def(`colStart_${i}`, i === 0 ? '0.0' : `(+ colStart_${i - 1} col_${i - 1} ${num(cg)})`));
+  rows.forEach((t, i) => def(`row_${i}`, num(t.px)));
+  rows.forEach((_, i) => def(`rowStart_${i}`, i === 0 ? '0.0' : `(+ rowStart_${i - 1} row_${i - 1} ${num(rg)})`));
+  const align = (start, area, size, how, axis) => {
+    if (how === 'stretch' || how === 'start' || how === undefined) return start;
+    if (how === 'center') return `(+ ${start} (/ (- ${area} ${size}) 2.0))`;
+    if (how === 'end') return `(+ ${start} (- ${area} ${size}))`;
+    return outOfSubset(`${axis}-self: ${how}`);
+  };
+  c.items.forEach((it, k) => {
+    const [ca, cb] = it.column, [ra, rb] = it.row;
+    if (!(Number.isInteger(ca) && Number.isInteger(cb) && ca >= 1 && cb > ca && cb <= cols.length + 1)) outOfSubset(`item ${k}: grid-column ${ca} / ${cb} inside the explicit columns`);
+    if (!(Number.isInteger(ra) && Number.isInteger(rb) && ra >= 1 && rb > ra && rb <= rows.length + 1)) outOfSubset(`item ${k}: grid-row ${ra} / ${rb} inside the explicit rows`);
+    def(`areaX_${k}`, `colStart_${ca - 1}`);
+    def(`areaW_${k}`, `(- (+ colStart_${cb - 2} col_${cb - 2}) colStart_${ca - 1})`);
+    def(`areaY_${k}`, `rowStart_${ra - 1}`);
+    def(`areaH_${k}`, `(- (+ rowStart_${rb - 2} row_${rb - 2}) rowStart_${ra - 1})`);
+    const areaY = `areaY_${k}`, areaH = `areaH_${k}`;
+    const autoW = it.width === undefined || it.width === 'auto', autoH = it.height === undefined || it.height === 'auto';
+    const jstretch = (it.justify ?? 'stretch') === 'stretch', astretch = (it.align ?? 'stretch') === 'stretch';
+    def(`w_${k}`, autoW && jstretch ? `areaW_${k}` : autoW ? outOfSubset(`item ${k}: width auto with justify-self ${it.justify} sizes to content`) : num(px(it.width, 'width')));
+    def(`h_${k}`, autoH && astretch ? areaH : autoH ? outOfSubset(`item ${k}: height auto with align-self ${it.align} sizes to content`) : num(px(it.height, 'height')));
+    def(`x_${k}`, align(`areaX_${k}`, `areaW_${k}`, `w_${k}`, autoW ? 'stretch' : it.justify, 'justify'));
+    def(`y_${k}`, align(areaY, areaH, `h_${k}`, autoH ? 'stretch' : it.align, 'align'));
+    // center / end of an item larger than its area: the overflow alignment is not measured yet (outside L1).
+    const fits = (how, size, area) => ['center', 'end'].includes(how) ? `(<= ${size} ${area})` : 'true';
+    defB(`ok_${k}`, `(and ${fits(autoW ? 'stretch' : it.justify, `w_${k}`, `areaW_${k}`)} ${fits(autoH ? 'stretch' : it.align, `h_${k}`, areaH)})`);
+  });
+  return { kind: 'grid', count: c.items.length, smt: ['(declare-const W Real)', ...lines].join('\n'), facts: [] };
+}
+
+// Flex, row, nowrap. config: { height, gap, justify, alignItems,
+//   items: [{ basis, grow, shrink, min, height: 'auto'|px, align }] }
+export function flexSpec(c) {
+  const lines = [], facts = [];
+  const def = (name, body) => lines.push(`(declare-const ${name} Real)`, `(assert (= ${name} ${body}))`);
+  const defB = (name, body) => lines.push(`(declare-const ${name} Bool)`, `(assert (= ${name} ${body}))`);
+  const n = c.items.length, H = px(c.height, 'container height'), gap = px(c.gap ?? 0, 'gap');
+  if (!n) outOfSubset('at least one item');
+  c.items.forEach((it, k) => {
+    px(it.basis, `item ${k} flex-basis`);
+    if (!((it.grow ?? 0) >= 0)) outOfSubset(`item ${k}: flex-grow >= 0`);
+    const s = it.shrink ?? 1; if (!(s === 0 || s >= 1)) outOfSubset(`item ${k}: flex-shrink is 0 or at least 1`);
+    if (!it.text && (it.min ?? 0) > it.basis) outOfSubset(`item ${k}: min-width <= flex-basis`);
+    if (it.text?.unknown) outOfSubset(`item ${k}: its text width is Unknown (${it.text.unknown})`);
+  });
+  if (c.items.some(it => it.text)) return flexTextSpec(c, { lines, facts, def, defB, n, H, gap });
+  const g = c.items.map(it => it.grow ?? 0), b = c.items.map(it => it.basis), m = c.items.map(it => it.min ?? 0);
+  const shrinks = c.items.map(it => it.shrink ?? 1), grows = g.filter(v => v > 0), gAtLeastOne = sumAtLeastOne(grows);
+  const sc = c.items.map((it, k) => shrinks[k] > 0 && it.basis > 0); // shrinkable (scaled factor shrink x basis > 0)
+  def('T', `(- W ${times(n - 1, gap)})`);
+  def('free', `(- T ${sum(b.map(num))})`);
+  // Growing (free >= 0): no max, so no freezing (CSS Flexbox §9.7; a factor sum below 1 takes that share).
+  c.items.forEach((_, k) => def(`grow_${k}`, !grows.length || g[k] === 0 ? num(b[k]) : `(+ ${num(b[k])} (* free ${gAtLeastOne ? `(/ ${num(g[k])} ${sum(g.filter(v => v > 0).map(num))})` : num(g[k])}))`));
+  // Shrinking (free < 0): one level t for all, each item clamped at its min (the result of §9.7's freezing loop when
+  // only min-width clamps): size_k = max(min_k, basis_k - scaled_k * t), sum = T; all at their floor when that is not reachable.
+  lines.push('(declare-const t Real)');
+  c.items.forEach((_, k) => def(`shrink_${k}`, sc[k] ? max(num(m[k]), `(- ${num(b[k])} (* ${times(shrinks[k], b[k])} t))`) : num(b[k])));
+  const floor = sum(c.items.map((_, k) => num(sc[k] ? m[k] : b[k])));
+  // Every rational is exact in SMT (no float division here: 20 / 60 as a double is not 1/3).
+  const tMax = c.items.reduce((acc, _, k) => sc[k] ? max(acc, `(/ (- ${num(b[k])} ${num(m[k])}) ${times(shrinks[k], b[k])})`) : acc, '0.0');
+  facts.push(`(>= t 0.0)`, `(=> (>= free 0.0) (= t 0.0))`,
+    `(=> (< free 0.0) (ite (> ${floor} T) (= t ${tMax}) (= ${sum(c.items.map((_, k) => `shrink_${k}`))} T)))`);
+  c.items.forEach((_, k) => def(`w_${k}`, `(ite (>= free 0.0) grow_${k} shrink_${k})`));
+  return flexPositions(c, { lines, facts, def, defB, n, H, gap });
+}
+
+// Main-axis positions (justify-content over the leftover L) and the cross axis, from the sizes w_k.
+function flexPositions(c, { lines, facts, def, defB, n, H, gap }) {
+  def('L', `(- T ${sum(c.items.map((_, k) => `w_${k}`))})`);
+  const j = c.justify ?? 'flex-start';
+  const lead = { 'flex-start': '0.0', start: '0.0', normal: '0.0', 'flex-end': 'L', end: 'L', center: '(/ L 2.0)', 'space-between': '0.0',
+    'space-around': `(/ L ${num(2 * n)})`, 'space-evenly': `(/ L ${num(n + 1)})` }[j];
+  const between = { 'space-between': n > 1 ? `(/ L ${num(n - 1)})` : '0.0', 'space-around': `(/ L ${num(n)})`, 'space-evenly': `(/ L ${num(n + 1)})` }[j] ?? '0.0';
+  if (lead === undefined) outOfSubset(`justify-content: ${j}`);
+  // A negative leftover: only the values that fall back to the start are in L1 (space-between falls back to flex-start).
+  defB('mainOk', ['flex-start', 'start', 'normal', 'space-between'].includes(j) ? 'true' : '(>= L 0.0)');
+  c.items.forEach((_, k) => def(`x_${k}`, k === 0
+    ? `(ite (< L 0.0) 0.0 ${lead})`
+    : `(+ x_${k - 1} w_${k - 1} ${num(gap)} (ite (< L 0.0) 0.0 ${between}))`));
+  c.items.forEach((it, k) => {
+    const how = it.align ?? c.alignItems ?? 'stretch', autoH = it.height === undefined || it.height === 'auto';
+    if (!['stretch', 'flex-start', 'start', 'center', 'flex-end', 'end'].includes(how)) outOfSubset(`align-self: ${how}`);
+    if (autoH && how !== 'stretch') outOfSubset(`item ${k}: height auto with align-self ${how} sizes to content`);
+    const h = autoH ? H : px(it.height, `item ${k} height`);
+    def(`h_${k}`, num(h));
+    const y = how === 'center' ? (H - h) / 2 : ['flex-end', 'end'].includes(how) ? H - h : 0;
+    def(`y_${k}`, num(y));
+    defB(`ok_${k}`, `(and mainOk ${['center', 'flex-end', 'end'].includes(how) && h > H ? 'false' : 'true'})`);
+  });
+  return { kind: 'flex', count: n, smt: ['(declare-const W Real)', ...lines].join('\n'), facts };
+}
+
+// Flex with text items (docs/adr/0019-text-width-type.md): an item's automatic minimum (min-width not written) is its
+// text's min-content, a variable tmin_k in the TextWidth interval (unbounded above for a free string), so a min may exceed
+// the basis. Both directions are one level with each item clamped at its min (§9.7's loop when only mins clamp):
+//   h_k = max(basis_k, min_k); growing when the sum of h is at most T:
+//   grow:   size_k = max(min_k, basis_k + grow_k * u), sum = T (h_k for an item that does not grow, or when none grows)
+//   shrink: size_k = max(min_k, basis_k - shrink_k * basis_k * t), sum = T; every item at its floor when that is not reachable
+function flexTextSpec(c, { lines, facts, def, defB, n, H, gap }) {
+  const g = c.items.map(it => it.grow ?? 0), b = c.items.map(it => it.basis), shrinks = c.items.map(it => it.shrink ?? 1);
+  const grows = g.filter(v => v > 0);
+  if (grows.length && !sumAtLeastOne(grows)) outOfSubset('flex-grow factors that sum below 1 with a text minimum (the share of the free space changes as items freeze)');
+  c.items.forEach((it, k) => {
+    if (it.min !== undefined || !it.text) { def(`min_${k}`, num(it.min ?? 0)); return; }
+    const [lo, hi] = it.text.min;
+    lines.push(`(declare-const tmin_${k} Real)`, `(assert (>= tmin_${k} ${num(lo)}))`, ...(Number.isFinite(hi) ? [`(assert (<= tmin_${k} ${num(hi)}))`] : []));
+    def(`min_${k}`, `tmin_${k}`);
+  });
+  c.items.forEach((_, k) => def(`hyp_${k}`, max(num(b[k]), `min_${k}`)));
+  def('T', `(- W ${times(n - 1, gap)})`);
+  defB('growing', `(<= ${sum(c.items.map((_, k) => `hyp_${k}`))} T)`);
+  lines.push('(declare-const u Real)', '(declare-const t Real)');
+  c.items.forEach((_, k) => def(`grow_${k}`, g[k] > 0 ? max(`min_${k}`, `(+ ${num(b[k])} (* ${num(g[k])} u))`) : `hyp_${k}`));
+  const sc = c.items.map((_, k) => shrinks[k] > 0 && b[k] > 0);
+  c.items.forEach((_, k) => def(`shrink_${k}`, sc[k] ? max(`min_${k}`, `(- ${num(b[k])} (* ${times(shrinks[k], b[k])} t))`) : `hyp_${k}`));
+  c.items.forEach((_, k) => def(`floor_${k}`, sc[k] ? `min_${k}` : `hyp_${k}`));
+  defB('atFloor', `(> ${sum(c.items.map((_, k) => `floor_${k}`))} T)`);
+  facts.push('(>= u 0.0)', '(>= t 0.0)', '(=> growing (= t 0.0))', '(=> (not growing) (= u 0.0))',
+    `(=> growing ${grows.length ? `(= ${sum(c.items.map((_, k) => `grow_${k}`))} T)` : 'true'})`,
+    `(=> (and (not growing) (not atFloor)) (= ${sum(c.items.map((_, k) => `shrink_${k}`))} T))`, '(=> atFloor (= t 0.0))');
+  c.items.forEach((_, k) => def(`w_${k}`, `(ite growing grow_${k} (ite atFloor floor_${k} shrink_${k}))`));
+  return flexPositions(c, { lines, facts, def, defB, n, H, gap });
+}
+
+export const spec = c => c.display === 'grid' ? gridSpec(c) : flexSpec(c);
+
+/** The same reference with every name but W prefixed (`a.x_0`), so two states share one width in one query. */
+export function namespaced(s, prefix) {
+  const names = [...new Set([...s.smt.matchAll(/\(declare-const (\S+) /g)].map(m => m[1]).filter(n => n !== 'W'))];
+  const rename = text => names.reduce((t, n) => t.replace(new RegExp(`(?<=[\\s(])${n}(?=[\\s)])`, 'g'), `${prefix}.${n}`), text);
+  return { ...s, prefix, smt: rename(s.smt).replace('(declare-const W Real)\n', ''), facts: s.facts.map(rename), name: n => `${prefix}.${n}` };
+}
+
+// The CSS a configuration means (for the browsers and the engine). Items carry the classes i0, i1, …
+export function toCSS(c) {
+  const len = v => `${v}px`;
+  if (c.display === 'grid') {
+    const css = [`.c{display:grid;grid-template-columns:${c.columns.map(t => 'px' in t ? len(t.px) : `minmax(0,${t.fr}fr)`).join(' ')};grid-template-rows:${c.rows.map(t => len(t.px)).join(' ')};column-gap:${len(c.columnGap ?? 0)};row-gap:${len(c.rowGap ?? 0)}}`];
+    c.items.forEach((it, k) => css.push(`.i${k}{grid-column:${it.column[0]}/${it.column[1]};grid-row:${it.row[0]}/${it.row[1]};justify-self:${it.justify ?? 'stretch'};align-self:${it.align ?? 'stretch'}${it.width !== undefined && it.width !== 'auto' ? `;width:${len(it.width)}` : ''}${it.height !== undefined && it.height !== 'auto' ? `;height:${len(it.height)}` : ''}}`));
+    return css.join('');
+  }
+  const css = [`.c{display:flex;flex-direction:row;flex-wrap:nowrap;height:${len(c.height)};column-gap:${len(c.gap ?? 0)};justify-content:${c.justify ?? 'flex-start'};align-items:${c.alignItems ?? 'stretch'}}`];
+  c.items.forEach((it, k) => css.push(`.i${k}{flex:${it.grow ?? 0} ${it.shrink ?? 1} ${len(it.basis)};min-width:${len(it.min ?? 0)}${it.align ? `;align-self:${it.align}` : ''}${it.height !== undefined && it.height !== 'auto' ? `;height:${len(it.height)}` : ''}}`));
+  return css.join('');
+}
+// data-id names an item across two states (an item inserted before it changes its index, not its id).
+export const toHTML = c => `<div class="c">${c.items.map((it, k) => `<div class="i${k}" data-id="${it.id ?? k}"></div>`).join('')}</div>`;

@@ -801,7 +801,10 @@ export interface LayoutSummary {
     })[];
     sizes: (LayoutScenarioIdentity & LayoutPosition & {
         box: string;
-        path: string;
+        path: string; /** Source display, not the engine's internal one-column grid. */
+        display?: string;
+        float?: string;
+        alignContent?: string;
         range: LayoutRange;
         heightRange?: LayoutRange;
         region?: LayoutRegion;

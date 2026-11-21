@@ -18,6 +18,17 @@ isle から切り出した CSS 検証器(veriss)を、別のマシンで続け�
   - M3 構文の段の結果を `notes[]` に(`src/rules/syntax-notes.mjs` が文言)
   - M4 捨てた宣言を `style.$dropped[]` に(`src/layout/dropped.mjs`)
   - M5 CSS の誤りの検査を `src/rules/css-mistakes.mjs` の `createCssMistakes({ report, facts, tools })` に
+- **座標計算サブセット L1**: [ADR-0018](adr/0018-coordinate-subset.md)。Grid と Flex(row・nowrap)の座標を、engine から独立した
+  Z3 の仕様(`models/layout/spec.mjs`)として定義し直した。engine の領域ごとの式と幅の範囲全体で一致(`tests/layout-spec.test.mjs`)、
+  3 ブラウザーとランダムな設定で一致(`e2e/layout-spec.spec.mjs`)。次の段は TODO.md の「座標計算サブセット L1」
+- **CLS の壊れた例**: `models/layout/shift-cases.mjs`(壊れた 12、正しい 6)。2 つの状態を同じ幅で Z3 に解かせ(`shift.mjs`)、
+  3 ブラウザーで確かめた(`e2e/layout-shift.spec.mjs`)
+- **クリティカル CSS**: `packages/veriss/src/critical.mjs`([docs/critical-css.md](critical-css.md))。engine の `sizes` の行に `display`
+  と `float` を足した(block コンテナは内部で 1 列の grid として配置するが、行には block と書く)
+- **文字幅の型**: [ADR-0019](adr/0019-text-width-type.md)。`models/text/width.mjs` の `textWidth` が、総称の family を OS × ブラウザーの
+  表(`system-fonts.mjs`)で解決し、E2E の記録(`linux-widths.json`、`tools/text-widths.mjs`)か MoonBit の値 ± 許容で区間にする。
+  L1 の Flex の仕様で、文字の min-content を区間の中の変数にした。parley(`tools/parley-widths`、Rust)は MoonBit と同じ値を出した
+- **Lean**: この環境で Lean を入れる操作(インストール用のスクリプトの実行)が安全確認で止められた。L1 の Lean 版は未着手
 - **検査ルール一覧**: [docs/rule-catalog.md](rule-catalog.md)(Web 版 https://mizchi.github.io/veriss/、README からリンク)。約 420 のコードを
   13 の役割に分け、「検査可 / 一部 / 仕様のみ / 差を報告 / Unknown」を表にし、役割ごとに NG / OK の実例の画像(`docs/rule-catalog/*.png`)を付けた
   - 実例は `tools/rule-catalog/examples.mjs`。`run.mjs all` で判定、`shoot.mjs` で画像、`build-page.mjs <出力先>` で Web 版
@@ -54,7 +65,7 @@ tools/gate.sh                                     # push の前に毎回。20〜
 
 ## 次にやること
 
-- **eval の基準**: `evals/results/component-lint/` は古い Chromium で記録されていて、Playwright 1.64.1 の Chromium 156 では文字の組み方の差で `before`・`run-1` が変わる(TODO.md の 0)。gate の「eval が変わらない」は、同じブラウザーで main と比べて確かめる
+- **eval の基準**: `evals/results/component-lint/` は Chromium 156(Playwright 1.64.1)で記録した。結果の `browser` が記録した版。別の版では文字の組み方の差で狭い幅の判定が動くので、gate で eval が変わったら、まず `browser` の行(gate が並べて出す)を見る
 - **M6**: `solve` の中に残る「効かない宣言」の判定(`reasons` の一覧)を `rules/css-mistakes.mjs` に移す。layout の段は「親の display」「flow の中か」を事実として出す。レイアウトが Unknown のときに検査をやり直す `walkStyles` をなくす
 - **M7**: `rules/contrast`(色の規則を `src/color/` の上に。祖先の塗りの鎖だけで判定し、後ろに重なる箱の判定だけ layout があるときに足す)
 - **M8**: a11y を DOM の規則と幾何の規則に分ける。integrity と CLS も規則にする
@@ -364,3 +375,21 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
   `verification-reuse-review` の再利用調査はすでにmainの
   現行コード/ADRに反映されていたので、旧内容に戻さず祖先のみ追加した。
   `gh-pages` は配信成果物専用であり mainへ統合しない。
+
+### Upstream verification coverage expansion (2026-11-22, in progress)
+
+- Goal: not merely restyle the fork catalog. Incorporate new validation **subjects** from upstream `ee4cb5a` (first-view critical CSS extraction; independent L1 Grid/Flex geometry + shift model; cross-platform text-width checks), and show the corresponding capabilities/limits on the fork's site.
+- Accept only actual merged source and runnable checks, including negative/unknown controls. Retain TypeScript runtime as canonical, no false Verified from omitted layout evidence, 3-browser measurements and full gate before pushing. Never copy upstream GitHub Actions into the fork.
+- Next: merge upstream, resolve strict TypeScript boundaries, run upstream new suites in addition to existing gate, manually deploy and test the public URL. A new rule count is **not** implied by these model/feature additions; report separately from F-code diagnostics.
+
+#### Integration acceptance details
+
+- Upstream `ee4cb5a` adds four *subject areas* (critical first-view CSS, standalone L1 geometry, state-change L1 shift, text-width/platform model), not new F134+ warnings. This fork must distinguish them from the existing F116–F133 warning catalogue. The first-view extractor is part of the package's browser-capable TypeScript canonical runtime, and the public fork demo uses that actual code.
+- Important environment boundary: the upstream Linux text-width record references Linux font paths that do not exist on macOS. The reference record and L1 text Z3 tests still run, but the MoonBit-vs-browser live calibration is explicitly skipped when no reference fonts are loadable; an unrecorded text string stays `Unknown`. `e2e/layout-text-width.spec.mjs` must not compare Linux widths to macOS browsers without a macOS record. The reference remains Linux-only until separately recorded on the target OS.
+- Deployment and gate results must be appended only after they actually pass.
+
+#### Verified gate and publication boundary (2026-11-22)
+
+- The merged TypeScript source and generated ESM passed `pnpm build:ts`, `pnpm typecheck` and `pnpm check:ts`. The guarded `tools/gate.sh` returned 0: root and all five package test groups had zero failures; all four component-lint eval outputs were unchanged; the old four and new four E2E suites completed with **537 passed** across Chromium, Firefox, WebKit. The text-width suite explicitly skips unrecorded macOS browser-width comparisons, rather than using Linux widths on macOS. The root runner had 47 passed and one skipped Linux-font-file calibration case; the skipped case is not included as a verified claim.
+- `pnpm test` as a combined workspace invocation fails before the recursive stage because this QA worktree's `node_modules` is a symlink and pnpm 12 refuses the unsafe task-run state path (`ERR_PNPM_UNSAFE_TASK_RUN_STATE_PATH`). The actual root and package tests were executed directly by the gate and had zero failures. The symlink was not replaced or modified.
+- The live fork catalog has 19 examples, including a genuinely executed first-view CSS split. The public site must be checked separately after the static-only `gh-pages` push (and is not changed by this merge commit alone).
