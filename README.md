@@ -4,7 +4,7 @@ Static verification of responsive CSS over the DOM: layout (every viewport width
 
 Unknown is never turned into success: what the model does not cover is reported as Unknown with its reason.
 
-**What it checks**: [the rule catalog](https://mizchi.github.io/veriss/) (Japanese) groups every check by role, says what can and cannot be checked, and shows each role with a detected (NG) and a corrected (OK) example as veriss judges them.
+**What it checks**: [the fork rule catalog](https://kikutadev.github.io/veriss/) (Japanese) groups every check by role, says what can and cannot be checked, and shows each role with a detected (NG) and a corrected (OK) example as veriss judges them. Adapted from the [upstream rule catalog](https://mizchi.github.io/veriss/); the fork site also documents its TypeScript and experimental Lean additions.
 
 ## Packages
 
@@ -23,7 +23,7 @@ Users: [mizchi/isle](https://github.com/mizchi/isle) checks its components' layo
 Not published to npm. With pnpm, depend on a package directory at a commit:
 
 ```json
-{ "dependencies": { "@mizchi/veriss": "github:mizchi/veriss#<commit>&path:packages/veriss" } }
+{ "dependencies": { "@mizchi/veriss": "github:kikutadev/veriss#<commit>&path:packages/veriss" } }
 ```
 
 ## Develop
@@ -48,7 +48,8 @@ and generated ESM in `packages/` remain the ordinary veriss runtime.
 
 ## Docs
 
-- [Rule catalog](https://mizchi.github.io/veriss/) (`docs/rule-catalog.md`) — the checks by role, with NG / OK examples
+- [Fork rule catalog](https://kikutadev.github.io/veriss/) (`docs/rule-catalog.md`) — checks by role, NG / OK examples, and fork changes
+- [Original catalog](https://mizchi.github.io/veriss/) — upstream project and source examples
 - `docs/static-check-checklist.md` — every CSS×DOM pattern, how it was measured
 - `docs/layout-checking.md` — the layout model and its subset
 - `docs/adr/` — design decisions

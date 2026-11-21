@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>veriss 検査ルール一覧</title>
+<title>veriss 検査ルール一覧 — kikutadev fork</title>
+<meta name="description" content="veriss フォークのCSS・DOM静的検査一覧。13分類の検査範囲、NG/OK例、TypeScript移行・Lean研究の追加点。">
+<link rel="canonical" href="https://kikutadev.github.io/veriss/">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -27,11 +29,15 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.75 var(--sans);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;padding-block:40px 80px}
 header{grid-column:1/-1;display:grid;gap:12px}
+.topline{display:flex;align-items:baseline;justify-content:space-between;gap:8px 20px;flex-wrap:wrap}
+.topline .links{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
 header .eyebrow{font:600 12px var(--mono);letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+h1 .fork{display:inline-block;font:600 12px var(--mono);letter-spacing:.07em;vertical-align:middle;background:var(--code-bg);border-radius:4px;padding:2px 7px;color:var(--muted);margin-left:9px}
 h1{font-size:clamp(26px,4vw,36px);line-height:1.3;margin:0;text-wrap:balance}
 header p{margin:0;max-width:70ch;color:var(--muted)}
 .legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:4px;font-size:13px;color:var(--muted)}
 .legend span.cnt{font:600 12px var(--mono);margin-left:4px;font-variant-numeric:tabular-nums}
+.fork-note{border-left:3px solid var(--accent);padding-left:12px;font-size:13px;color:var(--muted)}
 .tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .tools input{font:14px var(--mono);padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);width:min(360px,100%)}
 .tools input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -61,16 +67,17 @@ tr[hidden]{display:none}
 .v-ok{color:var(--ok);background:var(--ok-bg)} .v-part{color:var(--part);background:var(--part-bg)} .v-unk{color:var(--unk);background:var(--unk-bg)}
 .v-spec{color:var(--spec);background:var(--spec-bg)} .v-diff{color:var(--diff);background:var(--diff-bg)}
 .vnote{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
-@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr);gap:24px;padding-block:24px 60px}nav{position:static;display:flex;flex-wrap:wrap;gap:6px}nav a{border:1px solid var(--line);border-radius:999px;padding:3px 10px}}
+@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr);gap:16px;padding-block:24px 60px}nav{position:static;display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:thin;padding-block:4px 12px}nav a{white-space:nowrap;flex:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px}h1 .fork{margin:0 0 0 4px}}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
-  <div class="eyebrow">veriss · static CSS × DOM checks</div>
-  <h1>veriss 検査ルール一覧</h1>
-  <p>約 420 個の検査コードを 13 の役割に分け、何が検査でき、何が検査できない(Unknown)かをまとめた。各役割の画像は、代表例の NG(検出される書き方)と OK(直した正常系)を Chromium で描き、それぞれに veriss が返した判定を並べたもの(赤い破線 = NG で指摘された箱、緑の破線 = OK の同じ箱)。</p>
+  <div class="topline"><div class="eyebrow">kikutadev / veriss · static CSS × DOM</div><div class="links"><a href="https://github.com/kikutadev/veriss">フォークのコード</a><a href="https://mizchi.github.io/veriss/">元のカタログ</a></div></div>
+  <h1>veriss 検査ルール一覧 <span class="fork">FORK EDITION</span></h1>
+  <p>約420の検査コードを13の役割に整理し、検査できる条件とUnknownになる境界を説明する。元のカタログのNG/OK実例を引き継ぎ、フォークで加えたTypeScript実装とLeanの独立検算（研究段階）を区別して掲載。</p>
+  <p class="fork-note">フォーク独自の変更点と、形式的に証明できる範囲の境界は<a href="#フォークで追加統合したこと">こちら</a>。上流の新規ルールF116〜F133も取り込み済み。</p>
   <div class="legend" id="legend"></div>
   <div class="tools"><label for="q" class="hits">コードや語で絞り込む</label><input id="q" type="search" placeholder="例: CONTRAST、表、Unknown" autocomplete="off"><span class="hits" id="hits"></span></div>
 </header>

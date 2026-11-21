@@ -3,13 +3,26 @@
 veriss の検査コード(約 420 個)を役割ごとに分け、**何が検査できて、何が検査できない(Unknown)か**を表にしたもの。
 各役割の先頭の画像は、その役割の代表例を **NG(検出される書き方)と OK(直した正常系)の組**で Chromium で描き、
 それぞれに veriss が返した判定を並べたもの(赤い破線 = NG で指摘された箱、緑の破線 = OK の同じ箱)。OK の側はどれも
-verified で指摘なしになる。Web 版: https://mizchi.github.io/veriss/
+verified で指摘なしになる。フォーク版 Web: https://kikutadev.github.io/veriss/ (元のカタログ: https://mizchi.github.io/veriss/)
 
 - コードの頭文字: `E_` = 誤り(多くはブラウザーでの描画や操作の失敗。10 の「仕様のみ」の行は、描画に出ないマークアップの適合性の誤り)、`W_` = 警告(ほぼ確実に書き間違い)、`U_` = Unknown(検査しなかった。成功にはしない)
 - 「判定」の欄: **検査可** = 静的に決まり、3 ブラウザー(Chromium・Firefox・WebKit)で実測して照合済み/**一部** = 条件付きで検査し、
   外れる場合は Unknown/**仕様のみ** = マークアップの適合性で、描画には出ない(ブラウザーの照合がない)/**差を報告** = ブラウザーで結果が違うので
   解析は Unknown にし、違うこと自体を警告する
 - 出典: F・A〜G の番号は [static-check-checklist.md](static-check-checklist.md)、直し方の文言は `packages/adapter-core/src/lint.mjs`
+
+## フォークで追加・統合したこと
+
+このページは [mizchi/veriss](https://github.com/mizchi/veriss) の13分類とNG/OK実例を引き継ぎ、[kikutadev/veriss](https://github.com/kikutadev/veriss) に取り込んだ変更点を併記したもの。**この一覧の約420コードは静的検査のカタログ**であり、以下のLean研究の証明済み範囲と同一ではない。
+
+| 領域 | このフォークでの変更 | できること・できないこと | 根拠 |
+|---|---|---|---|
+| TypeScript 基盤 | ランタイム・各アダプター・検証ツールのソースをTypeScriptへ移行。従来のESMパッケージは生成物として維持 | 型チェック、生成コードの一致検査を実行できる。型付けだけでCSS全域が証明されるわけではない | [移行・検証ログ](handoff.md) |
+| 状態依存CSS | hover時のCSS変数・依存先のレイアウトを追跡し、独立した状態として再検証 | 対応した有限状態は検証。依存が解析できない操作や上限超過は `Unknown` | [状態検証の設計](interactive-state-and-motion-design.md) |
+| Lean 4（研究） | 幾何モデル・到達状態・有限分岐・コンポーネント間の条件・限定的なCSSカスケードについて、独立チェッカーと証明書を実装 | **入力された閉じたモデルの証明書を検算する研究機能**。任意のHTML/CSS/JSから完全自動で証明する機能ではなく、通常のveriss実行にも自動接続されない | [Lean研究の境界と使い方](../experiments/lean/README.md) |
+| 上流の新規検査 | F116〜F133（`will-change`、`preserve-3d`、`text-wrap`、`dialog`、ブラウザー別CSS、container query unitなど）をTypeScript正本とテストへ取り込み | 3ブラウザー照合を維持。挙動が異なる箇所はブラウザー差と `Unknown` を区別 | [CSS実測一覧](static-check-checklist.md) |
+
+進行中の別ブランチの実験は、この `main` に統合された機能として数えていない。
 
 ## 全体の表
 
@@ -277,6 +290,6 @@ React・Vue・Svelte の adapter がコンポーネントを状態ごとの箱�
 - `tools/rule-catalog/examples.mjs` に例の組(共通の HTML と CSS に、NG と OK の差分。文字の契約、撮る幅、ホバー・フォーカスの状態)、
   `tools/rule-catalog/shoot.mjs` が両方を veriss の `analyzeHTML` で判定し、Chromium(deviceScaleFactor 2)で並べて描いてカードにする。
   画像の中の判定とメッセージは、その場で veriss が返したもの。`node tools/rule-catalog/run.mjs all` で判定だけを見られる
-- Web 版は `node tools/rule-catalog/build-page.mjs <出力先>` がこの文書と画像から作る。main に push すると
-  `.github/workflows/pages.yml` が GitHub Pages に出す
+- Web 版は `node tools/rule-catalog/build-page.mjs <出力先>` がこの文書と画像から作る。
+  公開先はフォークの `gh-pages` ブランチ（静的生成物のみ）。GitHub Actionsは使わず手動更新する
 - 撮ったのは Chromium だけ。3 ブラウザーの照合は各検査の e2e(`e2e/layout-css-mistakes.spec.mjs`、`e2e/layout-accessibility.spec.mjs` ほか)が受け持つ
