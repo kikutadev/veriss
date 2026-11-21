@@ -56,3 +56,39 @@ test('viewport units bring the classic PC scrollbars into the analysis (vw inclu
   assert.equal(r.profiles.find(p => p.name === 'pc').status, 'unknown');
   assert.equal(keptOf(r).foot, true);
 });
+
+// Text: measured with the font files; a free string laid out empty (the least it takes: a longer one only pushes down).
+import {loadTextMetrics} from '../src/text-node.mjs';
+const fonts = {Roboto: {file: new URL('../text-metrics/fixtures/roboto-variable.ttf', import.meta.url).pathname}};
+const textMetrics = await loadTextMetrics({fonts});
+const type = 'font-family:Roboto;font-size:16px;line-height:24px;font-weight:400';
+const article = (middle = '') => page(`<h1 class="title">A heading that wraps on narrow phones</h1><p class="lead">Some text in the first view, measured with the font file.</p>${middle}<div class="gap"></div><footer class="foot">Below the fold</footer>`);
+const articleCSS = `*{margin:0}body{${type}}.title{font-size:32px;line-height:40px}.gap{height:1100px}.foot{background:#222;color:#fff}.free{background:#eee}`;
+
+test('text is measured with the font files and laid out at the size its characters need', () => {
+  const r = extractCriticalCSS(article(), {css: articleCSS, textMetrics, fonts});
+  assert.deepEqual(r.profiles.map(p => p.status), ['verified', 'verified'], JSON.stringify(r.profiles));
+  assert.equal(r.texts.length, 3);
+  assert.ok(r.texts.every(t => /measured with Roboto/.test(t.sized)), JSON.stringify(r.texts));
+  assert.equal(keptOf(r).foot, false); assert.equal(keptOf(r).title, true); assert.equal(keptOf(r).lead, true);
+  assert.ok(!r.css.includes('.foot{')); assert.match(r.rest, /\.foot\{/);
+  // Without the font file the text is not measured: Unknown, everything kept.
+  const none = extractCriticalCSS(article(), {css: articleCSS});
+  assert.ok(none.texts.every(t => /not measured/.test(t.sized)));
+  assert.ok(none.profiles.every(p => p.status === 'unknown'));
+  // Everything kept but the rule no element matches (.free is not on this page).
+  assert.equal(keptOf(none).foot, true); assert.equal(none.rest, '.free{background:#eee}');
+});
+
+test('a free string is laid out empty: what follows it may only be pushed further down', () => {
+  // Free text above the gap: the footer is below the fold even with the text empty, so it is still dropped.
+  const free = extractCriticalCSS(article('<p class="free" data-text-free>{comment}</p>'), {css: articleCSS, textMetrics, fonts});
+  assert.match(free.texts.find(t => /free/.test(t.sized)).sized, /laid out empty/);
+  assert.equal(keptOf(free).foot, false); assert.equal(keptOf(free).free, true);
+  // An adapter's '…' (an expression's value) is free too.
+  assert.ok(extractCriticalCSS(article('<p class="free">…</p>'), {css: articleCSS, textMetrics, fonts}).texts.some(t => /free/.test(t.sized)));
+  // In a block container that centres its content, a longer text moves what is before it up: not plain block flow.
+  const centred = extractCriticalCSS(page('<div class="box"><div class="late"></div><p class="free" data-text-free>{x}</p></div>'),
+    {css: `*{margin:0}body{${type}}.box{height:3000px;align-content:end}.late{height:10px}`, textMetrics, fonts});
+  assert.equal(keptOf(centred).late, true); assert.match(centred.elements.find(e => e.classes[0] === 'late').reason ?? '', /first view|not in plain block flow/);
+});

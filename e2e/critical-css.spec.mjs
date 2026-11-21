@@ -35,3 +35,42 @@ for (const [name, p] of Object.entries(pages)) test(`critical CSS keeps the firs
     expect(critical.shot === full.shot, `${name} at ${width}x${height}: the first-view pixels`).toBe(true);
   }
 });
+
+// Text pages: measured with the font file (the browsers load the same file), and a free string that is extracted once
+// from the template and then drawn empty, short and long: the critical CSS holds for every value it takes.
+import {readFileSync} from 'node:fs';
+import {loadTextMetrics} from '../packages/veriss/src/text-node.mjs';
+const fontFile = new URL('../packages/veriss/text-metrics/fixtures/roboto-variable.ttf', import.meta.url).pathname;
+const fonts = {Roboto: {file: fontFile}};
+const fontCSS = '@font-face{font-family:Roboto;src:url(/roboto.ttf);font-display:block}';
+const type = 'font-family:Roboto;font-size:16px;line-height:24px;font-weight:400';
+const textPages = {
+  text: {template: doc('<header class="bar">Site name</header><h1 class="title">A heading that wraps on narrow phones</h1><p class="lead">Some text in the first view, measured with the font file the browsers load too.</p><div class="gap"></div><footer class="foot">Below the fold</footer>'),
+    css: `${fontCSS}*{margin:0}body{${type}}.bar{background:#123;color:#fff}.title{font-size:32px;line-height:40px}.gap{height:1200px;background:#eef}.foot{background:#222;color:#fff}`},
+  free: {template: doc('<header class="bar">Site name</header><p class="comment" data-text-free>{comment}</p><div class="gap"></div><footer class="foot">Below the fold</footer>'),
+    values: ['', 'A short comment.', Array.from({length: 40}, (_, i) => `word${i}`).join(' ')],
+    css: `${fontCSS}*{margin:0}body{${type}}.bar{background:#123;color:#fff}.comment{background:#ffe}.gap{height:1200px;background:#eef}.foot{background:#222;color:#fff}`},
+};
+for (const [name, p] of Object.entries(textPages)) test(`critical CSS keeps the first view of a ${name} page`, async ({page}) => {
+  const textMetrics = await loadTextMetrics({fonts});
+  const r = extractCriticalCSS(p.template, {css: p.css, textMetrics, fonts});
+  expect(r.profiles.map(x => x.status), JSON.stringify(r.profiles)).not.toContain('unknown');
+  expect(r.dropped, `${name}: some rules are dropped`).toBeGreaterThan(0);
+  await page.route('**/roboto.ttf', route => route.fulfill({body: readFileSync(fontFile), contentType: 'font/ttf'}));
+  for (const value of p.values ?? [null]) {
+    const html = value === null ? p.template : p.template.replace('{comment}', value);
+    for (const [width, height] of sizes) {
+      await page.setViewportSize({width, height});
+      const draw = async css => {
+        await page.route('http://critical.test/', route => route.fulfill({contentType: 'text/html', body: html.replace('<body>', `<head><style>${css}</style></head><body>`)}));
+        await page.goto('http://critical.test/'); await page.evaluate(() => document.fonts.ready);
+        await page.unroute('http://critical.test/');
+        const boxes = await page.evaluate(h => [...document.querySelectorAll('body *')].map(e => { const b = e.getBoundingClientRect(); return b.top < h ? [b.x, b.y, b.width, b.height].join(',') : null; }), height);
+        return {boxes, shot: (await page.screenshot()).toString('base64')};
+      };
+      const full = await draw(p.css), critical = await draw(r.css);
+      full.boxes.forEach((b, i) => { if (b !== null) expect(critical.boxes[i], `${name} "${value?.slice(0, 12)}" at ${width}x${height}: element ${i}`).toBe(b); });
+      expect(critical.shot === full.shot, `${name} "${value?.slice(0, 12)}" at ${width}x${height}: the first-view pixels`).toBe(true);
+    }
+  }
+});
