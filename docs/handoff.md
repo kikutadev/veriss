@@ -324,7 +324,7 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - Implemented a browser-bundled static verifier on the first screen with editable HTML/CSS, warnings/Unknown status, NG/OK presets (including upstream F116/F129/F133), and sandboxed visual preview. Original 13-category table and 15 representative images remain as reference. TypeScript migration and Lean checker descriptions are separate from actual runtime diagnostics.
 - Site generation now requires the `esbuild` dev dependency to emit `demo.js` alongside `index.html` and images. The Pages `gh-pages` branch is manually published: no GitHub Actions. Before declaring done, test actual browser interactions on the **public URL**, including repair eliminating a finding, an unresolved/Unknown case, and a narrow mobile viewport.
 
-## 残存ブランチ統合（2026-11-22、進行中）
+## 残存ブランチ統合（2026-11-22、検証完了）
 
 目的: fork/main の strict TypeScript 正本と既存検証の健全性を維持して、
 残存の幅遷移・汎用幾何レビュー・TS 条件境界修正・検証基盤再利用調査、および
@@ -367,7 +367,7 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
   adapter部分幾何16件を確認。追加ブラウザE2EはChromium・Firefox・
   WebKitそれぞれ4件、計12/12成功。未対応CSS/異なる進捗/変動する
   クロス軸をUnknownにする負例は維持。TypeScript strict、
-  build:tsとcheck:tsも成功。正式gateは別途実行する。
+  build:tsとcheck:tsも成功。後記の正式gateで統合版を受け入れた。
 - 旧 `automatic-width-transition` の履歴には汎用レビュー、旧
   island監査と追加テストも含む。現行 `.mts` に役立つロジック・
   テストを取り込み、`-s ours` で旧JSツリーを上書きせず祖先を記録。
@@ -393,3 +393,25 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - The merged TypeScript source and generated ESM passed `pnpm build:ts`, `pnpm typecheck` and `pnpm check:ts`. The guarded `tools/gate.sh` returned 0: root and all five package test groups had zero failures; all four component-lint eval outputs were unchanged; the old four and new four E2E suites completed with **537 passed** across Chromium, Firefox, WebKit. The text-width suite explicitly skips unrecorded macOS browser-width comparisons, rather than using Linux widths on macOS. The root runner had 47 passed and one skipped Linux-font-file calibration case; the skipped case is not included as a verified claim.
 - `pnpm test` as a combined workspace invocation fails before the recursive stage because this QA worktree's `node_modules` is a symlink and pnpm 12 refuses the unsafe task-run state path (`ERR_PNPM_UNSAFE_TASK_RUN_STATE_PATH`). The actual root and package tests were executed directly by the gate and had zero failures. The symlink was not replaced or modified.
 - The live fork catalog has 19 examples, including a genuinely executed first-view CSS split. The public site must be checked separately after the static-only `gh-pages` push (and is not changed by this merge commit alone).
+
+### 残存ブランチ統合と最新mainの最終受入（2026-11-22）
+
+- `automatic-width-transition`、その祖先の `generalization-review`、
+  `island-state-audit`、`ts-contracts`、`verification-reuse-review`、
+  `typescript-migration` のコミット履歴をmain統合候補の祖先として
+  確定。旧JavaScriptのままではなく新規幅遷移API/契約/テストを
+  strict TypeScriptへ移植し、focus paint/非活性アニメーションの
+  独立幾何と6件のアプリモデルJSONを補完。
+- さらに進行中の並行作業で更新されたfork/main `2037adb`（
+  上流のcritical CSS、L1レイアウトシフト、font-widthの差分を含む）を
+  保存したまま競合なく組み合わせ、型付き生成物の一致を再検査。
+- 旧main相当の必須ゲートは474/474 E2E成功。その後、追加上流分を
+  含む統合HEADでも正式 `tools/gate.sh` はexit 0、rootと全5 package
+  単体テストの失敗0、component-lint eval4回差分なし、
+  Chromium/Firefox/WebKitの8 E2Eスイート合計549/549成功。
+  追加幅遷移12/12も個別検証済み。終了後に検証worktreeの
+  Playwright Chrome残留0、ホスト全体でも残留0を確認。
+- `gh-pages` は本体ソースではなく公開成果物のみを持つ独立履歴。
+  GitHub Actionsを使わずに別途公開を管理する。旧hash固定の
+  ポートフォリオ島監査実行器は古いスナップショットに依存し、
+  元ブランチの履歴に残すが現行の汎用TS経路へは組み込まない。
