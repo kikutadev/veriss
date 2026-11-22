@@ -147,11 +147,11 @@ tr[hidden]{display:none}
 </section>
 <section id="real-ui" aria-labelledby="real-ui-title">
   <h2 id="real-ui-title">実際のUIでどこまで検証できたか</h2>
-  <p class="demo-intro">2026年11月22日、実際のHTML/CSSを3種類取得して検査。全3件がUnknownでした。下記のエラーはすべてCSSショートハンドの重複指定であり、画面の破綻を検出できた件数ではありません。</p>
-  <div class="tw"><table><thead><tr><th>入力</th><th>判定</th><th>エラー</th><th>Unknown</th></tr></thead><tbody>
-    <tr><td><a href="https://kikuta.dev/about/">ポートフォリオ / About</a></td><td>Unknown</td><td>3</td><td>33</td></tr>
-    <tr><td>DUO瓦割り / タイトル</td><td>Unknown</td><td>5</td><td>6</td></tr>
-    <tr><td><a href="https://getbootstrap.com/docs/5.3/examples/album/">Bootstrap / Album</a></td><td>Unknown</td><td>5</td><td>437</td></tr>
+  <p class="demo-intro">2026年11月22日、実際のHTML/CSSを3種類取得して検査。全3件がUnknownのままです。正常なCSSの上書きをエラー扱いしないよう修正したため、旧版のエラー13件は0件になりました。実サイトのレイアウト破綻が見つかったという意味ではありません。</p>
+  <div class="tw"><table><thead><tr><th>入力</th><th>判定</th><th>エラー</th><th>警告</th><th>Unknown</th></tr></thead><tbody>
+    <tr><td><a href="https://kikuta.dev/about/">ポートフォリオ / About</a></td><td>Unknown</td><td>0</td><td>13</td><td>33</td></tr>
+    <tr><td>DUO瓦割り / タイトル</td><td>Unknown</td><td>0</td><td>2</td><td>9</td></tr>
+    <tr><td><a href="https://getbootstrap.com/docs/5.3/examples/album/">Bootstrap / Album</a></td><td>Unknown</td><td>0</td><td>2</td><td>438</td></tr>
   </tbody></table></div>
   <p class="demo-intro">同じ静的入力をChromium・Firefox・WebKitの各5画面幅で観測し、横はみ出しは0/45。JavaScript、外部画像・フォント、すべての幅を検証したという意味ではありません。<a href="https://github.com/kikutadev/veriss/blob/main/docs/product-real-ui-evidence.md">入力・測定・再実行方法</a></p>
 </section>
