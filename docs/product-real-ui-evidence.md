@@ -55,3 +55,17 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 同じ完全文書への静的 `analyzeHTML` は、元のCSSの `@import` や未対応規則等のため `Unknown`、幾何反例 `E_LAYOUT_*` は取得できない。改変前後のエラー5件はともに `E_CSS_SHORTHAND_CONFLICT` で、レイアウト破綻を検知していない。
 - ブラウザでの負例は `e2e/layout-product-real-ui.spec.mts` に固定し、幅390pxでゲームシェルが390→700pxになることをChromium・Firefox・WebKitで照合する。**既存コードの部分幾何投影も**、headの非スタイルリンク、未閉包の `@import`、body overflow伝播などがある元入力では独立した矩形を作れない。これらはエンジンが根拠なしに値を補完しないためのUnknownである。
 - **次の実装修正の条件**: CSSの読み込み閉包が成立している入力だけを対象に、実装から依存関係を独立投影できる要素を増やす。`@import`や祖先の overflow を単に削り落として `VERIFIED` にすることは禁止する。正常なCSSに対する幾何モデルの成立を先に確認し、その上で上記改変に対する反例の検算へ進む。
+
+## Phase2 状態別の警告分類：ポートフォリオ About（2026-11-22）
+
+- 取得済み `portfolio-about.html/css` の初期状態では、`#mobile-island-panel` に `inert` と `aria-hidden="true"` が付いている。この閉じた状態に `analyzeHTML` を適用すると `W_CSS_STATE_UNREACHABLE` が10件（フォーカス状態の警告）出る。
+- 同じHTMLの**メニューの `inert` と `aria-hidden` を解除した明示的状態**を同じCSSで解析すると、上記10件は0件になる。両状態ともページ全体は `Unknown` のままで、CSS・DOMの完全証明を意味しない。
+- 公開 <https://kikuta.dev/about/> を実ブラウザで操作して確認：初期は `inert=true` / `aria-hidden=true`、メニューボタン押下後は `inert=false` / `aria-hidden=false` / `aria-expanded=true`、リンクに `tabIndex=0`。初期DOMの警告を「開いてもフォーカスできない不具合」と読むのは誤り。
+- **判断**：状態遷移を無視して警告を隠すのではなく、`closed` と `open` の**明示的なDOMスナップショット**を個別に評価する。JavaScriptのあらゆる到達状態を自動証明したとは主張しない。
+
+## ファイル選択UI撤去後の公開受入（2026-11-22）
+
+- ユーザー判断により、WebのHTML/CSSファイル選択と読込処理・専用E2Eを撤去した。ローカルファイルは既存のCLIで検証する。HTML/CSSの直接入力、NG→OKデモ、実UI3件のUnknownの表は維持。
+- fork `main` のコード `beda8f9` は `pnpm build:ts`、`pnpm check:ts`、`tools/gate.sh` 監督ランナー**exit 0**。root・全5 package単体失敗0、既存component-lint eval差分なし、3ブラウザE2E **549 passed**。追加の実UIサンプル・ゲームシェル改変のE2Eは別実行でChromium/Firefox/WebKit **12/12 passed**、作業対象Chrome残留0。
+- 公開は `gh-pages` `73900a5`。GitHub Pages build完了、配信HTMLはローカルビルドと SHA-256 一致。<https://kikutadev.github.io/veriss/#live-check> において、ファイル選択欄0件、NG=`VIOLATED` → 修正後=`VERIFIED` → 未対応=`UNKNOWN`、390px幅の横はみ出しなし、実UI3件の結果表を実ブラウザで確認。
+- 残りは**実UIの有効な不具合発見・修正の再現**と閉包済みCSS・状態別契約の改善。今回の意図的なゲームCSS破壊とナビ状態別警告は診断上の限界を明らかにしたが、実サイト由来の不具合発見実績としては計上しない。

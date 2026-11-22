@@ -444,3 +444,9 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - 本筋は、実UIの誤検出を独立ブラウザ実測で分類し、検査器の汎用性・有効な不具合検出実績を改善する。URL収集Workerも復活させない。
 
 - 撤去後の個別受入: 実UI由来の負例（ゲームシェルを700px幅へ改変）を含め、3ブラウザの専用E2E12/12成功。Web UIのファイル選択が存在しないことを回帰テスト化。静的完全文書は改変を幾何エラーとして検出できずUnknown、モデルが安全だという主張はしない。
+
+- 追加のPhase2知見: About のナビは初期 `inert` 状態で `W_CSS_STATE_UNREACHABLE` が10件、`inert`解除版スナップショットでは0件。実サイトのメニュー操作で同じ状態変化を確認。警告全消しではなく状態別契約が必要。`docs/product-real-ui-evidence.md` 参照。
+
+#### Phase2 ファイルUI撤去版の公開検証（2026-11-22）
+
+- fork main `beda8f9`、`gh-pages` `73900a5`。正式ゲートexit=0、全パッケージ単体失敗0、既存3ブラウザE2E549件、Phase2個別12件成功。公開ページでファイル入力0件、NG→VERIFIED→UNKNOWN、390pxで横はみ出し0、実UI3件の表を実操作で確認。成果と残課題は `docs/product-real-ui-evidence.md` に記録。
