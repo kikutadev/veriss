@@ -450,3 +450,8 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 #### Phase2 ファイルUI撤去版の公開検証（2026-11-22）
 
 - fork main `beda8f9`、`gh-pages` `73900a5`。正式ゲートexit=0、全パッケージ単体失敗0、既存3ブラウザE2E549件、Phase2個別12件成功。公開ページでファイル入力0件、NG→VERIFIED→UNKNOWN、390pxで横はみ出し0、実UI3件の表を実操作で確認。成果と残課題は `docs/product-real-ui-evidence.md` に記録。
+
+### Phase 2 実CSSの誤検出改善（2026-11-22）
+
+- 正常な一括指定→個別指定のCSSカスケードを解析し、実UI3件に残っていた偽の`E_CSS_SHORTHAND_CONFLICT`を13件→0件に削減。方向依存の重複指定は確定エラーでなくUnknown。Bootstrapの疑似要素リセット由来ノイズも減り、警告27→2件。3件の全体判定はUnknownであり、レイアウト不具合を発見したとの主張はしない。
+- 実装は fork main `41561bc`、公開 Pages `5cca38e`。正式ゲート exit 0、全unit fail 0、既存E2E 549 passed、追加E2E 18 passed。公開ページで3件の改修後値、NG→OK→Unknown、390px幅、ファイルアップロード/Worker未追加を実操作で確認。検証根拠・残る未証明は `docs/product-real-ui-evidence.md`。

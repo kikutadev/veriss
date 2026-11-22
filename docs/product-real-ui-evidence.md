@@ -77,3 +77,9 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 標準的な `*,*::before,*::after{box-sizing:border-box}` だけを理由に、存在しない疑似要素の警告を大量に出すことをやめた。背景・位置・サイズを実際に指定し、`content` がない場合の警告は維持。Bootstrap公式サンプルでこの種のノイズ警告が25件減った。
 - 3ブラウザで、5種類の上書き（border、padding、margin、`!important`）について実測値とverissの区間幾何証明を比較。追加の個別E2Eで3ブラウザそれぞれ成功。対応CSSのみ `Verified` とし、実ページ3件は `Unknown` を維持。
 - 残る本質課題はJS状態の列挙や `@import` の閉包、ゲームシェル幅超過の部分幾何検出。ブラウザ実測は証明ではなく、実サイトのレイアウト破綻検出実績も現時点では0件。
+
+### 精度改善の公開受入（2026-11-22）
+
+- CSS shorthand refinement / 疑似要素リセットの修正は fork `main` `41561bc`、GitHub Pages `gh-pages` `5cca38e` に統合・公開。正規 `tools/gate.sh` は隔離ウォッチドッグ経由で **exit 0**、root / 5 package単体テストで fail 0、component-lint eval差分なし、既存3ブラウザE2E **549 passed**。実UIとCSSカスケードの追加個別E2E **18 passed**。
+- 公開 <https://kikutadev.github.io/veriss/#real-ui> で最新の3件の診断件数を確認。配信HTMLはビルド済みの `_site/index.html` とSHA-256一致。`#live-check` の NG=`VIOLATED` → 修正後=`VERIFIED` → 未対応例=`UNKNOWN`、幅390pxで横はみ出しなし。ファイル選択UI、Cloudflare Workerともに存在しない。
+- **残余:** 任意の実UI全体の証明は3件ともUnknown、実サイト由来のレイアウト破綻の発見実績は0。CSS読み込み閉包、コンポーネント状態の列挙、健全な部分幾何検証による検出範囲拡大が必要。
