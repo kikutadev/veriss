@@ -41,3 +41,10 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 4. **使い始める導線:** 公開Webデモはブラウザの File API によるHTML/CSSファイル読込を追加。25,000文字超は無理にメインスレッドで実行せず、完全なCSSを渡せるCLIへ案内する。**Cloudflare Workerは不要**。
 
 本レポートは Phase 2 の **実UIデータ収集・実測段階** の完了記録であり、検出精度の製品価値実証が完了したことを意味しない。
+
+## リリース受入（2026-11-22）
+
+- 追加の固定入力・CLI再現3/3単体テスト成功。新しい実UI観測9件とWebファイル入力・悪意ある外部参照遮断9件は、Chromium / Firefox / WebKit で **18/18成功**（`node tools/gate-guarded.mjs --product-e2e`）。Chromeプロセス残留0。
+- 全体の正式 `tools/gate.sh` は監督ランナーを通して **exit 0**、root + 5 package単体失敗0、既存component-lint評価の不変、3ブラウザE2E **549 passed**。`pnpm build:ts` / `pnpm check:ts` 成功。正式ゲートのE2E549件と新規個別18件は別実行（合算の全体ゲートではない）。
+- fork mainの実装 `045f748`、静的配信 `gh-pages` の `fcd13ed`。GitHub Actionsは使用せず、<https://kikutadev.github.io/veriss/#live-check> の配信済みHTMLをローカルビルドとSHA-256照合。実公開ブラウザでHTML/CSSファイルを指定するとNG `VIOLATED` → 修正済みCSSで `VERIFIED`、390pxで横はみ出しなし、実UI3件のUnknown表示を確認した。Cloudflare Workerへの呼び出しコードは配信バンドルに存在しない。
+- 完了したのはPhase 2の**実例収集・限定実測・ファイル導線**である。実サイトでverissが新たな不具合を発見してNG→修正後OKにした実績は **0件のまま**。検査精度の価値実証およびPhase 3は未達。

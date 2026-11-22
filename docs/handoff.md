@@ -432,3 +432,8 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - ポートフォリオ About / DUO瓦割りタイトル / Bootstrap Album の静的HTMLと元CSSを固定。CLIは3件ともUnknown、エラー13件はすべてshorthand競合でありレイアウト不具合13件とは言えない。3ブラウザ×5幅×3件＝45点の実測では水平はみ出し0。再現、限界と次に取り組む誤検出・検出不足は `docs/product-real-ui-evidence.md`。
 - 公開デモへローカルHTML/CSSファイルのブラウザ内読込（各25,000文字以内）と外部リソースを遮断したプレビューを追加。Workerは使用しない。型チェック・ローカルE2E 15/15成功。正式ゲート・公開版QAは別途実施し、完了後だけ報告する。
+
+#### Phase2データの正式ゲートと公開反映（2026-11-22）
+
+- Phase2初回調査とWorker不要のローカルファイル読込を fork `main` `045f748`、GitHub Pages `gh-pages` `fcd13ed` に反映。`tools/gate.sh` exit=0、全単体失敗0、既存3ブラウザE2E549件成功、追加3ブラウザE2E18件成功。公開URLでNG→OK、実UI3件結果、390pxの横はみ出しなしを確認。
+- 本物のレイアウト不具合を検出・修正した数は0。Unknownの上位原因とshort-hand競合の解釈は `docs/product-real-ui-evidence.md` を正本とし、次は実UIで証明可能な局所モデル／状態遷移の実効性を改善。Phase2完了とは記載しない。

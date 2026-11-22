@@ -91,3 +91,10 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - <https://kikutadev.github.io/veriss/> の実ブラウザーで初期 NG→修正後OK、443.5px反例、Unknown、初期表示CSS 2規則保持・1規則分離、390px viewport で横はみ出しなしを確認。
 - 別の空プロジェクトに `pnpm add github:kikutadev/veriss#93bacf0&path:packages/veriss` でGitコミット指定インストール成功し、`pnpm exec veriss check` で `VERIFIED`。これにより tarball に加えてGit依存の配布も確認。
 - **Phase2未着手**: 3つの異種実UIでの有効検出・誤検知・Unknownの実証はこのリリースに含まない。
+
+### Phase 2 初回実測とファイル入力の受入（2026-11-22）
+
+- [x] 3実UIの同一ソース入力・ハッシュ付き再現、CLI実行、3エンジン×5幅の実測を保存。エラー13件はショートハンド競合であり、レイアウト不具合の検出成功例は現時点で0。数と限界は [実UIの検証記録](product-real-ui-evidence.md) を正とする。
+- [x] Workers不要のHTML/CSSローカルファイル入力を公開デモへ追加（それぞれ25,000文字まで、超過はCLI）。JS・外部リソース実行/取得を禁止した参考プレビュー。個別3ブラウザ18 E2Eと正式gate（既存3ブラウザ549 E2E）成功。
+- [x] fork main `045f748`、公開 `gh-pages` `fcd13ed`。公開URLの実操作で NG→OK / 390pxで横はみ出しなし / 結果表を確認。公開先は <https://kikutadev.github.io/veriss/>。WorkerのURL取得モードは復活させていない。
+- [ ] 実UI由来の有効NG→OK検出実証、誤検出の分類と改善。**Phase2は継続中。**
