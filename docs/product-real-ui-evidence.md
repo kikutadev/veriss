@@ -128,3 +128,10 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 同じ2公開デモの外部E2Eを新API利用へ切替え、3ブラウザで**6件成功**。RBACの画面外フォーカスとReact-admin Ordersの320px越境を維持して検出。アプリ側の描画タイミングによる追加の越境数値変化は固定の断定をしない。
 - 新規のオフライン3ブラウザE2E `layout-browser-observations.spec.mts` で、**意図的な内部横スクロールはページ越境ではない／見えないフォーカスを検出／閉じたdrawerをinert化すると観測失敗が消える／320px画面に334px mainを置くと観測失敗／正しい幅へ戻すと観測成功**、を全エンジンで検証。単体テストでは実測失敗後でも静的全幅の`status`がUnknownから昇格しないことを確認。
 - [READMEのコピー可能な使い方](../README.md#check-an-authenticated-web-app-from-an-existing-playwright-test) にPlaywright上でのstate/contract/observationの接続例を追加。
+
+### Phase 2c 公開・導入受入（2026-11-23）
+
+- 共通observer実装はfork `main` `b8ba7ac`、公開デモはGitHub Pages `gh-pages` `12dfb00` に統合。正式 `tools/gate.sh`（`tools/gate-guarded.mjs`で隔離実行）は **exit 0**、全package unit fail 0、既存3ブラウザE2E **552 passed**。新規observerの独立オフラインE2E **3 passed**、第三者ログイン済みWebアプリの外部E2E **6 passed** はそれぞれ別実行であり、正式552件に含めていない。
+- 公開 <https://kikutadev.github.io/veriss/#real-ui> は静的ビルド `_site/index.html` とSHA-256一致。実ブラウザでログイン後UI結果表、共通observerの導入文書リンク、NG→OK→Unknown切替、390px横はみ出しなし、不要なファイル入力/Worker未復活を確認。
+- 本体/adapter-coreをtarball化して別の空プロジェクトへインストールし、公開APIと`verifyUI`の観測失敗/静的Unknownを確認。さらに、**フォークのGitコミット `b8ba7ac` から両パッケージを別プロジェクトへ直接インストール**し、同じ結果を確認。Webサイトで認証処理を実行したり、入力を取得するWorkerを増設したりはしていない。
+- 残余: React/Vue等の実装からの完全な状態列挙やJS/CSS閉包を静的に自動導出する機能は未実装。ログイン済みE2Eを利用する観測APIは実際に機能するが、それだけで全幅・全状態をVerifiedとは主張しない。

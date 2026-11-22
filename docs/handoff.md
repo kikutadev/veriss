@@ -466,3 +466,8 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - `@mizchi/veriss-adapter-core` に`captureViewport` / `captureClosedScopeTabFocus` を追加。既存の認証済みPlaywright Pageだけを使い、スクロール範囲と閉じたdrawerへの画面外Tabフォーカスを状態名付きの`Observation`へ変換。HTML本文/入力値/セッションは収集しない。静的モデル証明はUnknownのまま。
 - React-admin公式デモと公開RBAC管理画面の外部3ブラウザE2EをObserverへ切替え、実障害2件を再検出。オフライン3ブラウザの内部スクロール・inert・横幅の対照も追加。再実行と導入例は `README.md`、実測根拠は `docs/product-real-ui-evidence.md`。次はSPA状態契約の導入容易性を高める（自動で全状態を証明できるとの主張はしない）。
+
+### Phase 2c 公開受入（2026-11-23）
+
+- fork main `b8ba7ac`、Pages `12dfb00` に統合。正式gate exit0（全unit fail0、3ブラウザ552 E2E）、追加オフラインobserver 3 E2E、第三者ログイン済みUI 6 E2Eが独立して成功。公開HTMLのSHA一致、実ブラウザ操作で導入案内・NG→OK→Unknown・390px幅を確認。Gitコミット指定の本体+adapter-coreを外部空プロジェクトへ導入し、公開API動作成功。
+- Phase 2b/2cの当面の製品価値: **ログイン後の実UI状態をユーザーの既存Playwright E2Eから再利用可能な共通APIで観測し、契約違反を報告**。範囲の外にある静的証明はUnknown。今後は状態列挙と入力のCSS閉包が課題。`docs/product-real-ui-evidence.md` / `README.md` を参照。
