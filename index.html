@@ -153,6 +153,7 @@ tr[hidden]{display:none}
     <tr><td><a href="https://jorgeariosg.github.io/react-admin-rbac/">RBAC管理画面デモ</a></td><td>ログイン後／スマホ／メニューを閉じる</td><td>画面外のナビゲーションへTabで移動。Chromium・Firefox・WebKitで再現</td><td>Unknown</td></tr>
     <tr><td><a href="https://marmelab.com/react-admin-demo/">React-admin公式デモ</a></td><td>ログイン後／注文一覧／320px幅</td><td>ページ幅が約334pxとなり横にはみ出す。Chromium・Firefox・WebKitで再現</td><td>Unknown</td></tr>
   </tbody></table></div>
+  <p class="demo-intro">正常系の対照として、React-admin公式デモのOrders → Add filter → Save current queryで開くモーダルも検査。320 / 390 / 768px × 3ブラウザで、Tab移動がモーダル内に収まることと、保存せず閉じられることを確認しました。フォーカス制御のない模擬モーダルでは、背面への操作漏れを3ブラウザで検出します。</p>
   <p class="demo-intro">閉じたメニューが画面外にあるだけなら不具合とは判定しません。実際のTab移動でフォーカスが届くことを区別し、注文一覧の内側スクロールとページ全体の横はみ出しも別々に計測しています。ブラウザ観測は静的証明ではないため、verissの全幅判定はUnknownを維持します。開発者は自分のPlaywrightのログイン済み画面に<a href="https://github.com/kikutadev/veriss#check-an-authenticated-web-app-from-an-existing-playwright-test">共通observerを組み込み</a>、同じ状態別検証を実行できます。<a href="https://github.com/kikutadev/veriss/blob/main/docs/product-real-ui-evidence.md">検証条件・再実行手順</a></p>
   <h3>静的HTML/CSS入力：従来の3サイト</h3>
   <p class="demo-intro">2026年11月22日、実際のHTML/CSSを3種類取得して検査。全3件がUnknownのままです。正常なCSSの上書きをエラー扱いしないよう修正したため、旧版のエラー13件は0件になりました。実サイトのレイアウト破綻が見つかったという意味ではありません。</p>
