@@ -85,11 +85,6 @@ tr[hidden]{display:none}
 .demo-toolbar button{padding:8px 14px;cursor:pointer;font-weight:600}
 .demo-toolbar button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
 .demo-toolbar button#demo-run{background:var(--fg);border-color:var(--fg);color:var(--bg);margin-left:auto}
-/* Local inputs use the browser File API, never a Cloudflare endpoint. */
-.demo-file-import{display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
-.demo-file-import label{font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px}
-.demo-file-import input{max-width:180px;font:11px var(--sans);color:var(--muted)}
-#demo-files-feedback{font-size:12px;color:var(--muted)}
 .demo-editor-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 .demo-input{min-width:0;display:grid;gap:6px}
 .demo-input textarea{display:block;box-sizing:border-box;width:100%;min-height:156px;padding:10px;resize:vertical;white-space:pre;tab-size:2}
@@ -133,11 +128,6 @@ tr[hidden]{display:none}
     <button id="demo-ng" type="button" aria-pressed="true">NG</button><button id="demo-ok" type="button" aria-pressed="false">修正後 OK</button>
     <span class="demo-width"><label for="demo-width-min">幅</label><input id="demo-width-min" type="number" value="375" min="1" max="5000" aria-label="検証の最小幅（px）"><span>–</span><input id="demo-width-max" type="number" value="1280" min="1" max="5000" aria-label="検証の最大幅（px）">px</span>
     <button id="demo-run" type="button">静的検査を実行</button>
-  </div>
-  <div class="demo-file-import" aria-label="ローカルファイルを読み込む">
-    <label for="demo-file-html">HTMLファイル <input id="demo-file-html" type="file" accept=".html,.htm,text/html"></label>
-    <label for="demo-file-css">CSSファイル <input id="demo-file-css" type="file" accept=".css,text/css"></label>
-    <output id="demo-files-feedback" aria-live="polite">端末内で読み込みます。サーバーへの送信はありません。</output>
   </div>
   <div class="demo-editor-grid">
     <div class="demo-input"><label for="demo-html">HTML</label><textarea id="demo-html" spellcheck="false" aria-label="検査対象HTML"></textarea></div>

@@ -8,7 +8,7 @@ Unknown is never turned into success: what the model does not cover is reported 
 
 ## Try the product
 
-**[Try the live responsive verifier](https://kikutadev.github.io/veriss/#live-check)**: the first example intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS, **choose local HTML + CSS files (up to 25,000 characters per file)**, and change the viewport width range. File selection runs in the browser without Cloudflare Worker requests; use the CLI below for large or complete stylesheets.
+**[Try the live responsive verifier](https://kikutadev.github.io/veriss/#live-check)**: the first example intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS directly, and change the viewport width range. Use the CLI below for files and complete stylesheets; the website does not fetch arbitrary URLs or use Cloudflare Workers.
 
 **Use it with files** (Node 24+, pnpm 12; this fork is not published to npm):
 

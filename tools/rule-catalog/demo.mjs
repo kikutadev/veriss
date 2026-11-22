@@ -12,9 +12,6 @@ const node = (id) => {
 const picker = node('demo-case');
 const htmlEditor = node('demo-html');
 const cssEditor = node('demo-css');
-const htmlFile = node('demo-file-html');
-const cssFile = node('demo-file-css');
-const fileFeedback = node('demo-files-feedback');
 const widthMin = node('demo-width-min');
 const widthMax = node('demo-width-max');
 const rangeLabel = node('demo-range');
@@ -55,7 +52,6 @@ for (const example of allExamples) {
 let selected = null;
 let side = 'ng';
 let modified = false;
-const imported = new Set();
 function markStale() {
     modified = true;
     status.textContent = '未検査の変更があります';
@@ -169,41 +165,8 @@ function loadPreset() {
     cssEditor.value = selected.css;
     caption.textContent = selected.caption;
     modified = false;
-    imported.clear();
-    htmlFile.value = '';
-    cssFile.value = '';
-    fileFeedback.textContent = '端末内で読み込みます。サーバーへの送信はありません。';
     inspect();
 }
-async function importFile(which, input) {
-    const file = input.files?.[0];
-    if (!file)
-        return;
-    try {
-        // Refuse large files before reading them into the page.
-        if (file.size > 100000)
-            throw new Error('ブラウザデモはHTML/CSSそれぞれ25,000文字までです。大きなファイルはCLIで検査してください。');
-        const value = await file.text();
-        if (value.length > 25000)
-            throw new Error('ブラウザデモはHTML/CSSそれぞれ25,000文字までです。大きなファイルはCLIで検査してください。');
-        (which === 'html' ? htmlEditor : cssEditor).value = value;
-        selected = null;
-        ng.setAttribute('aria-pressed', 'false');
-        ok.setAttribute('aria-pressed', 'false');
-        imported.add(which);
-        markStale();
-        fileFeedback.textContent = `${which.toUpperCase()}ファイルをブラウザ内に読み込みました（外部送信なし）。`;
-        if (imported.size === 2) {
-            caption.textContent = '読み込んだHTML/CSSを検査します。JavaScriptや外部スタイルシートは取得しません。';
-            inspect();
-        }
-    }
-    catch (err) {
-        fileFeedback.textContent = err instanceof Error ? err.message : String(err);
-    }
-}
-htmlFile.addEventListener('change', () => { void importFile('html', htmlFile); });
-cssFile.addEventListener('change', () => { void importFile('css', cssFile); });
 picker.addEventListener('change', () => { side = 'ng'; loadPreset(); });
 ng.addEventListener('click', () => { side = 'ng'; loadPreset(); });
 ok.addEventListener('click', () => { side = 'ok'; loadPreset(); });

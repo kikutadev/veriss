@@ -139,7 +139,7 @@ else {
     const command = (transitionE2E || productE2E) ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
     const args = productE2E
         ? ['exec', 'playwright', 'test', '-c', 'playwright.layout.config.mjs', '--trace', 'off',
-            'e2e/layout-product-real-ui.spec.mjs', 'e2e/layout-product-file-upload.spec.mjs', '--reporter=list']
+            'e2e/layout-product-real-ui.spec.mjs', '--reporter=list']
         : transitionE2E
             ? ['exec', 'playwright', 'test', '-c', 'playwright.layout.config.mjs', '--trace', 'off',
                 'e2e/layout-partial-geometry.spec.mjs', '-g',

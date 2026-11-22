@@ -92,9 +92,11 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - 別の空プロジェクトに `pnpm add github:kikutadev/veriss#93bacf0&path:packages/veriss` でGitコミット指定インストール成功し、`pnpm exec veriss check` で `VERIFIED`。これにより tarball に加えてGit依存の配布も確認。
 - **Phase2未着手**: 3つの異種実UIでの有効検出・誤検知・Unknownの実証はこのリリースに含まない。
 
-### Phase 2 初回実測とファイル入力の受入（2026-11-22）
+### Phase 2 初回実測の受入・不要なファイル入力の撤去（2026-11-22）
 
 - [x] 3実UIの同一ソース入力・ハッシュ付き再現、CLI実行、3エンジン×5幅の実測を保存。エラー13件はショートハンド競合であり、レイアウト不具合の検出成功例は現時点で0。数と限界は [実UIの検証記録](product-real-ui-evidence.md) を正とする。
 - [x] Workers不要のHTML/CSSローカルファイル入力を公開デモへ追加（それぞれ25,000文字まで、超過はCLI）。JS・外部リソース実行/取得を禁止した参考プレビュー。個別3ブラウザ18 E2Eと正式gate（既存3ブラウザ549 E2E）成功。
-- [x] fork main `045f748`、公開 `gh-pages` `fcd13ed`。公開URLの実操作で NG→OK / 390pxで横はみ出しなし / 結果表を確認。公開先は <https://kikutadev.github.io/veriss/>。WorkerのURL取得モードは復活させていない。
+- [x] Phase2実測はfork main `045f748`、公開 `gh-pages` `fcd13ed` で一度受入済み。ファイル選択UIは後続の撤去版で上書きする。WorkerによるURL取得モードは復活させない。
 - [ ] 実UI由来の有効NG→OK検出実証、誤検出の分類と改善。**Phase2は継続中。**
+
+- [x] 実ゲームの改変CSS（390px画面で700px固定幅）をブラウザで測定し、全CSSでは幾何反例が出ない検出漏れを再現。**既存ゲームの不具合を発見したとは主張しない。** 次は閉包済みCSSによる独立投影の実証。

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {run} from '../tools/rule-catalog/run.mjs';
 import {examples,sides} from '../tools/rule-catalog/examples.mjs';
 
@@ -25,4 +26,14 @@ test('unsupported styling remains Unknown in both the demo and engine',()=>{
   assert.equal(run(bad).status,'unknown');
   assert.ok(run(bad).findings.some(x=>x.code.startsWith('U_')));
   assert.equal(run(good).status,'verified');
+});
+
+
+test('public demo has no HTML/CSS file picker or URL collector',()=>{
+  const html=readFileSync(new URL('../tools/rule-catalog/page-template.html',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../tools/rule-catalog/demo.mts',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/type=["']file["']|demo-file-html|demo-file-css/);
+  assert.doesNotMatch(client,/demo-file-html|demo-file-css|importFile\(/);
+  assert.match(html,/id="demo-html"/);
+  assert.match(html,/id="demo-css"/);
 });

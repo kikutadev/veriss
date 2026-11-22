@@ -29,7 +29,7 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
   ```sh
   node packages/veriss/bin/veriss.mjs check --html tests/fixtures/product-real-ui/duo-game-title.html --css tests/fixtures/product-real-ui/duo-game-title.css --min-width 320 --max-width 1280 --json
   ```
-- `node tools/gate-guarded.mjs --product-e2e` で3ブラウザの全45点観測とファイル入力E2Eを実行。検証器出力とブラウザ計測は別物として扱い、点観測を証明に変換しない。
+- `node tools/gate-guarded.mjs --product-e2e` で3ブラウザの全45点観測を実行。検証器出力とブラウザ計測は別物として扱い、点観測を証明に変換しない。
 - **再取得が必要な場合のみ** `node tools/capture-product-real-ui.mjs --capture`。ポートフォリオ・Bootstrapは開発マシンから直接公開ページにアクセスし、DUOは隣接するゲームのソースを参照する。再取得によりソースが変わり得るので、比較時は事前のSHA-256を照合する。Workerは使用しない。
 - Bootstrap部分は第三者の実例としてのオフライン評価資料であり、当フォークの作例や独自成果とは称しない。
 
@@ -38,13 +38,20 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 1. **未達:** 実ページから「verissでのみ発見してブラウザで再現し、修正後に反例が消えた」実例はまだ0件。既存のGrid NG→OKは、意図して作った製品デモであり実サイトでの発見実績ではない。
 2. **最優先:** `E_CSS_SHORTHAND_CONFLICT` の判定・重大度を「実際に壊れる」表示と混同しない。一般的な上書きの正常例と意図しないミスの対照を3ブラウザで調べ、誤検知・有効検出を確定する。
 3. **次点:** 3件の Unknown 主要因から、小さくても健全に証明できる局所モデル・入力準備の改善点を抽出する。ただし未対応を黙って成功にしない。
-4. **使い始める導線:** 公開Webデモはブラウザの File API によるHTML/CSSファイル読込を追加。25,000文字超は無理にメインスレッドで実行せず、完全なCSSを渡せるCLIへ案内する。**Cloudflare Workerは不要**。
+4. **使い始める導線:** 公開WebはHTML/CSSの直接入力と既存デモを維持。ファイル選択UIは不要との判断で撤去し、実ファイルはCLIから検査する。Cloudflare Workerは使わない。
 
 本レポートは Phase 2 の **実UIデータ収集・実測段階** の完了記録であり、検出精度の製品価値実証が完了したことを意味しない。
 
 ## リリース受入（2026-11-22）
 
-- 追加の固定入力・CLI再現3/3単体テスト成功。新しい実UI観測9件とWebファイル入力・悪意ある外部参照遮断9件は、Chromium / Firefox / WebKit で **18/18成功**（`node tools/gate-guarded.mjs --product-e2e`）。Chromeプロセス残留0。
+- 追加の固定入力・CLI再現3/3単体テスト成功。当時の新しい実UI観測9件と、後に撤去したWebファイル入力等9件は、Chromium / Firefox / WebKit で **18/18成功**（`node tools/gate-guarded.mjs --product-e2e`）。Chromeプロセス残留0。
 - 全体の正式 `tools/gate.sh` は監督ランナーを通して **exit 0**、root + 5 package単体失敗0、既存component-lint評価の不変、3ブラウザE2E **549 passed**。`pnpm build:ts` / `pnpm check:ts` 成功。正式ゲートのE2E549件と新規個別18件は別実行（合算の全体ゲートではない）。
-- fork mainの実装 `045f748`、静的配信 `gh-pages` の `fcd13ed`。GitHub Actionsは使用せず、<https://kikutadev.github.io/veriss/#live-check> の配信済みHTMLをローカルビルドとSHA-256照合。実公開ブラウザでHTML/CSSファイルを指定するとNG `VIOLATED` → 修正済みCSSで `VERIFIED`、390pxで横はみ出しなし、実UI3件のUnknown表示を確認した。Cloudflare Workerへの呼び出しコードは配信バンドルに存在しない。
-- 完了したのはPhase 2の**実例収集・限定実測・ファイル導線**である。実サイトでverissが新たな不具合を発見してNG→修正後OKにした実績は **0件のまま**。検査精度の価値実証およびPhase 3は未達。
+- fork mainの実装 `045f748`、静的配信 `gh-pages` の `fcd13ed`。GitHub Actionsは使用せず、<https://kikutadev.github.io/veriss/#live-check> の配信済みHTMLをローカルビルドとSHA-256照合。当時は実公開ブラウザでHTML/CSSファイル読込とNG→修正済みCSS、390px画面、実UI3件の結果表を確認した。その後、ファイル読込UIはユーザー指定で撤去した。Cloudflare Workerへの呼び出しコードは配信バンドルに存在しない。
+- 完了したのはPhase 2の**実例収集・限定実測**である。ファイル選択UIは後続のユーザー判断で撤去した。実サイトでverissが新たな不具合を発見してNG→修正後OKにした実績は **0件のまま**。検査精度の価値実証およびPhase 3は未達。
+
+## Phase2 負例：実ゲームの改変CSSで検出漏れを調査（2026-11-22）
+
+- DUO瓦割りの**実際の初期HTMLとCSS**に、テスト限定で `#game-shell{width:700px!important;max-width:none!important}` を追記する（ゲーム本体は変更しない）。390×600pxで、元のゲームシェル幅は390pxだが改変後700pxとなる。横方向の操作・表示が欠損し得る明白な**意図的な破壊**であり、実際に配信中のゲームのバグではない。
+- 同じ完全文書への静的 `analyzeHTML` は、元のCSSの `@import` や未対応規則等のため `Unknown`、幾何反例 `E_LAYOUT_*` は取得できない。改変前後のエラー5件はともに `E_CSS_SHORTHAND_CONFLICT` で、レイアウト破綻を検知していない。
+- ブラウザでの負例は `e2e/layout-product-real-ui.spec.mts` に固定し、幅390pxでゲームシェルが390→700pxになることをChromium・Firefox・WebKitで照合する。**既存コードの部分幾何投影も**、headの非スタイルリンク、未閉包の `@import`、body overflow伝播などがある元入力では独立した矩形を作れない。これらはエンジンが根拠なしに値を補完しないためのUnknownである。
+- **次の実装修正の条件**: CSSの読み込み閉包が成立している入力だけを対象に、実装から依存関係を独立投影できる要素を増やす。`@import`や祖先の overflow を単に削り落として `VERIFIED` にすることは禁止する。正常なCSSに対する幾何モデルの成立を先に確認し、その上で上記改変に対する反例の検算へ進む。

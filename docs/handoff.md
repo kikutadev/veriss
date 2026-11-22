@@ -437,3 +437,10 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - Phase2初回調査とWorker不要のローカルファイル読込を fork `main` `045f748`、GitHub Pages `gh-pages` `fcd13ed` に反映。`tools/gate.sh` exit=0、全単体失敗0、既存3ブラウザE2E549件成功、追加3ブラウザE2E18件成功。公開URLでNG→OK、実UI3件結果、390pxの横はみ出しなしを確認。
 - 本物のレイアウト不具合を検出・修正した数は0。Unknownの上位原因とshort-hand競合の解釈は `docs/product-real-ui-evidence.md` を正本とし、次は実UIで証明可能な局所モデル／状態遷移の実効性を改善。Phase2完了とは記載しない。
+
+### Phase 2 方針修正（2026-11-22）
+
+- ユーザー指示によりWebのファイル検証UI（HTML/CSS選択）、読込処理と専用E2Eを撤去。追加の公開画面要素は増やさない。既存の直接入力デモ・CLI・実UI3件の評価と再生入力は維持。
+- 本筋は、実UIの誤検出を独立ブラウザ実測で分類し、検査器の汎用性・有効な不具合検出実績を改善する。URL収集Workerも復活させない。
+
+- 撤去後の個別受入: 実UI由来の負例（ゲームシェルを700px幅へ改変）を含め、3ブラウザの専用E2E12/12成功。Web UIのファイル選択が存在しないことを回帰テスト化。静的完全文書は改変を幾何エラーとして検出できずUnknown、モデルが安全だという主張はしない。

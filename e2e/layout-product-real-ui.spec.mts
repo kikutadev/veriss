@@ -46,3 +46,25 @@ for(const sample of cases){
   console.log('PHASE2_BROWSER '+JSON.stringify({source:sample.name,browser:browserName,observations:seen}));
  });
 }
+
+// Negative control from an actual game UI: a deliberately injected fixed-width
+// regression is visibly clipped at mobile width. It is NOT an existing defect
+// of the original game. A static UNKNOWN must not be marketed as passing.
+test('real game CSS mutation clips shell, static Unknown does not mean safe',async({page,browserName})=>{
+ const root=resolve('tests/fixtures/product-real-ui');
+ const [html,css]=await Promise.all([
+  readFile(resolve(root,'duo-game-title.html'),'utf8'),
+  readFile(resolve(root,'duo-game-title.css'),'utf8')
+ ]);
+ const width=390,height=600;
+ await page.setViewportSize({width,height});
+ await page.route('**/*',route=>route.abort());
+ await page.setContent(html.replace('</head>',`<style>${css}</style></head>`),{waitUntil:'domcontentloaded'});
+ const before=await page.locator('#game-shell').boundingBox();
+ expect(before?.width).toBe(width);
+ await page.addStyleTag({content:'#game-shell{width:700px!important;max-width:none!important}'});
+ const after=await page.locator('#game-shell').boundingBox();
+ expect(after?.width).toBe(700);
+ expect(after!.x+after!.width).toBeGreaterThan(width);
+ console.log('PHASE2_MUTATION '+JSON.stringify({browser:browserName,width,height,normalWidth:before?.width,mutantWidth:after?.width,kind:'injected-not-live-defect'}));
+});
