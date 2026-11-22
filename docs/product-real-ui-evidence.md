@@ -92,3 +92,9 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 正常版では指定された320〜1280px全幅に対する右端 `inlineEnd <= viewport` が **Verified**。`#game-shell{width:700px!important;max-width:none!important}` を追加した**テスト用破壊版**は同じ検査で **Violated**。390pxの実ブラウザで元の390px幅→破壊版700px幅を確認。これは修正済みの実バグではなく、明示的に挿入した負例である。
 - Chromium / Firefox / WebKit で、正常版7幅×2高さ、改変版6幅×2高さの矩形を証明済み領域のアフィン式と比較し、**全点一致**。別のgeneric block例4種類×6幅×2高さも3ブラウザで一致。`e2e/layout-product-real-ui.spec.mts` と `e2e/layout-partial-geometry.spec.mts` に再実行可能なテストを追加。
 - **製品価値の現在地**: 実ゲームの現物HTML/CSSと固定したCSS読み込み閉包を使えば、横方向だけでも意図的な破壊を静的に発見できるようになった。ただし **実サイト由来の未知バグ検出実績は依然0件**。次は依存関係の入力整備とJS状態別契約に進める。
+
+### CSS閉包の部分証明：正式ゲート・公開受入（2026-11-22）
+
+- 実装はfork `main` `5508568`、静的Pagesは `gh-pages` `5f4953c` に公開済み。`pnpm build:ts` / `pnpm check:ts` 成功、公式 `tools/gate.sh`（監督起動）exit=0、rootと全5パッケージunit fail=0、既存3ブラウザE2E **552 passed**（従来549件+部分幾何の新規3件）。実UI3ブラウザ個別 **21 passed** は別実行である。Chrome残留なし。
+- GitHub Pagesの公開ビルドは`_site/index.html`とSHA-256一致。<https://kikutadev.github.io/veriss/#real-ui> で、Bootstrap公式サンプルと部分幾何実証の文言、NG→OK→Unknown、390pxの横はみ出しなし、ファイルアップロード・Workerなしを実ブラウザで確認。新しい操作UIは作っていない。
+- 全3サイトのページ全体はUnknownを維持。DUOのCSS読込依存を固定した場合だけ横方向の契約が成立するという区別を厳守。実サイトの未知不具合を発見した数は依然0件。

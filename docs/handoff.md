@@ -455,3 +455,9 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - 正常な一括指定→個別指定のCSSカスケードを解析し、実UI3件に残っていた偽の`E_CSS_SHORTHAND_CONFLICT`を13件→0件に削減。方向依存の重複指定は確定エラーでなくUnknown。Bootstrapの疑似要素リセット由来ノイズも減り、警告27→2件。3件の全体判定はUnknownであり、レイアウト不具合を発見したとの主張はしない。
 - 実装は fork main `41561bc`、公開 Pages `5cca38e`。正式ゲート exit 0、全unit fail 0、既存E2E 549 passed、追加E2E 18 passed。公開ページで3件の改修後値、NG→OK→Unknown、390px幅、ファイルアップロード/Worker未追加を実操作で確認。検証根拠・残る未証明は `docs/product-real-ui-evidence.md`。
+
+### Phase 2 閉じた実ゲームCSSの横方向契約（2026-11-22）
+
+- DUO瓦割りHTMLと現物CSSのGoogle Fonts `@import` を実取得した `@font-face` 632件で閉じた再現入力を固定（gzip CSS+SHAと取得UA/URLを `tests/fixtures/product-real-ui/` に保存）。通常は`#game-shell`の横方向契約がVerified、意図的な700px上書きはViolated。未解決@import、classic scrollbar、外部stylesheetはUnknown。全CSS・高さ・JS状態の検証ではない。
+- 幅%+max-width(px)+auto marginとfaviconメタデータの独立幾何、body overflow伝播の横方向限定サロゲートを汎用的に改善。3ブラウザで実ゲーム正常/破壊版・汎用4種の予測矩形を照合。
+- fork main `5508568`、GitHub Pages `5f4953c`。公式gate exit0、全unit fail0、3ブラウザ必須552 E2E、実UIの個別21 E2E成功。公開URLで実例記述・デモNG→OK→Unknown・390px・不要UI未復活を確認。実サイト由来未知バグ検出0件。詳細は `docs/product-real-ui-evidence.md`。
