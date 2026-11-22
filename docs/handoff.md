@@ -471,3 +471,9 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - fork main `b8ba7ac`、Pages `12dfb00` に統合。正式gate exit0（全unit fail0、3ブラウザ552 E2E）、追加オフラインobserver 3 E2E、第三者ログイン済みUI 6 E2Eが独立して成功。公開HTMLのSHA一致、実ブラウザ操作で導入案内・NG→OK→Unknown・390px幅を確認。Gitコミット指定の本体+adapter-coreを外部空プロジェクトへ導入し、公開API動作成功。
 - Phase 2b/2cの当面の製品価値: **ログイン後の実UI状態をユーザーの既存Playwright E2Eから再利用可能な共通APIで観測し、契約違反を報告**。範囲の外にある静的証明はUnknown。今後は状態列挙と入力のCSS閉包が課題。`docs/product-real-ui-evidence.md` / `README.md` を参照。
+
+### Phase 2d ログイン後モーダル受入（2026-11-23）
+
+- 新しい `captureModalTabFocus` と `modalFocusObservation` は `@mizchi/veriss-adapter-core` から利用可能。ログイン後の実React-admin Ordersでフィルターメニュー→Save current queryのモーダルを開き、3ブラウザ×3幅でTabの背面漏れなしを確認、保存せずCancel。意図的な漏れ負例をオフライン3ブラウザで検出し、制御あり対照は通過。body/htmlの一時フォーカスだけでは違反にせず不確定とする。全幅静的証明はUnknown。
+- fork main実装 `14a8e85`、GitHub Pages `98ad6ef`。公式ゲート exit0（単体 fail0、既存552 E2E）、独立オフライン6 E2E・実アプリ6 E2E成功。Git-pinnedインストールと公開サイトの実ブラウザ受入を確認。検証条件は `docs/product-real-ui-evidence.md`、導入例は `README.md`。
+- 次の価値検証候補: RBACデモのViewerではUsersの編集/停止ボタンが無効（実画面で確認）。Adminとの権限別状態契約を検証すること。フォームバリデーション/エラー状態も対象候補。外部認証の自動収集やWorkerの追加は不要。
