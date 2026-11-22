@@ -1,0 +1,15 @@
+{
+  "name": "portfolio-about",
+  "source": "https://kikuta.dev/about/",
+  "markup": "https://kikuta.dev/about/",
+  "stylesheets": [
+    {
+      "url": "https://kikuta.dev/_astro/BaseLayout.D7I6vR7-.css",
+      "sha256": "a77d342a73f584758572fe118c9bbd685dccecf59b131e18f26b8f5cd83f1c74",
+      "bytes": 45819
+    }
+  ],
+  "htmlSha256": "856797e5cd7be3517c1f71e73bb8abef4b5b95afc5d913b457ef7f7a5c038749",
+  "cssSha256": "a77d342a73f584758572fe118c9bbd685dccecf59b131e18f26b8f5cd83f1c74",
+  "method": "static initial HTML + fetched author CSS in source order, scripts and stylesheet loading nodes removed; JS not executed; images/fonts not fetched; capture date 2026-11-22"
+}

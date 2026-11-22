@@ -1,0 +1,15 @@
+{
+  "name": "duo-game-title",
+  "source": "game/duo-breaker",
+  "markup": "game/duo-breaker/index.html",
+  "stylesheets": [
+    {
+      "url": "game/duo-breaker/src/style.css",
+      "sha256": "c79c7677db10706ecd7510e80483859f2a58dc4b7becfa99baa37a5bce095a77",
+      "bytes": 21502
+    }
+  ],
+  "htmlSha256": "dbb950999f0ee0b0e7565a2bf04553e22c2c7fb6043d0774fd09c534b34a157a",
+  "cssSha256": "c79c7677db10706ecd7510e80483859f2a58dc4b7becfa99baa37a5bce095a77",
+  "method": "static initial HTML + fetched author CSS in source order, scripts and stylesheet loading nodes removed; JS not executed; images/fonts not fetched; capture date 2026-11-22"
+}

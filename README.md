@@ -8,7 +8,7 @@ Unknown is never turned into success: what the model does not cover is reported 
 
 ## Try the product
 
-**[Try the live responsive verifier](https://kikutadev.github.io/veriss/#live-check)**: the first example intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS and change the viewport width range.
+**[Try the live responsive verifier](https://kikutadev.github.io/veriss/#live-check)**: the first example intentionally overflows at narrow widths. Switch **NG** → **修正後 OK** to see a real counterexample disappear; edit HTML/CSS, **choose local HTML + CSS files (up to 25,000 characters per file)**, and change the viewport width range. File selection runs in the browser without Cloudflare Worker requests; use the CLI below for large or complete stylesheets.
 
 **Use it with files** (Node 24+, pnpm 12; this fork is not published to npm):
 
@@ -27,7 +27,7 @@ node packages/veriss/bin/veriss.mjs check --html tests/fixtures/veriss-cli/grid.
 
 The first command reports a failing viewport (416px in this fixture), the second reports **VERIFIED**. The CLI checks a **static HTML fragment** plus the **complete author CSS** that you provide, running the analyzer and the independent Z3 layout proof. It does **not** fetch external stylesheets or run JS. Unsupported cases return **UNKNOWN**, not success. Exit codes: 0 verified, 1 violated, 2 unknown, 3 invalid input/runtime failure. Errors/warnings/Unknown are separate counts; `--json` includes the failing width interval and witness when available.
 
-[Product-value plan and release acceptance](docs/product-value-plan.md).
+[Product-value plan and release acceptance](docs/product-value-plan.md). [Real-world UI findings and reproduction](docs/product-real-ui-evidence.md): three actual inputs all remain Unknown, not a claim of real-site proof.
 
 ## Expanded verification targets (upstream 2026-11-22)
 

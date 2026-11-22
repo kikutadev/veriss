@@ -1,0 +1,20 @@
+{
+  "name": "bootstrap-album",
+  "source": "https://getbootstrap.com/docs/5.3/examples/album/",
+  "markup": "https://getbootstrap.com/docs/5.3/examples/album/",
+  "stylesheets": [
+    {
+      "url": "https://getbootstrap.com/docs/5.3/dist/css/bootstrap.min.css",
+      "sha256": "9caac977a0af0c2229abd397eee3345899c4020da2a1a0b711c1cc543fe3719d",
+      "bytes": 232360
+    },
+    {
+      "url": "inline",
+      "sha256": "e6ae21f57f58e33821780aeeab3ca273504aae918101e2af78338bc1f494e293",
+      "bytes": 1347
+    }
+  ],
+  "htmlSha256": "c0d2e5cea20c31c02e2e247f4bbee152b6ddc4a1d61054d1c1e1ffb48351e95b",
+  "cssSha256": "0d8c5c3dfc763bf28affb548449dae08b6d13b7862363066ce34d4279e6dca43",
+  "method": "static initial HTML + fetched author CSS in source order, scripts and stylesheet loading nodes removed; JS not executed; images/fonts not fetched; capture date 2026-11-22"
+}

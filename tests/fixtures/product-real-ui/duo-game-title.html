@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#090e18">
+<title>DUO瓦割り | KIKUTA GAMES</title>
+<meta name="description" content="タイミングを決めてパワーを溜めろ。ミスした瞬間、折りたたみスマホが一斉に逆折れ！">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+</head><body>
+<main id="game-shell" data-i18n-aria="gameTitle" aria-label="DUO瓦割り">
+  <div id="game-canvas" aria-hidden="true"></div>
+  <div id="hud" class="hud" hidden="">
+    <div class="hud-top"><button class="tiny-link" id="pause-button" type="button"><span data-i18n="pauseButton">Ⅱ メニュー</span></button><div id="combo-board" class="combo-board"><span>CHAIN</span><strong id="combo-count">0</strong></div></div>
+    <div id="power-callout" class="power-callout" aria-live="polite"></div>
+    <div id="meter" class="meter" data-i18n-aria="meterAria" aria-label="タイミングゲージ"><div class="meter-text"><strong id="meter-instruction" data-i18n="meterInstruction">緑の範囲でタップ</strong><span id="speed-text">SPEED x1.0</span></div><div class="meter-track"><div class="meter-zone"></div><div class="meter-center"></div><div id="needle" class="meter-needle"></div><div id="hit-marker" class="hit-marker" hidden=""></div></div><p id="meter-hint" data-i18n="meterHint">画面のどこでもタップ可能　／　ミスで一撃解放</p></div>
+  </div>
+  <section id="title-screen" class="overlay title-screen">
+    <header class="top-brand"><span>KIKUTA GAMES</span><div class="title-top-actions"><a href="/" data-i18n="gamesBack">← ゲーム一覧</a>
+      <div class="language-switch" role="group" aria-label="Language"><button type="button" data-language="ja" aria-pressed="true">日本語</button><button type="button" data-language="en" aria-pressed="false">EN</button></div></div></header>
+    <div class="hero-title"><div class="eyebrow">FOLDABLE PHONE × KARATE</div><h1>DUO<span data-i18n="gameSuffix">瓦割り</span></h1><p><span data-i18n="heroLead">折りたたむ方向？ </span><strong data-i18n="heroEmphasis">逆だ。</strong></p></div>
+    <div class="title-foot">
+      <div class="world-counter"><div class="counter-label">WORLDWIDE DAMAGE</div><div class="counter-num"><strong id="global-broken">—</strong><span data-i18n="phoneUnit">台</span></div><div class="counter-money" id="global-money">累計 — 円</div><small class="update-hint" data-i18n="statsHint">集計は約30分ごとに反映 · 表示は画面を開いたときに更新</small></div>
+      <button id="start-button" class="btn btn-primary" type="button" data-i18n="startLoading" disabled="">準備中…</button>
+      <button id="history-open" class="btn btn-secondary" type="button" data-i18n="historyOpen" hidden="">瓦割り記録</button>
+      <a class="btn btn-secondary" href="./ranking/" data-i18n="rankingsLink">ランキングを見る ↗</a>
+      <div class="price-note"><a href="https://www.apple.com/jp/shop/buy-iphone/iphone-duo" target="_blank" rel="noopener noreferrer" data-i18n-aria="applePrice" aria-label="Apple公式のiPhone Duo価格を見る"><span data-i18n="priceNote">Duo ¥364,800（税込）</span></a></div>
+    </div>
+  </section>
+  <section id="result-screen" class="overlay result-screen" hidden="">
+    <div class="result-content"><div class="result-summary"><span class="result-eyebrow">SMASH RESULT</span><h2 id="result-heading" data-i18n="resultHeading">破壊完了。</h2><div class="result-count"><strong id="result-broken">0</strong><span data-i18n="phoneUnit">台</span></div><div class="result-label" data-i18n="damageLabel">被害総額</div><div id="result-money" class="result-money">¥0</div><div class="result-sub" id="result-chain">0連続成功</div><div id="result-rank" class="result-rank" hidden=""></div><p id="result-joke" class="result-joke" data-i18n="resultJoke">左右のパーツは別々の人に引き取られました。</p></div><div class="result-actions">
+      <form id="name-form"><label for="player-name" data-i18n="nameLabel">ランキングに名前を刻む（15文字以内）</label><div class="name-row"><input id="player-name" type="text" maxlength="30" data-i18n-placeholder="namePlaceholder" placeholder="ニックネーム" autocomplete="nickname"><button type="submit" data-i18n="nameSubmit">登録</button></div><small id="name-status" aria-live="polite"></small></form>
+      <div class="result-action-row"><button id="retry-button" class="btn btn-primary" type="button" data-i18n="retry">もう一度 →</button><button id="share-button" class="btn btn-secondary" type="button" data-i18n="share">シェア ↗</button></div>
+      <button id="replay-button" class="btn btn-secondary replay-button" type="button" data-i18n="replayButton">▶ 今のプレイをリプレイ</button>
+      <small id="local-history-status" class="local-history-status"></small>
+      <div class="result-links"><a href="./ranking/" data-i18n="rankLink">ランキング</a><button id="return-title" type="button" data-i18n="titleBack">タイトルへ</button><a href="/" data-i18n="gameList">ゲーム一覧へ</a></div></div>
+    </div>
+  </section>
+  <section id="history-screen" class="overlay history-screen" hidden="" data-i18n-aria="historyTitle" aria-label="瓦割り記録">
+    <header class="history-header"><button id="history-close" type="button" data-i18n="historyBack">← タイトルへ</button><h2 data-i18n="historyTitle">瓦割り記録</h2></header>
+    <p class="history-description" data-i18n="historyDescription">このブラウザで記録した直近100プレイ。選ぶとリプレイできます。</p>
+    <div id="history-list" class="history-list"></div>
+    <p class="history-note" data-i18n="historyNote">ブラウザのデータを消すと記録も消えます。</p>
+  </section>
+  <section id="pause-screen" class="overlay pause-screen" hidden=""><div class="pause-card"><h2 data-i18n="pauseTitle">一時停止</h2><button class="btn btn-primary" id="resume-button" type="button" data-i18n="resume">再開</button><button class="btn btn-secondary" id="pause-title" type="button" data-i18n="titleBack">タイトルへ</button><a class="btn btn-secondary" href="/" data-i18n="gameList">ゲーム一覧へ</a></div></section>
+  <div id="replay-controls" class="replay-controls" hidden=""><div class="replay-info">REPLAY <span id="replay-rate">1.0×</span></div><div class="replay-control-actions"><button type="button" id="replay-speed">2倍速</button><button type="button" id="replay-exit">結果へ戻る</button></div></div>
+  <div id="tap-layer" role="button" tabindex="0" data-i18n-aria="tapAria" aria-label="中央のタイミングでタップ" hidden=""></div>
+  <div id="smash-overlay" class="smash-overlay" hidden=""><div><span id="smash-count">0</span></div><span class="smash-caption">PHONES DESTROYED</span></div>
+  <div id="aftermath-label" class="aftermath-label" hidden=""></div>
+  <div id="flash" class="flash" aria-hidden="true"></div>
+</main>
+
+</body></html>

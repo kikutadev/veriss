@@ -121,8 +121,12 @@ if (process.argv[2] === '--watchdog') {
     setInterval(() => browser.isConnected(), 1000);
   `;
   const transitionE2E = process.argv[2] === '--transition-e2e';
-  const command = transitionE2E ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
-  const args = transitionE2E
+  const productE2E = process.argv[2] === '--product-e2e';
+  const command = (transitionE2E || productE2E) ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
+  const args = productE2E
+    ? ['exec','playwright','test','-c','playwright.layout.config.mjs','--trace','off',
+       'e2e/layout-product-real-ui.spec.mjs','e2e/layout-product-file-upload.spec.mjs','--reporter=list']
+    : transitionE2E
     ? ['exec','playwright','test','-c','playwright.layout.config.mjs','--trace','off',
        'e2e/layout-partial-geometry.spec.mjs','-g',
        'conditional convex|font-independent form|shared progress can|closed CSS width',

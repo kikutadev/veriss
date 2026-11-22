@@ -12,6 +12,9 @@ const node = (id) => {
 const picker = node('demo-case');
 const htmlEditor = node('demo-html');
 const cssEditor = node('demo-css');
+const htmlFile = node('demo-file-html');
+const cssFile = node('demo-file-css');
+const fileFeedback = node('demo-files-feedback');
 const widthMin = node('demo-width-min');
 const widthMax = node('demo-width-max');
 const rangeLabel = node('demo-range');
@@ -52,6 +55,7 @@ for (const example of allExamples) {
 let selected = null;
 let side = 'ng';
 let modified = false;
+const imported = new Set();
 function markStale() {
     modified = true;
     status.textContent = '未検査の変更があります';
@@ -63,7 +67,14 @@ function markStale() {
 function renderPreview() {
     const html = htmlEditor.value;
     const css = cssEditor.value.replace(/<\/style/gi, '<\\/style');
-    preview.srcdoc = `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}html,body{margin:0}${css}</style><body>${html}</body></html>`;
+    // No outgoing image/font/stylesheet fetches and no JS inside this preview.
+    const prelude = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'">';
+    if (/<head(?:\s|>)/i.test(html)) {
+        preview.srcdoc = html.replace(/<head(?:\s[^>]*)?>/i, m => m + prelude + `<style>${css}</style>`);
+    }
+    else {
+        preview.srcdoc = `<!doctype html><html lang="ja"><head>${prelude}<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}html,body{margin:0}${css}</style></head><body>${html}</body></html>`;
+    }
 }
 function inspect() {
     criticalStatus.textContent = '';
@@ -71,13 +82,13 @@ function inspect() {
     status.textContent = '解析中…';
     status.dataset.status = '';
     findings.replaceChildren();
-    renderPreview();
     try {
         const min = Number(widthMin.value), max = Number(widthMax.value);
         if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || min < 1 || max > 5000 || min > max)
             throw new Error('検証幅は1–5000pxで、最小幅は最大幅以下にしてください');
         if (htmlEditor.value.length > 25000 || cssEditor.value.length > 25000)
             throw new Error('ブラウザデモはHTML/CSSそれぞれ25,000文字までです');
+        renderPreview();
         rangeLabel.textContent = `viewport ${min}–${max}px`;
         const result = run({ html: htmlEditor.value, css: cssEditor.value, vw: [min, max], accessibility: modified ? true : selected?.accessibility ?? true, ...(!modified && selected?.boxes ? { boxes: selected.boxes } : {}) });
         const count = result.findings.length;
@@ -158,8 +169,41 @@ function loadPreset() {
     cssEditor.value = selected.css;
     caption.textContent = selected.caption;
     modified = false;
+    imported.clear();
+    htmlFile.value = '';
+    cssFile.value = '';
+    fileFeedback.textContent = '端末内で読み込みます。サーバーへの送信はありません。';
     inspect();
 }
+async function importFile(which, input) {
+    const file = input.files?.[0];
+    if (!file)
+        return;
+    try {
+        // Refuse large files before reading them into the page.
+        if (file.size > 100000)
+            throw new Error('ブラウザデモはHTML/CSSそれぞれ25,000文字までです。大きなファイルはCLIで検査してください。');
+        const value = await file.text();
+        if (value.length > 25000)
+            throw new Error('ブラウザデモはHTML/CSSそれぞれ25,000文字までです。大きなファイルはCLIで検査してください。');
+        (which === 'html' ? htmlEditor : cssEditor).value = value;
+        selected = null;
+        ng.setAttribute('aria-pressed', 'false');
+        ok.setAttribute('aria-pressed', 'false');
+        imported.add(which);
+        markStale();
+        fileFeedback.textContent = `${which.toUpperCase()}ファイルをブラウザ内に読み込みました（外部送信なし）。`;
+        if (imported.size === 2) {
+            caption.textContent = '読み込んだHTML/CSSを検査します。JavaScriptや外部スタイルシートは取得しません。';
+            inspect();
+        }
+    }
+    catch (err) {
+        fileFeedback.textContent = err instanceof Error ? err.message : String(err);
+    }
+}
+htmlFile.addEventListener('change', () => { void importFile('html', htmlFile); });
+cssFile.addEventListener('change', () => { void importFile('css', cssFile); });
 picker.addEventListener('change', () => { side = 'ng'; loadPreset(); });
 ng.addEventListener('click', () => { side = 'ng'; loadPreset(); });
 ok.addEventListener('click', () => { side = 'ok'; loadPreset(); });
