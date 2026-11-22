@@ -461,3 +461,8 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - DUO瓦割りHTMLと現物CSSのGoogle Fonts `@import` を実取得した `@font-face` 632件で閉じた再現入力を固定（gzip CSS+SHAと取得UA/URLを `tests/fixtures/product-real-ui/` に保存）。通常は`#game-shell`の横方向契約がVerified、意図的な700px上書きはViolated。未解決@import、classic scrollbar、外部stylesheetはUnknown。全CSS・高さ・JS状態の検証ではない。
 - 幅%+max-width(px)+auto marginとfaviconメタデータの独立幾何、body overflow伝播の横方向限定サロゲートを汎用的に改善。3ブラウザで実ゲーム正常/破壊版・汎用4種の予測矩形を照合。
 - fork main `5508568`、GitHub Pages `5f4953c`。公式gate exit0、全unit fail0、3ブラウザ必須552 E2E、実UIの個別21 E2E成功。公開URLで実例記述・デモNG→OK→Unknown・390px・不要UI未復活を確認。実サイト由来未知バグ検出0件。詳細は `docs/product-real-ui-evidence.md`。
+
+### Phase 2c ログイン後UI observer（2026-11-23）
+
+- `@mizchi/veriss-adapter-core` に`captureViewport` / `captureClosedScopeTabFocus` を追加。既存の認証済みPlaywright Pageだけを使い、スクロール範囲と閉じたdrawerへの画面外Tabフォーカスを状態名付きの`Observation`へ変換。HTML本文/入力値/セッションは収集しない。静的モデル証明はUnknownのまま。
+- React-admin公式デモと公開RBAC管理画面の外部3ブラウザE2EをObserverへ切替え、実障害2件を再検出。オフライン3ブラウザの内部スクロール・inert・横幅の対照も追加。再実行と導入例は `README.md`、実測根拠は `docs/product-real-ui-evidence.md`。次はSPA状態契約の導入容易性を高める（自動で全状態を証明できるとの主張はしない）。

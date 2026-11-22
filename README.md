@@ -31,6 +31,40 @@ The first command reports a failing viewport (416px in this fixture), the second
 
 **Audit post-login demo states (requires network, not part of the offline gate):** `node tools/gate-guarded.mjs --external-e2e`. Uses only publicly documented demo accounts, observes two distinct apps on Chromium/Firefox/WebKit at four widths, and reports `verifyUI` observation failures while preserving static `UNKNOWN`.
 
+## Check an authenticated web app from an existing Playwright test
+
+Use the **app's existing login and navigation steps**; veriss does not need credentials or a URL-fetching worker. The adapter-core observer measures **only a browser document's horizontal extent, the selected main rectangle, and focus geometry**. It does not collect text, input values, cookies, tokens or HTML/CSS source. This is a **runtime observation**, not a proof that every width or application state is covered.
+
+Install the two Git packages at matching commits in a project that already uses Playwright: `@mizchi/veriss` and `@mizchi/veriss-adapter-core` (the latter has a peer dependency on the former). Then, inside a Playwright test **after the application has reached a stable logged-in state**:
+
+```js
+import {captureViewport, captureClosedScopeTabFocus, verifyUI} from '@mizchi/veriss-adapter-core';
+
+// page: the Playwright Page returned by your own authenticated E2E setup.
+const viewport = await captureViewport(page, {state:'dashboard',profile:'phone'});
+// For menus, call only while this specific scope is CLOSED.
+const focus = await captureClosedScopeTabFocus(page, {
+  state:'dashboard', profile:'phone',
+  anchor:'[aria-label="Open menu"]', closedScope:'#sidebar', steps:6
+});
+const model = {
+  version:1, initial:'dashboard', states:['dashboard'],
+  transitions:[{from:'dashboard',event:'keyboard-focus-visible',to:'dashboard'}],
+  profiles:[{id:'phone',viewport:{min:320,max:1280,height:{min:844,max:844}}}],
+  contracts:[
+    {id:'root-fit',kind:'predicate',predicate:{op:'compare',relation:'le',
+      left:{target:'scrollExtent',field:'inlineEnd'},right:{environment:'safeRight'}}},
+    {id:'focus',kind:'action',event:'keyboard-focus-visible'}
+  ]
+};
+const report = verifyUI({model,observations:[viewport.observation,focus.observation]});
+// Check sampled failures separately from the static proof status.
+if (report.observationStatus === 'failed') throw new Error('Observed UI contract violation');
+// Without closed CSS/geometry evidence, report.status is UNKNOWN, even if samples pass.
+```
+
+`captureViewport` returns `frame.documentWidth`, `frame.main` and structural selectors for overflow contributors; `captureClosedScopeTabFocus` returns the sampled Tab steps and an action observation. For SPA navigation or animation, **wait for the relevant state to settle** before capturing. Use separate `state` names for each list/dialog/menu configuration and declare their transitions in the model. You can review the complete login → dashboard → menu → list examples in [`e2e/external-authenticated-ui.spec.mts`](e2e/external-authenticated-ui.spec.mts); the repeatable offline control is [`e2e/layout-browser-observations.spec.mts`](e2e/layout-browser-observations.spec.mts).
+
 ## Expanded verification targets (upstream 2026-11-22)
 
 - `@mizchi/veriss/critical`: extract first-view CSS for phone/desktop viewport ranges, conservatively keeping unknown rules; browser demo is on the [fork site](https://kikutadev.github.io/veriss/#first-view).

@@ -120,3 +120,11 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 ### 製品上の意味と未対応
 
 **実ブラウザでログイン済みUIの不具合候補を見つけ、状態別のveriss観測契約に渡す経路**を再現可能にした。現時点では「既存デモの無断変更なしに、宣言した状態と画面幅の観測を比較できる」まで。サンプル点から全幅の静的Verifiedを導くこと、実装からすべての状態・遷移を自動推論すること、認証済みセッションの安全なスナップショットを閉じたCSSモデルにすることは**未実装**。E2Eが6件成功したことは第三者アプリが6件合格だったという意味ではなく、上記の検出と対照が再現できたという意味である。
+
+### Phase 2c: WebアプリE2Eへの再利用可能な観測API（2026-11-23）
+
+- `packages/adapter-core/src/browser-observations.mts` にPlaywrightの実装を依存関係へ加えず、`captureViewport`、`captureClosedScopeTabFocus` と型・純粋な観測変換関数を公開した。既存のPlaywright Pageを渡し、すでに認証・操作された**その場のDOM**からデータを得る。自動ログイン、任意URL取得、Cloudflare Worker、HTML/CSSのWebアップロードは加えていない。
+- 取得するのはdocumentの `scrollWidth`、選んだ `main` の矩形、横はみ出し候補の*タグ名＋DOM上の位置*（属性値/本文なし）、閉じたスコープへのTabフォーカスの矩形のみ。フォーム値、Cookie、セッション、トークン、全文HTMLは保持しない。アプリ側の状態待機・ログイン操作は呼び出し側が責任を持つ。
+- 同じ2公開デモの外部E2Eを新API利用へ切替え、3ブラウザで**6件成功**。RBACの画面外フォーカスとReact-admin Ordersの320px越境を維持して検出。アプリ側の描画タイミングによる追加の越境数値変化は固定の断定をしない。
+- 新規のオフライン3ブラウザE2E `layout-browser-observations.spec.mts` で、**意図的な内部横スクロールはページ越境ではない／見えないフォーカスを検出／閉じたdrawerをinert化すると観測失敗が消える／320px画面に334px mainを置くと観測失敗／正しい幅へ戻すと観測成功**、を全エンジンで検証。単体テストでは実測失敗後でも静的全幅の`status`がUnknownから昇格しないことを確認。
+- [READMEのコピー可能な使い方](../README.md#check-an-authenticated-web-app-from-an-existing-playwright-test) にPlaywright上でのstate/contract/observationの接続例を追加。
