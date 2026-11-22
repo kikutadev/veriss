@@ -98,3 +98,25 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 実装はfork `main` `5508568`、静的Pagesは `gh-pages` `5f4953c` に公開済み。`pnpm build:ts` / `pnpm check:ts` 成功、公式 `tools/gate.sh`（監督起動）exit=0、rootと全5パッケージunit fail=0、既存3ブラウザE2E **552 passed**（従来549件+部分幾何の新規3件）。実UI3ブラウザ個別 **21 passed** は別実行である。Chrome残留なし。
 - GitHub Pagesの公開ビルドは`_site/index.html`とSHA-256一致。<https://kikutadev.github.io/veriss/#real-ui> で、Bootstrap公式サンプルと部分幾何実証の文言、NG→OK→Unknown、390pxの横はみ出しなし、ファイルアップロード・Workerなしを実ブラウザで確認。新しい操作UIは作っていない。
 - 全3サイトのページ全体はUnknownを維持。DUOのCSS読込依存を固定した場合だけ横方向の契約が成立するという区別を厳守。実サイトの未知不具合を発見した数は依然0件。
+
+## Phase 2b: ログイン後の第三者Webアプリ2件（2026-11-22）
+
+### 検証対象・入力状態
+
+| アプリ | 出所 | 認証方法 | 実際に操作した状態 |
+| --- | --- | --- | --- |
+| [RBAC管理画面](https://jorgeariosg.github.io/react-admin-rbac/) | [公開ソース](https://github.com/JorgeARiosG/react-admin-rbac) | READMEで公開された**デモアカウント**のみ | login → dashboard → メニュー開閉 → Users一覧、閉じたメニューからTabを6回 |
+| [React-admin公式デモ](https://marmelab.com/react-admin-demo/) | [公開ソース](https://github.com/marmelab/react-admin/tree/master/examples/demo) | 画面に表示される **demo/demo** | login → dashboard → メニュー開閉 → Orders一覧 → dashboard、閉じたメニューからTabを6回 |
+
+両サイトはWebアプリであり、**ログイン後の描画済みDOM**を Chromium / Firefox / WebKit の各320・390・768・1280px（高さ844px）で計測した。実行手順は `node tools/gate-guarded.mjs --external-e2e`（別設定 `playwright.external.config.mts`）。サンプル用の公開認証情報だけを使用し、任意の本物アカウント・Cookie・セッショントークン・利用者データは取得/保存しない。外部デモの公開状態とネットワークに依存するため、**通常のオフラインrelease gateには含めない**。
+
+### 確認できたこと（ブラウザ観測であり全幅証明ではない）
+
+- **RBAC / 閉じたモバイルメニュー:** メニューの外側の操作からTabキーで進むと、`aside` が左へ完全退避しているにもかかわらず、その内部リンクやボタンへフォーカスが移る。390pxで Chromium 4件、Firefox 4件、WebKit 2件（先頭6回のTabだけを計測）。メニューが画面外にある**こと自体は不具合ではない**が、見えない操作へのキーボード到達は再現した。メニューを開いてUsers一覧へ移動できることも実操作で確認。
+- **React-admin / Orders一覧:** 320px幅で `main` の横幅がおよそ**334.36px**、document rootのscrollWidthがおよそ**334px**となり、ページ単位で約14pxはみ出す。Chromium・Firefox・WebKitすべてで確認。主な越境要素は `.RaList-actions` と内部のフィルターフォーム。テーブル内部での**意図的な横スクロールだけ**をページ全体の破綻と数えないよう、`documentElement.scrollWidth` と `main.getBoundingClientRect()` を分けて採取した。
+- **対照:** RBACのダッシュボード初期表示は各幅でrootの横はみ出しがなく、React-adminの閉じたメニューからの最初の6回のTabでも画面外フォーカスは検出されなかった。画面幅390/1280ではReact-admin Ordersの約14px越境は再現しない。RBAC Users一覧では描画/読み込み状況によって追加のページ横越境も観測されたが、その幅・再現安定性は今後再評価する。
+- `verifyUI`に手動で宣言した `login/dashboard/drawer-open/list` の状態グラフ、各画面の実測 `main` と `document-scroll-extent`、キーボード操作の成功/失敗を観測として入力した。**どちらも全幅の静的 `status=unknown` を維持**しながら、実測不一致を `observationStatus=failed` として報告。RBACは `keyboard-focus-visible`、React-adminは `main-horizontal-fit` と `document-width-fit` が失敗（他の幅・状態は対照として保持）。これは描画後の実測に対する失敗判定であり、CSS・JS実装から保証付きで自動導出した反例ではない。
+
+### 製品上の意味と未対応
+
+**実ブラウザでログイン済みUIの不具合候補を見つけ、状態別のveriss観測契約に渡す経路**を再現可能にした。現時点では「既存デモの無断変更なしに、宣言した状態と画面幅の観測を比較できる」まで。サンプル点から全幅の静的Verifiedを導くこと、実装からすべての状態・遷移を自動推論すること、認証済みセッションの安全なスナップショットを閉じたCSSモデルにすることは**未実装**。E2Eが6件成功したことは第三者アプリが6件合格だったという意味ではなく、上記の検出と対照が再現できたという意味である。

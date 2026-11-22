@@ -75,7 +75,8 @@
     "evals/scenarios/**/*.mts",
     "e2e/**/*.mts",
     "tests/**/*.mts",
-    "playwright.layout.config.mts"
+    "playwright.layout.config.mts",
+    "playwright.external.config.mts"
   ],
   "exclude": [
     "**/node_modules",

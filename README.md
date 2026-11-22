@@ -27,7 +27,9 @@ node packages/veriss/bin/veriss.mjs check --html tests/fixtures/veriss-cli/grid.
 
 The first command reports a failing viewport (416px in this fixture), the second reports **VERIFIED**. The CLI checks a **static HTML fragment** plus the **complete author CSS** that you provide, running the analyzer and the independent Z3 layout proof. It does **not** fetch external stylesheets or run JS. Unsupported cases return **UNKNOWN**, not success. Exit codes: 0 verified, 1 violated, 2 unknown, 3 invalid input/runtime failure. Errors/warnings/Unknown are separate counts; `--json` includes the failing width interval and witness when available.
 
-[Product-value plan and release acceptance](docs/product-value-plan.md). [Real-world UI findings and reproduction](docs/product-real-ui-evidence.md): three actual inputs all remain Unknown, not a claim of real-site proof.
+[Product-value plan and release acceptance](docs/product-value-plan.md). [Real-world UI findings and reproduction](docs/product-real-ui-evidence.md): three static real-site inputs remain Unknown, while separate **post-login browser observations** on two public demo apps reproduce a hidden-drawer keyboard-focus problem and a 320px orders-list overflow. Runtime findings are not static proof.
+
+**Audit post-login demo states (requires network, not part of the offline gate):** `node tools/gate-guarded.mjs --external-e2e`. Uses only publicly documented demo accounts, observes two distinct apps on Chromium/Firefox/WebKit at four widths, and reports `verifyUI` observation failures while preserving static `UNKNOWN`.
 
 ## Expanded verification targets (upstream 2026-11-22)
 

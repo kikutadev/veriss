@@ -122,8 +122,10 @@ if (process.argv[2] === '--watchdog') {
   `;
   const transitionE2E = process.argv[2] === '--transition-e2e';
   const productE2E = process.argv[2] === '--product-e2e';
-  const command = (transitionE2E || productE2E) ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
-  const args = productE2E
+  const externalE2E = process.argv[2] === '--external-e2e';
+  const command = (transitionE2E || productE2E || externalE2E) ? 'pnpm' : browserProbe ? process.execPath : probe ? '/bin/sh' : '/bin/bash';
+  const args = externalE2E ? ['exec','playwright','test','-c','playwright.external.config.mjs','--reporter=list',...process.argv.slice(3)]
+    : productE2E
     ? ['exec','playwright','test','-c','playwright.layout.config.mjs','--trace','off',
        'e2e/layout-product-real-ui.spec.mjs','--reporter=list']
     : transitionE2E

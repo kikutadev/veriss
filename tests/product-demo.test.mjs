@@ -34,3 +34,13 @@ test('public demo has no HTML/CSS file picker or URL collector', () => {
     assert.match(html, /id="demo-html"/);
     assert.match(html, /id="demo-css"/);
 });
+test('the public real-UI evidence distinguishes authenticated browser observations from static proof', () => {
+    const html = readFileSync(new URL('../tools/rule-catalog/page-template.html', import.meta.url), 'utf8');
+    assert.match(html, /ログイン後の管理画面/);
+    assert.match(html, /react-admin-rbac/);
+    assert.match(html, /react-admin-demo/);
+    assert.match(html, /320px幅.*334px/);
+    assert.match(html, /3ブラウザ/);
+    assert.match(html, /ブラウザ観測.*静的証明ではない/);
+    assert.match(html, /Bootstrap公式サンプル/);
+});
