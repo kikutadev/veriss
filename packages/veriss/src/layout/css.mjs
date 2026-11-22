@@ -18,7 +18,7 @@ import { familyProblem, fontShorthandProblem } from './font-syntax.mjs';
 import { gridTrackProblem } from './grid-syntax.mjs';
 import { keywordProblem } from './keyword-syntax.mjs';
 import { timingProblem } from './timing-syntax.mjs';
-import { findCSSWriteConflicts, cssWriteConflictMessage } from '../css-writes.mjs';
+import { findCSSWriteConflicts, cssWriteConflictMessage, isCSSWriteDirectionalOverlap } from '../css-writes.mjs';
 import { q, cmp, add, mul, div, exact, number } from './linear.mjs';
 import { parseCondition, preferenceValues } from './conditions.mjs';
 import { supportsCondition, supportsFunctionToken } from './supports.mjs';
@@ -1577,12 +1577,21 @@ export function parseLayoutCSS(sheets, diagnostic, { scripting, mediaFeatures } 
                 if (named.length && !discrete)
                     note({ code: 'W_CSS_TRANSITION_DISPLAY', file: filename, line: sourceStart(at(named, 0)).line, selector: node.selector });
             }
-            const conflicts = findCSSWriteConflicts(authored.map(declaration => declaration.prop));
+            // Normal CSS patterns such as `border:0; border-top:1px solid` are
+            // ordered refinements. Model the actual cascade instead of stopping the
+            // whole rule with a false error. Other overlapping writes are kept as
+            // explicit conflicts until a sound interpretation is available.
+            const conflicts = findCSSWriteConflicts(authored.map(declaration => declaration.prop), true);
             for (const conflict of conflicts) {
                 const location = (index) => ({ file: filename, line: sourceStart(at(authored, index)).line, column: sourceStart(at(authored, index)).column });
                 const css = location(conflict.later);
-                diagnostic('E_CSS_SHORTHAND_CONFLICT', cssWriteConflictMessage(conflict), css.line, filename, { severity: 'error', css, hint: conflict.hint, conflict: { properties: conflict.properties, longhands: conflict.longhands },
-                    related: [{ css: location(conflict.earlier), message: `Earlier ${conflict.properties[0]} declaration` }] });
+                if (isCSSWriteDirectionalOverlap(conflict.properties[0], conflict.properties[1])) {
+                    diagnostic('U_LAYOUT_CSS', `${cssWriteConflictMessage(conflict)}: overlap depends on writing-mode/direction and is not a definite error`, css.line, filename, { severity: 'unknown', css, conflict: { properties: conflict.properties, longhands: conflict.longhands } });
+                }
+                else {
+                    diagnostic('E_CSS_SHORTHAND_CONFLICT', cssWriteConflictMessage(conflict), css.line, filename, { severity: 'error', css, hint: conflict.hint, conflict: { properties: conflict.properties, longhands: conflict.longhands },
+                        related: [{ css: location(conflict.earlier), message: `Earlier ${conflict.properties[0]} declaration` }] });
+                }
             }
             if (conflicts.length)
                 continue;

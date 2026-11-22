@@ -82,6 +82,10 @@ test('F9: a ::before or ::after with no content is never generated', () => {
   const [w] = codes(run('.a::before{display:block;width:10px;height:10px;background:red}'), 'W_CSS_PSEUDO_NO_CONTENT');
   assert.ok(w); assert.match(w.message, /content/);
   assert.equal(codes(run('.a::before{content:"";display:block;height:10px}'), 'W_CSS_PSEUDO_NO_CONTENT').length, 0);
+  // Global box-sizing resets on pseudo-elements are intentional boilerplate,
+  // not attempted visual styling that needs a generated pseudo-element.
+  assert.equal(codes(run('*,*::before,*::after{box-sizing:border-box}'), 'W_CSS_PSEUDO_NO_CONTENT').length,0);
+  assert.equal(codes(run('*,*::before,*::after{box-sizing:border-box}.a::before{background:red}'), 'W_CSS_PSEUDO_NO_CONTENT').length,1);
   // Content from another rule counts.
   assert.equal(codes(run('.a::after{content:""}.a::after{display:block;height:4px}'), 'W_CSS_PSEUDO_NO_CONTENT').length, 0);
 });
@@ -1503,4 +1507,38 @@ test('F133: a container query unit with no query container for its axis is a sma
   // Not a unit: a name or a string with the letters in it.
   assert.equal(hit('.a{animation-name:cqw}@keyframes cqw{to{opacity:.5}}').length, 0);
   assert.equal(hit('.a{width:50svw}').length, 0);
+});
+
+// A later longhand intentionally refines an earlier broad declaration.
+// This is not a CSS syntax error; the cascade uses the final longhand value.
+test('real UI: ordered shorthand refinements are modeled instead of rejected',()=>{
+  const html='<html lang="en"><body><main class="x"></main></body></html>';
+  const base='*{box-sizing:border-box;margin:0;padding:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}';
+  for(const [declarations] of [
+    ['height:60px;border:0;border-top:2px solid black;border-bottom:3px solid black'],
+    ['height:60px;padding:0;padding-top:12px;padding-left:8px'],
+    ['height:60px;margin:0;margin-left:8px'],
+    ['height:60px;border:0;border-top:2px solid black;border-top-width:4px'],
+    ['height:60px;padding:0!important;padding-top:12px'],
+  ]){
+    const report=analyzeHTML(html,{name:'P',css:base+'.x{'+declarations+'}',viewport:{min:320,max:900,height:{min:300,max:700}}});
+    assert.equal(report.status,'verified',`${declarations}: ${JSON.stringify(report.diagnostics)}`);
+    assert.ok(!report.diagnostics.some(d=>d.code==='E_CSS_SHORTHAND_CONFLICT'));
+    assert.ok(report.sizes.some(s=>s.box==='.x'&&s.rect),'Missing actual box proof');
+  }
+  // In horizontal text the two axes are disjoint. They only overlap in
+  // vertical writing modes, which must not be called a definite CSS mistake.
+  const logical=analyzeHTML(html,{name:'P',css:base+'.x{height:60px;margin-top:40px;margin-inline:auto}',viewport:{min:320,max:900}});
+  assert.equal(logical.status,'unknown');
+  assert.ok(!logical.diagnostics.some(d=>d.code==='E_CSS_SHORTHAND_CONFLICT'));
+  assert.ok(logical.diagnostics.some(d=>d.code==='U_LAYOUT_CSS'&&/writing.mode/i.test(d.message)));
+
+  // An earlier safe broad declaration must not mask a *later* longhand
+  // that is itself overwritten by another shorthand in the same rule.
+  const masked=analyzeHTML(html,{name:'P',css:base+'.x{height:60px;padding:0;padding-top:12px;padding-block:20px}',viewport:{min:320,max:900}});
+  assert.ok(masked.diagnostics.some(d=>d.code==='U_LAYOUT_CSS'&&/writing.mode/.test(d.message)),JSON.stringify(masked.diagnostics));
+  // The reverse order can discard an intended earlier longhand. Preserve
+  // the existing review diagnostic until the losing declaration is classified.
+  const reverse=analyzeHTML(html,{name:'P',css:base+'.x{height:60px;padding-top:12px;padding:0}',viewport:{min:320,max:900}});
+  assert.ok(reverse.diagnostics.some(d=>d.code==='E_CSS_SHORTHAND_CONFLICT'));
 });

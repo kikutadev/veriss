@@ -117,11 +117,15 @@ export function createCssMistakes({ report, facts, tools }) {
         }
         if (contentRules.some(sels => sels.some(sel => sel.pseudoElement === pbox.pseudo && matches(sel, pbox, new Set([`::${pbox.pseudo}`])))))
             return;
-        if ((pstyle.content ?? 'none') !== 'none' || pstyle.display === 'none' || !Object.keys(pstyle.$sources ?? {}).some(key => key !== 'content') || layoutWarnings.some(w => w.code === 'W_CSS_PSEUDO_NO_CONTENT' && w.path === pbox.path))
+        // Global `*, *::before, *::after { box-sizing: border-box }` is a
+        // harmless reset for pseudo-elements that do not exist. Warn only when
+        // an author actually styles a visual aspect of an absent pseudo-box.
+        const styled = Object.keys(pstyle.$sources ?? {}).filter(key => !['content', 'box-sizing'].includes(key));
+        if ((pstyle.content ?? 'none') !== 'none' || pstyle.display === 'none' || !styled.length || layoutWarnings.some(w => w.code === 'W_CSS_PSEUDO_NO_CONTENT' && w.path === pbox.path))
             return;
-        const src = Object.values(pstyle.$sources).find(Boolean);
+        const src = styled.map(key => pstyle.$sources?.[key]).find(Boolean);
         layoutWarnings.push({ code: 'W_CSS_PSEUDO_NO_CONTENT', severity: 'warning', box: pbox.label, path: pbox.path, css: src ? [{ property: 'content', file: src.file, line: src.line, selector: src.selector }] : [],
-            message: `${pbox.label} is styled (${Object.keys(pstyle.$sources).filter(key => key !== 'content').slice(0, 3).join(', ')}) but has no content, so the browser never generates it. Add content: "" (or the text it should show)` });
+            message: `${pbox.label} is styled (${styled.slice(0, 3).join(', ')}) but has no content, so the browser never generates it. Add content: "" (or the text it should show)` });
     }
     // F108: a table column (col, colgroup) is not an ancestor of the cells and has no box of its own to pad or size: only
     // width, background, visibility and (with border-collapse: collapse) border act on it (CSS 2.2 §17.3; measured in

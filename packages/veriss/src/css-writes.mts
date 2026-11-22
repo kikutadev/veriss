@@ -75,10 +75,40 @@ function physical(property:string,mapping:readonly [string,string,string,string]
 const resettable=(property:string)=>!property.startsWith('--') && !['direction','unicode-bidi'].includes(property);
 const hint='Use non-overlapping longhands, or put an intentional override in a separate rule.';
 
+/** A later longhand can legitimately refine a shorthand in the same rule.
+ * Require it to be a strict subset under *every* supported writing direction,
+ * so a logical/physical mix is not assumed safe just from horizontal LTR.
+ * The CSS parser still has to validate and model both actual values; unsupported
+ * declarations make the whole analysis Unknown rather than Verified.
+ */
+export function isCSSWriteRefinement(earlier:string,later:string):boolean {
+  const a=normalize(earlier),b=normalize(later);
+  if(a===b||a==='all'||!shorthands.has(a))return false;
+  return orientations.every(mapping=>{
+    const broad=new Set(expand(a).map(name=>physical(name,mapping)));
+    const narrow=expand(b).map(name=>physical(name,mapping));
+    return narrow.length>0&&narrow.every(name=>broad.has(name))&&narrow.length<broad.size;
+  });
+}
+
+/** A logical/physical overlap that exists in only some writing modes is
+ * not a definite redundant declaration. The style still depends on an
+ * environment that must be explicitly modeled before claiming a proof.
+ */
+export function isCSSWriteDirectionalOverlap(earlier:string,later:string):boolean {
+  const a=normalize(earlier),b=normalize(later);
+  if(a==='all'||b==='all')return false;
+  const overlaps=orientations.map(mapping=>{
+    const prior=new Set(expand(a).map(name=>physical(name,mapping)));
+    return expand(b).map(name=>physical(name,mapping)).some(name=>prior.has(name));
+  });
+  return overlaps.some(Boolean)&&overlaps.some(value=>!value);
+}
+
 /** At most one diagnostic per later declaration; repeated identical properties are CSS fallbacks. */
 export interface CSSWriteConflict { earlier:number; later:number; properties:[string,string]; longhands:string[]; hint:string }
 interface WriteEntry { index:number; property:string; shorthand:boolean; writes:Set<string>[] }
-export function findCSSWriteConflicts(properties:readonly string[]):CSSWriteConflict[] {
+export function findCSSWriteConflicts(properties:readonly string[],ignoreOrderedRefinements=false):CSSWriteConflict[] {
   const entries:WriteEntry[]=properties.map((raw,index)=>{
     const property=normalize(raw);
     return {index,property,shorthand:property==='all'||shorthands.has(property),
@@ -88,7 +118,9 @@ export function findCSSWriteConflicts(properties:readonly string[]):CSSWriteConf
   for(const entry of entries) {
     let earliest:WriteEntry|undefined;
     const consider=(prior:WriteEntry)=>{
-      if(prior.property!==entry.property && (prior.shorthand||entry.shorthand) && (!earliest||prior.index<earliest.index)) earliest=prior;
+      if(prior.property!==entry.property && (prior.shorthand||entry.shorthand) &&
+        (!ignoreOrderedRefinements||!isCSSWriteRefinement(prior.property,entry.property)) &&
+        (!earliest||prior.index<earliest.index)) earliest=prior;
     };
     if(entry.property==='all') {
       for(const prior of previous) if(resettable(prior.property)) consider(prior);

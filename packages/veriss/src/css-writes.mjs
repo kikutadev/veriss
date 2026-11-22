@@ -78,7 +78,37 @@ function physical(property, mapping) {
 }
 const resettable = (property) => !property.startsWith('--') && !['direction', 'unicode-bidi'].includes(property);
 const hint = 'Use non-overlapping longhands, or put an intentional override in a separate rule.';
-export function findCSSWriteConflicts(properties) {
+/** A later longhand can legitimately refine a shorthand in the same rule.
+ * Require it to be a strict subset under *every* supported writing direction,
+ * so a logical/physical mix is not assumed safe just from horizontal LTR.
+ * The CSS parser still has to validate and model both actual values; unsupported
+ * declarations make the whole analysis Unknown rather than Verified.
+ */
+export function isCSSWriteRefinement(earlier, later) {
+    const a = normalize(earlier), b = normalize(later);
+    if (a === b || a === 'all' || !shorthands.has(a))
+        return false;
+    return orientations.every(mapping => {
+        const broad = new Set(expand(a).map(name => physical(name, mapping)));
+        const narrow = expand(b).map(name => physical(name, mapping));
+        return narrow.length > 0 && narrow.every(name => broad.has(name)) && narrow.length < broad.size;
+    });
+}
+/** A logical/physical overlap that exists in only some writing modes is
+ * not a definite redundant declaration. The style still depends on an
+ * environment that must be explicitly modeled before claiming a proof.
+ */
+export function isCSSWriteDirectionalOverlap(earlier, later) {
+    const a = normalize(earlier), b = normalize(later);
+    if (a === 'all' || b === 'all')
+        return false;
+    const overlaps = orientations.map(mapping => {
+        const prior = new Set(expand(a).map(name => physical(name, mapping)));
+        return expand(b).map(name => physical(name, mapping)).some(name => prior.has(name));
+    });
+    return overlaps.some(Boolean) && overlaps.some(value => !value);
+}
+export function findCSSWriteConflicts(properties, ignoreOrderedRefinements = false) {
     const entries = properties.map((raw, index) => {
         const property = normalize(raw);
         return { index, property, shorthand: property === 'all' || shorthands.has(property),
@@ -88,7 +118,9 @@ export function findCSSWriteConflicts(properties) {
     for (const entry of entries) {
         let earliest;
         const consider = (prior) => {
-            if (prior.property !== entry.property && (prior.shorthand || entry.shorthand) && (!earliest || prior.index < earliest.index))
+            if (prior.property !== entry.property && (prior.shorthand || entry.shorthand) &&
+                (!ignoreOrderedRefinements || !isCSSWriteRefinement(prior.property, entry.property)) &&
+                (!earliest || prior.index < earliest.index))
                 earliest = prior;
         };
         if (entry.property === 'all') {

@@ -70,3 +70,56 @@ test('real game CSS mutation clips shell, static Unknown does not mean safe', as
     expect(after.x + after.width).toBeGreaterThan(width);
     console.log('PHASE2_MUTATION ' + JSON.stringify({ browser: browserName, width, height, normalWidth: before?.width, mutantWidth: after?.width, kind: 'injected-not-live-defect' }));
 });
+// Three-engine oracle for the same ordered cascade accepted by the core.
+// No browser snapshot is promoted to a universal proof: the static engine
+// must independently return a supported rectangle for the entire interval.
+test('ordered shorthand refinements agree with browser cascade at three widths', async ({ page, browserName }) => {
+    const { analyzeHTML } = await import('../packages/veriss/src/html.mjs');
+    const html = '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"></head><body><main class="x"></main></body></html>';
+    const reset = '*{box-sizing:border-box;margin:0;padding:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}';
+    const cases = [
+        { css: 'height:60px;border:0;border-top:2px solid black;border-bottom:3px solid black', top: 2, bottom: 3, paddingTop: 0, paddingLeft: 0, marginLeft: 0 },
+        { css: 'height:60px;padding:0;padding-top:12px;padding-left:8px', top: 0, bottom: 0, paddingTop: 12, paddingLeft: 8, marginLeft: 0 },
+        { css: 'height:60px;margin:0;margin-left:8px', top: 0, bottom: 0, paddingTop: 0, paddingLeft: 0, marginLeft: 8 },
+        { css: 'height:60px;border:0;border-top:2px solid black;border-top-width:4px', top: 4, bottom: 0, paddingTop: 0, paddingLeft: 0, marginLeft: 0 },
+        { css: 'height:60px;padding:0!important;padding-top:12px', top: 0, bottom: 0, paddingTop: 0, paddingLeft: 0, marginLeft: 0 },
+    ];
+    for (const sample of cases) {
+        const css = reset + '.x{' + sample.css + '}';
+        const proof = analyzeHTML(html, { name: 'P', css, viewport: { min: 320, max: 1280, height: { min: 400, max: 900 } } });
+        expect(proof.status, `${sample.css}: ${JSON.stringify(proof.diagnostics)}`).toBe('verified');
+        const rect = proof.sizes.find(s => s.box === '.x')?.rect;
+        expect(rect).toBeTruthy();
+        for (const width of [320, 768, 1280]) {
+            await page.setViewportSize({ width, height: 700 });
+            await page.setContent(html.replace('</head>', `<style>${css}</style></head>`));
+            const actual = await page.locator('.x').evaluate(el => {
+                const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+                return { x: r.x, y: r.y, width: r.width, height: r.height, top: parseFloat(s.borderTopWidth), bottom: parseFloat(s.borderBottomWidth), paddingTop: parseFloat(s.paddingTop), paddingLeft: parseFloat(s.paddingLeft), marginLeft: parseFloat(s.marginLeft) };
+            });
+            expect(actual.top).toBe(sample.top);
+            expect(actual.bottom).toBe(sample.bottom);
+            expect(actual.paddingTop).toBe(sample.paddingTop);
+            expect(actual.paddingLeft).toBe(sample.paddingLeft);
+            expect(actual.marginLeft).toBe(sample.marginLeft);
+            for (const [field, model] of [['x', rect.inlineStart], ['y', rect.blockStart], ['width', rect.inlineSize], ['height', rect.blockSize]]) {
+                const expected = Number(model.coefficient) * width + Number(model.constant);
+                expect(actual[field], `${browserName} ${width}px ${sample.css} ${field}`).toBeCloseTo(expected, 3);
+            }
+        }
+    }
+});
+// Bootstrap's universal pseudo-element box-sizing reset does not create any
+// ::before / ::after content. It should not produce dozens of noise warnings.
+test('bootstrap universal pseudo reset is not treated as attempted generated content', async ({ page }) => {
+    const { analyzeHTML } = await import('../packages/veriss/src/html.mjs');
+    const root = resolve('tests/fixtures/product-real-ui');
+    const [html, css] = await Promise.all([readFile(resolve(root, 'bootstrap-album.html'), 'utf8'), readFile(resolve(root, 'bootstrap-album.css'), 'utf8')]);
+    const report = analyzeHTML(html, { name: 'Bootstrap', css, viewport: { min: 390, max: 390, height: { min: 844, max: 844 } } });
+    expect(report.diagnostics.filter(d => d.code === 'W_CSS_PSEUDO_NO_CONTENT')).toHaveLength(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/*', route => route.abort());
+    await page.setContent(html.replace('</head>', `<style>${css}</style></head>`), { waitUntil: 'load' });
+    const contents = await page.locator('.album').evaluate(el => [getComputedStyle(el, '::before').content, getComputedStyle(el, '::after').content]);
+    expect(contents).toEqual(['none', 'none']);
+});

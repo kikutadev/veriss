@@ -4,13 +4,13 @@
 
 veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI の3種類**の静的 HTML・CSS に適用した。いずれも `UNKNOWN` で、**実UIのレイアウト破綻を実際に検出・修正できた実証はまだない**。一方、同じ入力に対する Chromium・Firefox・WebKit の5幅×3種＝**45点観測**では、文書の水平スクロール幅が viewport を超えるケースは0だった。
 
-検出した `E_` 13件は全て `E_CSS_SHORTHAND_CONFLICT`。長短ハンドを同一規則内で組み合わせる記述への静的エラーであり、**レイアウト破綻13件ではない**。書き手が意図した上書きかどうかは特定していない。`UNKNOWN` に含まれる未対応をエラーや成功に読み替えない。
+**初回測定で検出した `E_` 13件**は全て `E_CSS_SHORTHAND_CONFLICT` だった。しかし大半は `border:0` → `border-top` のような正常な一括指定から個別指定への絞り込みだった。改修後は**3件すべてエラー0**となり、Bootstrapの見かけの警告も27件→2件に減った。3件のページ全体は依然 `Unknown`。真のレイアウト破綻を見つけたとは主張しない。
 
-| 対象 | 取得元 | CLI | Error | Warning | Unknown | 5幅×3ブラウザの水平はみ出し |
+| 対象 | 取得元 | CLI | Error（初回→改修後） | Warning（初回→改修後） | Unknown（初回→改修後） | 5幅×3ブラウザの水平はみ出し |
 | --- | --- | --- | ---: | ---: | ---: | --- |
-| portfolio-about | <https://kikuta.dev/about/> | `UNKNOWN` | 3 | 13 | 33 | 0/15 |
-| duo-game-title | `../game/duo-breaker/index.html` + `src/style.css` | `UNKNOWN` | 5 | 3 | 6 | 0/15 |
-| bootstrap-album | <https://getbootstrap.com/docs/5.3/examples/album/>（Bootstrap公式サンプル） | `UNKNOWN` | 5 | 27 | 437 | 0/15 |
+| portfolio-about | <https://kikuta.dev/about/> | `UNKNOWN` | 3→0 | 13→13 | 33→33 | 0/15 |
+| duo-game-title | `../game/duo-breaker/index.html` + `src/style.css` | `UNKNOWN` | 5→0 | 3→2 | 6→9 | 0/15 |
+| bootstrap-album | <https://getbootstrap.com/docs/5.3/examples/album/>（Bootstrap公式サンプル） | `UNKNOWN` | 5→0 | 27→2 | 437→438 | 0/15 |
 
 「Unknown診断の件数」は**未対応箇所の報告件数**であり、CSSルールや画面の何％を証明したかではない。現状で割合を被覆率として示すことはできない。Bootstrap はCSS約234KBで複雑なカスケード・変数・セレクタを持ち、`U_LAYOUT_CSS` 328件と `U_LAYOUT_SELECTOR` 94件が Unknown の大半を占める。ポートフォリオは主に `U_LAYOUT_SELECTOR` 20件、ゲームは `U_LAYOUT_CSS` 5件。
 
@@ -52,7 +52,7 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 ## Phase2 負例：実ゲームの改変CSSで検出漏れを調査（2026-11-22）
 
 - DUO瓦割りの**実際の初期HTMLとCSS**に、テスト限定で `#game-shell{width:700px!important;max-width:none!important}` を追記する（ゲーム本体は変更しない）。390×600pxで、元のゲームシェル幅は390pxだが改変後700pxとなる。横方向の操作・表示が欠損し得る明白な**意図的な破壊**であり、実際に配信中のゲームのバグではない。
-- 同じ完全文書への静的 `analyzeHTML` は、元のCSSの `@import` や未対応規則等のため `Unknown`、幾何反例 `E_LAYOUT_*` は取得できない。改変前後のエラー5件はともに `E_CSS_SHORTHAND_CONFLICT` で、レイアウト破綻を検知していない。
+- 同じ完全文書への静的 `analyzeHTML` は、元のCSSの `@import` や未対応規則等のため `Unknown`、幾何反例 `E_LAYOUT_*` は取得できない。当初は改変前後のエラー5件が全て `E_CSS_SHORTHAND_CONFLICT` だったが、正常な上書きのモデル化後は0件。**ゲームシェルの幅超過をまだ検出できない点は変わらない**。
 - ブラウザでの負例は `e2e/layout-product-real-ui.spec.mts` に固定し、幅390pxでゲームシェルが390→700pxになることをChromium・Firefox・WebKitで照合する。**既存コードの部分幾何投影も**、headの非スタイルリンク、未閉包の `@import`、body overflow伝播などがある元入力では独立した矩形を作れない。これらはエンジンが根拠なしに値を補完しないためのUnknownである。
 - **次の実装修正の条件**: CSSの読み込み閉包が成立している入力だけを対象に、実装から依存関係を独立投影できる要素を増やす。`@import`や祖先の overflow を単に削り落として `VERIFIED` にすることは禁止する。正常なCSSに対する幾何モデルの成立を先に確認し、その上で上記改変に対する反例の検算へ進む。
 
@@ -69,3 +69,11 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - fork `main` のコード `beda8f9` は `pnpm build:ts`、`pnpm check:ts`、`tools/gate.sh` 監督ランナー**exit 0**。root・全5 package単体失敗0、既存component-lint eval差分なし、3ブラウザE2E **549 passed**。追加の実UIサンプル・ゲームシェル改変のE2Eは別実行でChromium/Firefox/WebKit **12/12 passed**、作業対象Chrome残留0。
 - 公開は `gh-pages` `73900a5`。GitHub Pages build完了、配信HTMLはローカルビルドと SHA-256 一致。<https://kikutadev.github.io/veriss/#live-check> において、ファイル選択欄0件、NG=`VIOLATED` → 修正後=`VERIFIED` → 未対応=`UNKNOWN`、390px幅の横はみ出しなし、実UI3件の結果表を実ブラウザで確認。
 - 残りは**実UIの有効な不具合発見・修正の再現**と閉包済みCSS・状態別契約の改善。今回の意図的なゲームCSS破壊とナビ状態別警告は診断上の限界を明らかにしたが、実サイト由来の不具合発見実績としては計上しない。
+
+## Phase 2 検出精度修正（2026-11-22）
+
+- 3件の実サイトに共通していた「広いCSSプロパティの後に、その一部を個別に指定する」正常なカスケードを再解釈し、`E_CSS_SHORTHAND_CONFLICT` の一律停止を撤廃。先行する他の宣言も上書きするケースは漏らさず再検査する。後続の個別指定が、前の一括指定の真部分集合であることを全6方向の書字モードで確認してから実際の値を解析し、不適合なCSSは引き続きUnknownにする。
+- `margin-top` と `margin-inline` のように書字モードによってのみ重複する指定は確定エラーではないため、モデルが確定できない `U_LAYOUT_CSS` に分類。正常なCSSを誤って「破綻あり」と宣言しない。
+- 標準的な `*,*::before,*::after{box-sizing:border-box}` だけを理由に、存在しない疑似要素の警告を大量に出すことをやめた。背景・位置・サイズを実際に指定し、`content` がない場合の警告は維持。Bootstrap公式サンプルでこの種のノイズ警告が25件減った。
+- 3ブラウザで、5種類の上書き（border、padding、margin、`!important`）について実測値とverissの区間幾何証明を比較。追加の個別E2Eで3ブラウザそれぞれ成功。対応CSSのみ `Verified` とし、実ページ3件は `Unknown` を維持。
+- 残る本質課題はJS状態の列挙や `@import` の閉包、ゲームシェル幅超過の部分幾何検出。ブラウザ実測は証明ではなく、実サイトのレイアウト破綻検出実績も現時点では0件。
