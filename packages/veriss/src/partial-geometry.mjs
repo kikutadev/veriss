@@ -308,10 +308,14 @@ export function projectIndependentGeometry(html, css, target, profile, binding, 
     const root = children(doc).find(n => n.tagName === 'html'), body = children(root).find(n => n.tagName === 'body'), head = children(root).find(n => n.tagName === 'head');
     if (doc.mode !== 'no-quirks' || errors.length || !root || !body || !head)
         refuse('Projection requires a well-formed standards document');
-    if (children(head).some(n => !['meta', 'title'].includes(n.tagName)))
+    // Favicon metadata is not a stylesheet or rendered content. Keep it in
+    // the ORIGINAL DOM during selector-dependency analysis (:has() may read
+    // it), then omit it only from the reduced document sent to the engine.
+    const icon = (n) => n.tagName === 'link' && attrs(n).rel === 'icon' && !children(n).length;
+    if (children(head).some(n => !['meta', 'title'].includes(n.tagName) && !icon(n)))
         refuse('Document head has an unresolved stylesheet or rendering dependency');
     const elements = walk(root);
-    if (elements.some(n => ['style', 'link', 'base'].includes(n.tagName) || n.tagName === 'template' && Object.hasOwn(attrs(n), 'shadowrootmode')))
+    if (elements.some(n => ['style', 'base'].includes(n.tagName) || n.tagName === 'link' && !icon(n) || n.tagName === 'template' && Object.hasOwn(attrs(n), 'shadowrootmode')))
         refuse('Document has unresolved style sources or exceeds projection limit');
     if (binding !== undefined && !(typeof binding === 'string' && (/^[.#][A-Za-z_][A-Za-z0-9_-]*$/.test(binding) || allowed.has(binding))))
         refuse('Partial target binding requires a simple id, class or supported tag selector');
@@ -589,6 +593,22 @@ export function projectIndependentGeometry(html, css, target, profile, binding, 
             }
         }
     }
+    // If only horizontal coordinates are requested, overflowing the BODY
+    // propagates to the viewport when HTML's overflow is visible. With overlay
+    // scrollbars and no floats (proved above) the extra viewport clipping is
+    // irrelevant to the box's inline start/size. The reduced layout model
+    // needs explicit root overflow to avoid treating this as an unresolved
+    // scrollbar geometry. This is an inline-only surrogate, never a claim
+    // about page scrolling, clipping, vertical coordinates or full geometry.
+    const rootRules = need(records.get(root)), bodyRules = need(records.get(body));
+    const bodyOverflowSurrogate = inlineOnly &&
+        ['overflow-x', 'overflow-y'].every(key => summary(rootRules, key).length === 0 &&
+            guaranteed(bodyRules, key, v => v === 'hidden'));
+    if (bodyOverflowSurrogate)
+        sheet.append(postcss.rule({ selector: 'html' }).append(postcss.decl({ prop: 'overflow', value: 'hidden' })));
+    // Stylesheet dependencies were checked against the original DOM above;
+    // favicon links have no rendered boxes and are absent from the projection.
+    head.childNodes = head.childNodes.filter(n => !element(n) || !icon(n));
     // Preserve the original chain and author selector identities, so retained
     // selector specificity and inheritance remain unchanged. No artificial ID.
     for (let i = 0; i < chain.length; i++) {
@@ -596,7 +616,7 @@ export function projectIndependentGeometry(html, css, target, profile, binding, 
         n.childNodes = (n.childNodes ?? []).filter(c => c === next || n === root && c === head);
     }
     return { html: serialize(doc), css: sheet.toString(), path: 'Document' + '/0'.repeat(chain.length - 1),
-        assumptions: [...(blockOnly ? ['Only block start and size are proved: explicitly sized viewport-fixed non-replaced target, with no containing-block creator or cross-axis sizing dependency; horizontal declarations were removed and the reduced target uses an arbitrary horizontal surrogate.'] : []), ...(inlineOnly ? ['Only inline start and size are proved; supported root descendant-presence selectors are fixed to the supplied DOM. Block-axis-only declarations and omitted block-flow siblings and descendants may change vertical position or height. Overlay scrollbars and absence of intrinsic/float/aspect-ratio dependencies are required.'] : []), 'Automatically derived independent rectangle for ' + (binding ?? '#' + target) + ': retained original ancestor chain and matching layout cascade; removed rules have no possible subject in the retained chain or are non-geometric for explicit font-independent dimensions.', 'Closed, settled, scripting-enabled document; overlay scrollbars, unscrolled horizontal-tb/ltr CSS pixels; geometry only, not clipping, paint, hit testing, or full-document correctness.'] };
+        assumptions: [...(bodyOverflowSurrogate ? ['Horizontal-only surrogate: body overflow hidden propagates to the root in the original document; root overflow hidden is added only to avoid a scrollbar dependency in the reduced model. Overlay scrollbars and absence of floats make inline border-box geometry invariant; root clipping, scrolling and all block-axis properties are unproved.'] : []), ...(blockOnly ? ['Only block start and size are proved: explicitly sized viewport-fixed non-replaced target, with no containing-block creator or cross-axis sizing dependency; horizontal declarations were removed and the reduced target uses an arbitrary horizontal surrogate.'] : []), ...(inlineOnly ? ['Only inline start and size are proved; supported root descendant-presence selectors are fixed to the supplied DOM. Block-axis-only declarations and omitted block-flow siblings and descendants may change vertical position or height. Overlay scrollbars and absence of intrinsic/float/aspect-ratio dependencies are required.'] : []), 'Automatically derived independent rectangle for ' + (binding ?? '#' + target) + ': retained original ancestor chain and matching layout cascade; removed rules have no possible subject in the retained chain or are non-geometric for explicit font-independent dimensions.', 'Closed, settled, scripting-enabled document; overlay scrollbars, unscrolled horizontal-tb/ltr CSS pixels; geometry only, not clipping, paint, hit testing, or full-document correctness.'] };
 }
 // Use the engine's existing initial-scroll re-analysis; no scroll-dependent
 // coordinate is promoted to a proof for arbitrary scroll positions.

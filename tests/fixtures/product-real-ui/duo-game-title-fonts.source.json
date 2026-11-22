@@ -1,0 +1,10 @@
+{
+  "source": "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap",
+  "retrievedAt": "2026-11-22",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  "mediaType": "text/css",
+  "rawSha256": "a33f5d8c227333f4c47e2e2f2929990877cc59026d288cd6ad4534bc75f3d3e6",
+  "compressedSha256": "521fa4191413979932e35de24e20ad572997a1fc076f0700f2f8c6ab0853decd",
+  "rawBytes": 578818,
+  "purpose": "Pinned CSS @import closure for offline real-game horizontal proof; not a proof for all future responses or browser user agents."
+}

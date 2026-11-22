@@ -462,3 +462,33 @@ test('closed CSS width transition derivation covers responsive intermediate geom
   }
  }
 });
+
+test('capped percentage block widths, body overflow and favicon retain exact independent inline rectangles',async({page,browserName})=>{
+ const source='<!doctype html><html lang="en"><head><title>Dashboard</title><link rel="icon" href="/icon.svg"></head><body><main id="shell"><kbd>native text, unknown intrinsic height</kbd></main></body></html>';
+ const profile:EnvironmentProfile={id:'inline-caps',ua:browserName,viewport:{min:320,max:1000,height:{min:500,max:900}}};
+ const reset='*{box-sizing:border-box;margin:0;padding:0}body{overflow:hidden}';
+ const variants=[
+  'width:75%;max-width:520px;margin:auto',
+  'width:100%;max-width:520px;margin:auto;padding-inline:10px',
+  'width:120%;max-width:520px;margin:auto',
+  'width:100%;max-width:520px;margin-left:auto;margin-right:10px'
+ ];
+ await page.route('**/*',route=>route.abort());
+ for(const declarations of variants){
+  const css=reset+'#shell{height:100dvh;overflow:hidden;'+declarations+'}';
+  const [e]=domGeometry({state:'ready',profile,html:source,css,targets:['shell']});
+  expect(e?.axes).toEqual(['inline']);
+  expect(e?.rows?.length??0,JSON.stringify(e?.reason)).toBeGreaterThan(0);
+  await page.setContent(source.replace('</head>','<style>'+css+'</style></head>'));
+  for(const width of [320,390,519,520,700,1000])for(const height of [500,900]){
+   await page.setViewportSize({width,height});
+   const actual=await page.locator('#shell').evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.width]});
+   const rows=required(e?.rows,'Missing closed inline evidence').filter(r=>required(r.constraints,'Missing constraints').every(c=>c.strict?value(c,width,height)>0:value(c,width,height)>=0));
+   expect(rows.length,`${browserName} ${width}px ${declarations}`).toBeGreaterThan(0);
+   for(const row of rows){
+    expect(actual[0],`${browserName} ${width}px x ${declarations}`).toBeCloseTo(value(required(row.rect.inlineStart,'inline start'),width,height),1);
+    expect(actual[1],`${browserName} ${width}px width ${declarations}`).toBeCloseTo(value(required(row.rect.inlineSize,'inline size'),width,height),1);
+   }
+  }
+ }
+});

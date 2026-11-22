@@ -135,8 +135,24 @@ export function createGridItemAllocator({ cs, columnGap, box, style, placed, blo
         const w = String(item.style['inline-size']), area = itemInline(item);
         let outer = w.endsWith('%') ? times(areaInline(item), div(q(w.slice(0, -1)), q(100))) : scalar(px(w));
         // The used width is the width clamped by max-width, then min-width (measured: width: 300px with
-        // min-width: 350px and margin-left: auto ends at the right edge 350px wide). px bounds on a px width only.
+        // min-width: 350px and margin-left: auto ends at the right edge 350px wide).
         const minW = String(item.style['min-inline-size'] ?? 'auto'), maxW = String(item.style['max-inline-size'] ?? 'none');
+        // Ordinary block flow commonly uses width:100%;max-width:560px;margin:auto.
+        // Split its percentage width at every cap crossing before distributing
+        // nonnegative free space between auto margins. Do not guess content-box
+        // intrinsic edges, vertical writing modes or other layout contexts.
+        if (w.endsWith('%') && style.$blockFlow && item.style['box-sizing'] === 'border-box' &&
+            ['auto', '0', '0px'].includes(minW) && /^\d+(?:\.\d+)?px$/.test(maxW)) {
+            const share = item.style['margin-left'] === 'auto' ? (item.style['margin-right'] === 'auto' ? div(one, q(2)) : one) : zero;
+            const edges = ['left', 'right'].map(side => edgeValue(item.style, side)).reduce(sum, scalar(zero));
+            return bounded(preferredInlinePieces(item.style, areaInline(item), region, edges, itemInline(item))
+                .flatMap(piece => maximum(piece.region, piece.value, edges))
+                .flatMap(piece => {
+                const free = diff(itemInline(item), piece.value), positive = partition(piece.region, free, '>=');
+                return [...positive.yes.map(region => ({ region, offset: times(free, share) })),
+                    ...positive.no.map(region => ({ region, offset: scalar(0) }))];
+            }));
+        }
         if (!['auto', '0', '0px'].includes(minW) || maxW !== 'none') {
             if (w.endsWith('%') || ![minW, maxW].every(v => ['auto', '0', '0px', 'none'].includes(v) || /^\d+(?:\.\d+)?px$/.test(v)) || item.style['box-sizing'] === 'content-box')
                 throw Object.assign(new Error(`${item.box.label}: auto margins with a min-width or max-width are modeled for a px width and px bounds (border-box) only`), { code: 'U_LAYOUT_CSS', box: item.box });

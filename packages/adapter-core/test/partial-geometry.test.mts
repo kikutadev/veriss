@@ -213,3 +213,41 @@ test('focus outlines, font rasterization and inactive animation timing do not af
   assert.ok(!first(check(source,base+paint+extra,['settings'])).rows?.length,extra);
  }
 });
+
+test('percentage width with a px max and auto margins has a closed interval inline proof',()=>{
+ const source='<!doctype html><html lang="en"><head><title>Game shell</title></head><body><main id="shell"><kbd>unknown-height text</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}#shell{width:100%;max-width:560px;height:100dvh;overflow:hidden;margin:auto}';
+ const normal=first(domGeometry({state:'screen',profile,html:source,css:style,targets:['shell']}));
+ assert.ok(normal.source==='local-dom',JSON.stringify(normal));
+ assert.ok(normal.rows?.length,JSON.stringify(normal));
+ assert.equal(verify([normal],'shell').status,'verified');
+ const withIcon=first(domGeometry({state:'screen',profile,html:source.replace('</title>','</title><link rel="icon" href="/icon.svg" type="image/svg+xml">'),css:style,targets:['shell']}));
+ assert.ok(withIcon.rows?.length,JSON.stringify(withIcon));
+ const withStylesheet=first(domGeometry({state:'screen',profile,html:source.replace('</title>','</title><link rel="stylesheet" href="/other.css">'),css:style,targets:['shell']}));
+ assert.ok(!withStylesheet.rows?.length);
+ const external=first(domGeometry({state:'screen',profile,html:source,css:'@import url("other.css");'+style,targets:['shell']}));
+ assert.ok(!external.rows?.length);
+ const bad=first(domGeometry({state:'screen',profile,html:source,css:style+'#shell{width:700px!important;max-width:none!important}',targets:['shell']}));
+ assert.ok(bad.rows?.length,JSON.stringify(bad));
+ assert.equal(verify([bad],'shell').status,'violated');
+});
+
+test('body overflow propagation can retain horizontal evidence only for overlay scrollbars',()=>{
+ const source='<!doctype html><html lang="en"><head><title>Game</title><link rel="icon" href="/icon.svg"></head><body><main id="shell"><kbd>dynamic content</kbd></main></body></html>';
+ const style='*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%}body{overflow:hidden}#shell{width:100%;max-width:560px;height:100dvh;overflow:hidden;margin:auto}';
+ const base={state:'screen',profile,html:source,css:style,targets:['shell']};
+ const good=first(domGeometry(base));
+ assert.deepEqual(good.axes,['inline'],JSON.stringify(good));
+ assert.ok(good.rows?.length);
+ const model:UIModel={version:1,initial:'screen',states:['screen'],transitions:[],profiles:[profile],contracts:[{id:'horizontal',kind:'predicate',predicate:{op:'compare',relation:'le',left:{target:'shell',field:'inlineEnd'},right:{environment:'safeRight'}}}]};
+ assert.equal(verifyUI({model,evidence:[good]}).status,'verified');
+ const bad=first(domGeometry({...base,css:style+'#shell{width:700px!important;max-width:none!important}'}));
+ assert.deepEqual(bad.axes,['inline'],JSON.stringify(bad));
+ assert.ok(bad.rows?.length,JSON.stringify(bad));
+ assert.equal(verifyUI({model,evidence:[bad]}).status,'violated');
+ // A non-overlay profile is not independent of scrollbar width.
+ const classic={...profile,scrollbar:{name:'classic',inlineSize:15,blockSize:15}};
+ assert.ok(!first(domGeometry({...base,profile:classic})).rows?.length);
+ // Global CSS from a missing @import must never be discarded to make a proof.
+ assert.ok(!first(domGeometry({...base,css:'@import url(other.css);'+style})).rows?.length);
+});

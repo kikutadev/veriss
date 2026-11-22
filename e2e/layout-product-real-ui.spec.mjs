@@ -123,3 +123,76 @@ test('bootstrap universal pseudo reset is not treated as attempted generated con
     const contents = await page.locator('.album').evaluate(el => [getComputedStyle(el, '::before').content, getComputedStyle(el, '::after').content]);
     expect(contents).toEqual(['none', 'none']);
 });
+// Pin the third-party CSS loaded by the game's @import; do not silently
+// delete the import. This is a fixed snapshot, not a promise about future
+// Google Fonts responses or arbitrary network dependencies.
+test('pinned game CSS closure proves horizontal fit and detects injected overwidth', async ({ page, browserName }) => {
+    const { gunzipSync } = await import('node:zlib');
+    const { createHash } = await import('node:crypto');
+    const { createRequire } = await import('node:module');
+    const { domGeometry, verifyUI } = await import('../packages/adapter-core/src/ui-contracts.mjs');
+    const { evaluateAffine } = await import('./support/geometry.mjs');
+    const require = createRequire(new URL('../packages/veriss/package.json', import.meta.url));
+    const postcss = require('postcss');
+    const base = resolve('tests/fixtures/product-real-ui');
+    const [html, css, packed, metaText] = await Promise.all([
+        readFile(resolve(base, 'duo-game-title.html'), 'utf8'),
+        readFile(resolve(base, 'duo-game-title.css'), 'utf8'),
+        readFile(resolve(base, 'duo-game-title-fonts.css.gz')),
+        readFile(resolve(base, 'duo-game-title-fonts.source.json'), 'utf8')
+    ]);
+    const meta = JSON.parse(metaText);
+    const sha = (b) => createHash('sha256').update(b).digest('hex');
+    expect(sha(packed)).toBe(meta.compressedSha256);
+    const imported = gunzipSync(packed);
+    expect(sha(imported)).toBe(meta.rawSha256);
+    const importedRules = postcss.parse(imported.toString('utf8')).nodes.filter(n => n.type !== 'comment');
+    expect(importedRules.length).toBeGreaterThan(0);
+    expect(importedRules.every(n => n.type === 'atrule' && n.name === 'font-face')).toBe(true);
+    const parsed = postcss.parse(css);
+    const importNodes = parsed.nodes.filter(n => n.type === 'atrule' && n.name === 'import');
+    expect(importNodes).toHaveLength(1);
+    expect(importNodes[0].params).toBe(`url('${meta.source}')`);
+    importNodes[0].replaceWith(...importedRules);
+    const closedCSS = parsed.toString();
+    const mutation = '#game-shell{width:700px!important;max-width:none!important}';
+    const profile = { id: 'DUO-pinned', ua: browserName, viewport: { min: 320, max: 1280, height: { min: 600, max: 900 } } };
+    const baseInput = { state: 'title', profile, html, css: closedCSS, targets: ['game-shell'] };
+    const original = domGeometry({ ...baseInput, css })[0];
+    expect(original.rows?.length ?? 0, 'unresolved live @import must remain Unknown').toBe(0);
+    const good = domGeometry(baseInput)[0], bad = domGeometry({ ...baseInput, css: closedCSS + mutation })[0];
+    for (const e of [good, bad]) {
+        expect(e.axes, JSON.stringify(e.reason)).toEqual(['inline']);
+        expect(e.rows?.length ?? 0, JSON.stringify(e.reason)).toBeGreaterThan(0);
+    }
+    const model = { version: 1, initial: 'title', states: ['title'], transitions: [], profiles: [profile], contracts: [
+            { id: 'horizontal-fit', kind: 'predicate', predicate: { op: 'compare', relation: 'le', left: { target: 'game-shell', field: 'inlineEnd' }, right: { environment: 'safeRight' } } }
+        ] };
+    expect(verifyUI({ model, evidence: [good] }).status).toBe('verified');
+    expect(verifyUI({ model, evidence: [bad] }).status).toBe('violated');
+    await page.route('**/*', route => route.abort());
+    await page.setContent(html.replace('</head>', `<style>${closedCSS}</style></head>`), { waitUntil: 'domcontentloaded' });
+    const assertRows = async (e, width, height) => {
+        const actual = await page.locator('#game-shell').evaluate(el => { const r = el.getBoundingClientRect(); return [r.x, r.width]; });
+        const rows = (e.rows ?? []).filter(r => (r.constraints ?? []).every(c => c.strict ? evaluateAffine(c, width, height) > 0 : evaluateAffine(c, width, height) >= 0));
+        expect(rows.length, `${browserName}: ${width}×${height} no matching proof region`).toBeGreaterThan(0);
+        for (const r of rows) {
+            expect(actual[0], `${browserName}: ${width}px inline start`).toBeCloseTo(evaluateAffine(r.rect.inlineStart, width, height), 1);
+            expect(actual[1], `${browserName}: ${width}px inline size`).toBeCloseTo(evaluateAffine(r.rect.inlineSize, width, height), 1);
+        }
+        return actual;
+    };
+    for (const width of [320, 390, 559, 560, 561, 768, 1280])
+        for (const height of [600, 900]) {
+            await page.setViewportSize({ width, height });
+            await assertRows(good, width, height);
+        }
+    await page.addStyleTag({ content: mutation });
+    for (const width of [320, 390, 700, 701, 768, 1280])
+        for (const height of [600, 900]) {
+            await page.setViewportSize({ width, height });
+            const [x = NaN, w = NaN] = await assertRows(bad, width, height);
+            expect(w).toBe(700);
+            expect(x + w > width, width <= 700 ? `expected a clipped shell at ${width}px` : undefined).toBe(width < 700);
+        }
+});

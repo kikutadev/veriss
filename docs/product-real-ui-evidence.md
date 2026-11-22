@@ -83,3 +83,12 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - CSS shorthand refinement / 疑似要素リセットの修正は fork `main` `41561bc`、GitHub Pages `gh-pages` `5cca38e` に統合・公開。正規 `tools/gate.sh` は隔離ウォッチドッグ経由で **exit 0**、root / 5 package単体テストで fail 0、component-lint eval差分なし、既存3ブラウザE2E **549 passed**。実UIとCSSカスケードの追加個別E2E **18 passed**。
 - 公開 <https://kikutadev.github.io/veriss/#real-ui> で最新の3件の診断件数を確認。配信HTMLはビルド済みの `_site/index.html` とSHA-256一致。`#live-check` の NG=`VIOLATED` → 修正後=`VERIFIED` → 未対応例=`UNKNOWN`、幅390pxで横はみ出しなし。ファイル選択UI、Cloudflare Workerともに存在しない。
 - **残余:** 任意の実UI全体の証明は3件ともUnknown、実サイト由来のレイアウト破綻の発見実績は0。CSS読み込み閉包、コンポーネント状態の列挙、健全な部分幾何検証による検出範囲拡大が必要。
+
+## Phase 2 閉じたCSSでの実ゲーム横方向検証（2026-11-22）
+
+- DUO瓦割りの**初期HTML + 現物CSS**に含まれる1本のGoogle Fonts `@import` を、macOS上から直接取得した実CSSに置き換えた。固定したCSSは `tests/fixtures/product-real-ui/duo-game-title-fonts.css.gz`（生CSS SHA-256 `a33f5d8c227333f4c47e2e2f2929990877cc59026d288cd6ad4534bc75f3d3e6`）、取得URL・UA・gzipのSHAは隣の `.source.json`。取得した規則632件は**すべて `@font-face`**で、CSSルールを独断で削っていない。取得時点の応答に対する閉包であり、全ブラウザUA・将来のフォントサーバーの変更まで保証しない。フォント本体は保存していない。
+- 元のCSSの `@import` が**未解決**のままなら `domGeometry` の検証は従来どおり **Unknown**。実際に取得・固定したCSSを渡した場合のみ、フォント幅に依存しない `#game-shell` の**横方向（inlineStart/inlineSize）**の条件付き証明が成立する。ページ全体や高さ、JS状態、クリッピング・ヒットテストをVerifiedにしない。
+- 一般的な `width:100%; max-width:560px; margin:auto` の幅上限と自動余白の領域分割、`body{overflow:hidden}` がルートに伝播する場合の**overlayスクロールバー・floatなし・横方向限定**の保守的な投影、レンダリングに無関係な `link rel=icon` の扱いを改善。その他の外部スタイルシート・未対応書字方向・classicスクロールバー・曖昧な祖先は拒否する。
+- 正常版では指定された320〜1280px全幅に対する右端 `inlineEnd <= viewport` が **Verified**。`#game-shell{width:700px!important;max-width:none!important}` を追加した**テスト用破壊版**は同じ検査で **Violated**。390pxの実ブラウザで元の390px幅→破壊版700px幅を確認。これは修正済みの実バグではなく、明示的に挿入した負例である。
+- Chromium / Firefox / WebKit で、正常版7幅×2高さ、改変版6幅×2高さの矩形を証明済み領域のアフィン式と比較し、**全点一致**。別のgeneric block例4種類×6幅×2高さも3ブラウザで一致。`e2e/layout-product-real-ui.spec.mts` と `e2e/layout-partial-geometry.spec.mts` に再実行可能なテストを追加。
+- **製品価値の現在地**: 実ゲームの現物HTML/CSSと固定したCSS読み込み閉包を使えば、横方向だけでも意図的な破壊を静的に発見できるようになった。ただし **実サイト由来の未知バグ検出実績は依然0件**。次は依存関係の入力整備とJS状態別契約に進める。
