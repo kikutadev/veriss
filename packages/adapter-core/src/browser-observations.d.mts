@@ -63,3 +63,17 @@ export declare function captureClosedScopeTabFocus(page: BrowserObservationPage,
     steps: BrowserFocusStep[];
     observation: Observation;
 }>;
+/** A genuine aria-modal dialog must keep sequential keyboard focus inside.
+ * Sampled behavior only: this does not prove every element or browser state.
+ * The caller opens the dialog first and retains responsibility for teardown. */
+export declare function modalFocusObservation(state: string, profile: string, viewport: number, height: number, steps: readonly BrowserFocusStep[], event?: string): Observation;
+export declare function captureModalTabFocus(page: BrowserObservationPage, { state, profile, scope, steps, event }: {
+    state: string;
+    profile: string;
+    scope?: string;
+    steps?: number;
+    event?: string;
+}): Promise<{
+    steps: BrowserFocusStep[];
+    observation: Observation;
+}>;

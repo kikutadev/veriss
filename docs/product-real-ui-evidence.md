@@ -135,3 +135,10 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 公開 <https://kikutadev.github.io/veriss/#real-ui> は静的ビルド `_site/index.html` とSHA-256一致。実ブラウザでログイン後UI結果表、共通observerの導入文書リンク、NG→OK→Unknown切替、390px横はみ出しなし、不要なファイル入力/Worker未復活を確認。
 - 本体/adapter-coreをtarball化して別の空プロジェクトへインストールし、公開APIと`verifyUI`の観測失敗/静的Unknownを確認。さらに、**フォークのGitコミット `b8ba7ac` から両パッケージを別プロジェクトへ直接インストール**し、同じ結果を確認。Webサイトで認証処理を実行したり、入力を取得するWorkerを増設したりはしていない。
 - 残余: React/Vue等の実装からの完全な状態列挙やJS/CSS閉包を静的に自動導出する機能は未実装。ログイン済みE2Eを利用する観測APIは実際に機能するが、それだけで全幅・全状態をVerifiedとは主張しない。
+
+### Phase 2d: ログイン後モーダルとフォーカス漏れの対照（2026-11-23）
+
+- React-admin公式デモで**実際にログイン後のOrders一覧**を開き、Add filter → Save current queryを操作すると `role=dialog` / `aria-modal=true` のモーダルが表示される。保存はせずCancelで閉じる。`captureModalTabFocus`を追加して、320/390/768px幅の各8回Tab（Chromium/Firefox/WebKit）で**背面へのフォーカス漏れなし**を確認した。これは「問題発見」ではなく正常な対照例である。
+- 同じ検査を使い、`aria-modal=true` だけを付けたフォーカス非制御の模擬モーダルは背面のボタンへフォーカスが漏れるため**観測失敗**、フォーカスを内部で循環させる対照は**観測成功**（3ブラウザ）。どちらも静的全幅の証明 `status=unknown`、観測のみの失敗/成功を独立扱い。
+- native `<dialog>` では、ブラウザによりTab途中のactiveElementが `body` へ一時的に移る場合がある。背景の操作可能要素への移動と区別できない曖昧なサンプルを確定違反にしないよう、`body`/`html`の場合は**不確定で検査を拒否**する。実際の背景ボタンへの移動は引き続き失敗になる。非modal・非表示のダイアログも測定成功扱いしない。
+- 実サイト固有のDOMテキストやフォーム値を保存・送信しない。Playwright既存セッション利用、保存/変更API呼び出しなし。アプリ実装からの全状態自動列挙は引き続き未対応。

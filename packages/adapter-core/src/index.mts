@@ -14,7 +14,7 @@ export type {Choice,Choices,ContractUnknown} from './noshift.mjs';
 export type {Finding,LintMessage} from './lint.mjs';
 export type {FiniteAnalysis,FiniteDerived,FiniteHandler,FiniteExpression,FiniteUnknown} from './finite-state.mjs';
 export type {GeometryInput,GeometrySessionOptions} from './ui-contracts.mjs';
-export {captureViewport,captureClosedScopeTabFocus,viewportObservation,focusObservation} from './browser-observations.mjs';
+export {captureViewport,captureClosedScopeTabFocus,captureModalTabFocus,viewportObservation,focusObservation,modalFocusObservation} from './browser-observations.mjs';
 export type {BrowserFrame,BrowserFocusStep,BrowserObservationPage} from './browser-observations.mjs';
 export interface Variant {html:string;choices:Choices}
 export interface ComponentScope {mode:'scoped'|'global';ancestors?:'scoped';owned?:string[];escapes?:{selector:string;kind:string}[]}

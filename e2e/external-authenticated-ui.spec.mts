@@ -3,7 +3,7 @@
 // This is an external network audit, NOT a universal static proof or release gate.
 import {test,expect} from '@playwright/test';
 import type {Page} from '@playwright/test';
-import {captureViewport,captureClosedScopeTabFocus,type BrowserFrame,type BrowserFocusStep} from '../packages/adapter-core/src/browser-observations.mjs';
+import {captureViewport,captureClosedScopeTabFocus,captureModalTabFocus,type BrowserFrame,type BrowserFocusStep} from '../packages/adapter-core/src/browser-observations.mjs';
 import {verifyUI} from '../packages/adapter-core/src/ui-contracts.mjs';
 import type {Observation,UIModel} from '../packages/veriss/src/relational-contract.mjs';
 
@@ -125,6 +125,28 @@ test('react-admin official demo: authenticated dashboard, drawer, orders table',
  console.log('REACT_NAV_CLICKED',browserName);
  await expect(page).toHaveURL(/#\/orders/);
  await expect(page.getByRole('heading',{name:'Orders'}).first()).toBeVisible();
+ await page.getByRole('button',{name:'Add filter'}).click();
+ await page.getByRole('menuitem',{name:'Save current query...'}).click();
+ await expect(page.locator('[role=dialog][aria-modal=true]')).toBeVisible();
+ const modalRows=[];
+ const modalObservations:Observation[]=[];
+ for(const width of [320,390,768]){
+  await page.setViewportSize({width,height});
+  const sample=await captureModalTabFocus(page,{state:'query-dialog-open',profile:'demo',steps:8});
+  modalObservations.push(sample.observation);
+  modalRows.push({width,inside:sample.observation.passed===true,outside:sample.steps.filter(s=>!s.inScope).length});
+ }
+ console.log('AUTH_MODAL_AUDIT '+JSON.stringify({app:'react-admin official demo',browser:browserName,rows:modalRows}));
+ expect(modalRows.every(r=>r.inside),JSON.stringify(modalRows)).toBe(true);
+ const modalModel:UIModel={version:1,initial:'query-dialog-open',states:['query-dialog-open'],
+  transitions:[{from:'query-dialog-open',event:'modal-focus-contained',to:'query-dialog-open'}],
+  profiles:[{id:'demo',ua:browserName as 'chromium'|'firefox'|'webkit',viewport:{min:320,max:768,height:{min:844,max:844}}}],
+  contracts:[{id:'keyboard-contained',kind:'action',event:'modal-focus-contained'}]};
+ const modalReport=verifyUI({model:modalModel,observations:modalObservations});
+ expect(modalReport.status).toBe('unknown');
+ expect(modalReport.observationStatus).toBe('sampled');
+ await page.getByRole('button',{name:'Cancel'}).click();
+ await expect(page.locator('[role=dialog][aria-modal=true]')).toBeHidden();
  for(const width of widths){
   await page.setViewportSize({width,height});
   await sample(page,'list',frames,observations);

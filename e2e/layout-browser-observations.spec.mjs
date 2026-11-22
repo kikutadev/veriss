@@ -47,3 +47,34 @@ test('logged-in DOM observer distinguishes root overflow from scrollable childre
     expect(good.status, 'browser measurements do not prove every possible viewport').toBe('unknown');
     expect(good.observationStatus).toBe('sampled');
 });
+test('managed modal traps Tab; ARIA-only impostor leaks to background in all engines', async ({ page, browserName }) => {
+    const { captureModalTabFocus } = await import('../packages/adapter-core/src/browser-observations.mjs');
+    const modalModel = { version: 1, initial: 'dialog-open', states: ['dialog-open'],
+        transitions: [{ from: 'dialog-open', event: 'modal-focus-contained', to: 'dialog-open' }],
+        profiles: [{ id: 'browser', viewport: { min: 390, max: 390, height: { min: 844, max: 844 } } }],
+        contracts: [{ id: 'modal-focus', kind: 'action', event: 'modal-focus-contained' }] };
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setContent('<button id="outside">Outside</button><div role="dialog" aria-modal="true" style="display:block;padding:16px"><button id="last">Inside</button></div><button id="next">Next</button>');
+    await page.locator('#last').focus();
+    const failed = await captureModalTabFocus(page, { state: 'dialog-open', profile: 'browser', steps: 3 });
+    expect(failed.observation.passed, `${browserName} should detect leaky modal`).toBe(false);
+    const failedContract = verifyUI({ model: modalModel, observations: [failed.observation] });
+    expect(failedContract.status).toBe('unknown');
+    expect(failedContract.observationStatus).toBe('failed');
+    await page.setContent('<button id="outside">Outside</button><div role="dialog" aria-modal="true"><button id="first">First</button><button id="last">Last</button></div><button id="next">Next</button>');
+    await page.locator('#last').evaluate((el) => el.addEventListener('keydown', (event) => {
+        if (event.key === 'Tab' && !event.shiftKey) {
+            event.preventDefault();
+            document.querySelector('#first')?.focus();
+        }
+    }));
+    await page.locator('#last').focus();
+    const good = await captureModalTabFocus(page, { state: 'dialog-open', profile: 'browser', steps: 3 });
+    expect(good.observation.passed, `${browserName} native modal retains focus`).toBe(true);
+    expect(good.steps.every(s => s.inScope && !s.offscreen)).toBe(true);
+    const verifiedSample = verifyUI({ model: modalModel, observations: [good.observation] });
+    expect(verifiedSample.status).toBe('unknown');
+    expect(verifiedSample.observationStatus).toBe('sampled');
+    await page.locator('[role=dialog]').evaluate(el => el.removeAttribute('aria-modal'));
+    await expect(captureModalTabFocus(page, { state: 'dialog-open', profile: 'browser' })).rejects.toThrow(/Open visible aria-modal/);
+});

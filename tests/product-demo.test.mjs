@@ -44,4 +44,5 @@ test('the public real-UI evidence distinguishes authenticated browser observatio
     assert.match(html, /ブラウザ観測.*静的証明ではない/);
     assert.match(html, /Bootstrap公式サンプル/);
     assert.match(html, /共通observerを組み込み/);
+    assert.match(html, /模擬モーダル/);
 });

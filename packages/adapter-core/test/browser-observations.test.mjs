@@ -40,3 +40,28 @@ test('invalid measurements are refused, not used as proof samples', () => {
     assert.throws(() => viewportObservation('dashboard', 'p', { ...frame, documentWidth: NaN }), /viewport/i);
     assert.throws(() => focusObservation('dashboard', 'p', 390, 844, [], ''), /event/i);
 });
+test('a modal keyboard contract fails for background focus, not for a contained cycle', async () => {
+    const { modalFocusObservation, captureModalTabFocus } = await import('../src/browser-observations.mjs');
+    const inside = { ...focus, inScope: true, offscreen: false };
+    const escaped = { ...inside, inScope: false };
+    assert.equal(modalFocusObservation('dialog-open', 'p', 390, 844, [inside, inside]).passed, true);
+    assert.equal(modalFocusObservation('dialog-open', 'p', 390, 844, [inside, escaped]).passed, false);
+    assert.equal(modalFocusObservation('dialog-open', 'p', 390, 844, [{ ...inside, offscreen: true }]).passed, false);
+    assert.throws(() => modalFocusObservation('dialog-open', 'p', 390, 844, [{ ...escaped, tag: 'body' }]), /Indeterminate document focus/);
+    assert.equal(modalFocusObservation('dialog-open', 'p', 390, 844, [{ ...escaped, tag: 'body' }, escaped]).passed, false);
+    const events = [];
+    let cursor = 0;
+    const page = {
+        evaluate: async (fn, arg) => {
+            events.push({ fn: String(fn).slice(0, 70), arg });
+            if (events.length === 1)
+                return { present: true, modal: true, visible: true };
+            return { width: 390, height: 844, step: cursor++ === 1 ? escaped : inside };
+        },
+        locator: () => ({ focus: async () => { throw Error('Should not steal the modal focus'); } }),
+        keyboard: { press: async (key) => { assert.equal(key, 'Tab'); } }
+    };
+    const captured = await captureModalTabFocus(page, { state: 'dialog-open', profile: 'p', scope: '[role=dialog]', steps: 3 });
+    assert.equal(captured.observation.passed, false);
+    assert.equal(captured.steps.length, 3);
+});

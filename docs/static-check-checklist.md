@@ -506,3 +506,5 @@
 :is() / :where() 内 user-action は従来未モデル化だったため明示的に拒否する。
 純色 consumer と未使用の変数は幾何の依存と分ける。未知の関連を過小評価しない。
 独立した inventory UI の単体テストと Chromium/Firefox/WebKit の hover 操作で対照を確認。
+
+- [x] **ログイン後のモーダル（実測ベース）**: 公開 React-admin公式デモ Orders → Add filter → Save current query の `aria-modal=true` でTabを8回押し、320/390/768px・Chromium/Firefox/WebKitの計9点で背景のフォーカス逃げなし、Cancelで閉じる。ARIAだけの非トラップモーダルでは背景フォーカスを検出する対照（3エンジン）、フォーカス制御のある対照は通過。native `<dialog>` で `document.activeElement=BODY` となるブラウザ差は**実際の操作漏れと同一視せず不確定扱い**（`e2e/layout-browser-observations.spec.mts`、`e2e/external-authenticated-ui.spec.mts`、`packages/adapter-core/test/browser-observations.test.mts`）。これは静的CSS警告を増やすものではなく、ログイン済みPlaywrightの `Observation` に限る。

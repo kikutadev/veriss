@@ -75,3 +75,58 @@ export async function captureClosedScopeTabFocus(page, { state, profile, anchor,
     }
     return { steps: focus, observation: focusObservation(state, profile, width, height, focus, event) };
 }
+/** A genuine aria-modal dialog must keep sequential keyboard focus inside.
+ * Sampled behavior only: this does not prove every element or browser state.
+ * The caller opens the dialog first and retains responsibility for teardown. */
+export function modalFocusObservation(state, profile, viewport, height, steps, event = 'modal-focus-contained') {
+    identities(state, profile);
+    if (!event || !valid(viewport) || !viewport || !valid(height) || !height || !Array.isArray(steps) || steps.length === 0 ||
+        steps.some(s => !rectangle(s.bounds)))
+        throw new TypeError('Invalid modal focus measurement');
+    // Native <dialog> may transiently report BODY as activeElement in some
+    // engines while the top-layer modal still blocks background interaction.
+    // This is inconclusive, not evidence of a usable focus escape.
+    const definiteEscape = steps.some(s => !s.inScope && !['body', 'html'].includes(s.tag));
+    const hiddenFocus = steps.some(s => s.inScope && s.offscreen);
+    if (!definiteEscape && !hiddenFocus && steps.some(s => !s.inScope && ['body', 'html'].includes(s.tag)))
+        throw new Error('Indeterminate document focus during modal Tab traversal');
+    return { state, profile, width: viewport, height, event, to: state, passed: !definiteEscape && !hiddenFocus };
+}
+export async function captureModalTabFocus(page, { state, profile, scope = '[role="dialog"][aria-modal="true"]', steps = 6, event = 'modal-focus-contained' }) {
+    identities(state, profile);
+    if (!scope || !Number.isSafeInteger(steps) || steps < 1 || steps > 64)
+        throw new TypeError('Invalid modal exploration');
+    // Refuse nonmodal popovers and hidden DOM nodes, rather than reporting a
+    // false positive or pretending a missing dialog has been verified.
+    const init = await page.evaluate(({ selector }) => {
+        const el = document.querySelector(selector);
+        if (!el)
+            return { present: false, modal: false, visible: false };
+        const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+        return { present: true, modal: el.getAttribute('aria-modal') === 'true',
+            visible: r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden' };
+    }, { selector: scope });
+    if (!init.present || !init.modal || !init.visible)
+        throw new Error('Open visible aria-modal dialog required for focus capture');
+    const focus = [];
+    let width = 0, height = 0;
+    for (let i = 0; i < steps; i++) {
+        await page.keyboard.press('Tab');
+        const result = await page.evaluate(({ selector }) => {
+            const el = document.activeElement, r = el?.getBoundingClientRect();
+            if (!el || !r)
+                return { width: innerWidth, height: innerHeight, step: null };
+            return { width: innerWidth, height: innerHeight, step: { tag: el.tagName.toLowerCase(),
+                    inScope: !!el.closest(selector),
+                    offscreen: r.width <= 0 || r.height <= 0 || r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || r.top >= innerHeight,
+                    bounds: { x: r.x, y: r.y, width: r.width, height: r.height } } };
+        }, { selector: scope });
+        width = result.width;
+        height = result.height;
+        if (result.step)
+            focus.push(result.step);
+    }
+    if (focus.length !== steps)
+        throw new Error('Modal focus position could not be observed');
+    return { steps: focus, observation: modalFocusObservation(state, profile, width, height, focus, event) };
+}

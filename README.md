@@ -63,6 +63,27 @@ if (report.observationStatus === 'failed') throw new Error('Observed UI contract
 // Without closed CSS/geometry evidence, report.status is UNKNOWN, even if samples pass.
 ```
 
+For a genuinely **open** accessible modal (`role=dialog`, `aria-modal=true`), audit background focus escape without clicking Save or reading form values:
+
+```js
+import {captureModalTabFocus} from '@mizchi/veriss-adapter-core';
+// In the caller's test, open the modal first and wait until visible.
+const modal = await captureModalTabFocus(page, {
+  state:'query-dialog-open', profile:'phone', steps:8
+});
+const modalModel = {
+  version:1,initial:'query-dialog-open',states:['query-dialog-open'],
+  transitions:[{from:'query-dialog-open',event:'modal-focus-contained',to:'query-dialog-open'}],
+  profiles:[{id:'phone',viewport:{min:320,max:1280,height:{min:844,max:844}}}],
+  contracts:[{id:'dialog-focus',kind:'action',event:'modal-focus-contained'}]
+};
+const modalReport = verifyUI({model:modalModel,observations:[modal.observation]});
+if (modalReport.observationStatus === 'failed') throw new Error('Background focus leaked from modal');
+// A passing sample still has static status UNKNOWN.
+```
+
+A nonmodal popover or missing dialog is rejected rather than accepted. If a browser transiently reports document `body` focus (observed with native `<dialog>`), the sample is **inconclusive**, not an asserted background escape. This is a finite Tab observation, not full focus-trap or static proof.
+
 `captureViewport` returns `frame.documentWidth`, `frame.main` and structural selectors for overflow contributors; `captureClosedScopeTabFocus` returns the sampled Tab steps and an action observation. For SPA navigation or animation, **wait for the relevant state to settle** before capturing. Use separate `state` names for each list/dialog/menu configuration and declare their transitions in the model. You can review the complete login → dashboard → menu → list examples in [`e2e/external-authenticated-ui.spec.mts`](e2e/external-authenticated-ui.spec.mts); the repeatable offline control is [`e2e/layout-browser-observations.spec.mts`](e2e/layout-browser-observations.spec.mts).
 
 ## Expanded verification targets (upstream 2026-11-22)
