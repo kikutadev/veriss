@@ -122,3 +122,9 @@ Related: [ADR-0019](0019-relational-ui-contracts.md)（accepted: 観測と証明
 ## 変更・受入の現状
 
 このADRは**提案・詳細検討のみ**。既存SDK、テスト、公開サイトの実装・画面を変更していない。実装でP0/P1を通してから、実証済みの規則だけをAcceptedにする。静的Proofの範囲は既存仕様のまま。
+
+## P0 実装（2026-11-23）
+
+- `e2e/external-authenticated-ui.spec.mts` のモーダル/権限/閉じたdrawerの純粋E2E結果から`verifyUI`への擬似action自己遷移を削除。root/mainの幾何実測と`verifyUI`の照合は残す。
+- ランタイムobserverの戻り値はモーダル/閉じたdrawerについて`{steps,passed}`に単純化。旧権限API `captureControlAvailability`, `controlAvailabilityObservation`、不要な真偽値→`Observation`変換 `focusObservation`, `modalFocusObservation`、対応型と例を削除。権限は利用側E2Eの `expectRbacUserActions` が対象ごとの厳密な期待で判定する。
+- 独立した静的 `domGeometry` / `verifyUI` と汎用state/action契約そのものは変更しない。`captureViewport`の幾何観測は維持。P1とP2の設計は未実装。

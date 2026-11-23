@@ -180,3 +180,9 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - **実装目的:** 静的証明に寄与しないE2E真偽値を`Observation.passed`/自己遷移`verifyUI`へ流し込む冗長な実装を解消する。既存のDOM実測/フォーカス検査は残し、Playwrightのassertionを結果の正本にする。
 - **合格条件:** Adminの8編集と状態操作の対象ごとの許否、Manager/Viewerの全対象禁止を厳密検査し、Adminの誤った追加disabledまたはViewerの有効化の負例がChromium/Firefox/WebKitで失敗すること。既存のdrawer/モーダル漏れ・root横はみ出し検知は継続。`verifyUI`は**幾何の観測照合および閉じた静的証明のみ**に使い、actionの擬似自己遷移は除去する。不要な公開control availability API・対応テスト/README例は削除し、検査価値を減らさない。
 - **進め方:** 公開デモの自己停止対象を読み取りで特定 → オフライン負例のRed → E2E移行とAPI削除のGreen → 3ブラウザ外部・オフライン/TS・正式gate → fork mainへ統合。P1幾何観測の統合とP2実アプリCSS閉包はP0の結果を踏まえて次段階にする。
+
+#### Phase 2f P0 実装内容
+
+- [x] 権限チェックの弱い`some-enabled`契約を撤去し、8人のデモアカウントごとにAdmin/Manager/Viewerの編集と状態変更の可否をPlaywrightで検査。自己停止不可の固有例外を含む。オフライン対照は別のユーザーを誤ってdisabledにした場合、Admin本人を有効にした場合、Viewerのボタンをenabledにした場合、`aria-disabled`のみの場合を検査する。
+- [x] メニュー/モーダルの実ブラウザ観測に不要なaction自己遷移`verifyUI`ラッパーを外し、真偽値→`Observation`変換の公開API/型/テストを整理。静的に意味のある幾何の証拠と`verifyUI`は維持。
+- [ ] P1: 点の矩形計測を重複削減。P2: 実アプリソースとCSS閉包の成立性を調べ、1状態/1対象の静的証明を試す。

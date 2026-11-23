@@ -162,3 +162,9 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - Pagesの公開HTMLは同じ`_site/index.html`とSHA-256一致。<https://kikutadev.github.io/veriss/#real-ui> でAdmin/Manager/Viewer比較、既存のNG→OK→Unknownデモ、390px横はみ出しなし、ファイルアップロード/Worker未復活を実ブラウザで確認。第三者サイト側データの更新は行っていない。
 - 本体とadapter-coreのtarballを空の別プロジェクトにインストールしてAPIが読み込めることを確認。さらに**Gitコミット `98795c2` を指定した両パッケージ**を別の空プロジェクトへ導入し、`captureControlAvailability`、正常の観測通過／違反の観測失敗、静的 `status=unknown` を確認。
 - 未対応: 本番のサーバ認可、JS/DOMの全遷移の自動導出、すべての画面幅・権限状態の静的な証明。ユーザーの既存Playwrightテストに埋め込んだ範囲でのフロントエンド実測に限定する。
+
+
+### Phase 2f P0: 実測をPlaywrightの直接assertionへ整理（2026-11-23）
+
+- Phase2eで追加した `captureControlAvailability` はP0で撤去。ログイン後の公開RBACデモにおけるAdmin「全員編集可能・本人停止不可」、Manager/Viewer「編集/状態変更不可」を、**8人それぞれの対象に対して**Playwrightで検査する。件数のみの緩い `some-enabled` 条件では、別人の停止が誤って無効化されても検知できなかったため変更。
+- モーダル/閉じたdrawerのTab操作は `captureModalTabFocus` / `captureClosedScopeTabFocus` の直接 `passed` をassertし、actionの擬似自己遷移は削除。root/mainの**幾何の点観測**は既存 `verifyUI` に渡すが、静的な `status=unknown` は維持。以前のPhase2e記録は当時の経緯であり、現行SDKの仕様はREADMEとADR-0021を参照。

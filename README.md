@@ -29,82 +29,45 @@ The first command reports a failing viewport (416px in this fixture), the second
 
 [Product-value plan and release acceptance](docs/product-value-plan.md). [Real-world UI findings and reproduction](docs/product-real-ui-evidence.md): three static real-site inputs remain Unknown, while separate **post-login browser observations** on two public demo apps reproduce a hidden-drawer keyboard-focus problem and a 320px orders-list overflow. Runtime findings are not static proof.
 
-**Audit post-login demo states (requires network, not part of the offline gate):** `node tools/gate-guarded.mjs --external-e2e`. Uses only publicly documented demo accounts, observes two distinct apps on Chromium/Firefox/WebKit at four widths, and reports `verifyUI` observation failures while preserving static `UNKNOWN`.
+**Audit post-login demo states (requires network, not part of the offline gate):** `node tools/gate-guarded.mjs --external-e2e`. Uses only publicly documented demo accounts, observes two distinct apps on Chromium/Firefox/WebKit at four widths, and reports browser-only focus/permission findings alongside the separate `verifyUI` geometry observations (still static `UNKNOWN`).
 
 ## Check an authenticated web app from an existing Playwright test
 
-Use the **app's existing login and navigation steps**; veriss does not need credentials or a URL-fetching worker. The adapter-core observer measures **only a browser document's horizontal extent, the selected main rectangle, and focus geometry**. It does not collect text, input values, cookies, tokens or HTML/CSS source. This is a **runtime observation**, not a proof that every width or application state is covered.
-
-Install the two Git packages at matching commits in a project that already uses Playwright: `@mizchi/veriss` and `@mizchi/veriss-adapter-core` (the latter has a peer dependency on the former). Then, inside a Playwright test **after the application has reached a stable logged-in state**:
+Use the application's **existing Playwright login and navigation steps**. The observer reads the current page after it reaches a stable state. No credentials, URL worker, or application data upload are required.
 
 ```js
-import {captureViewport, captureClosedScopeTabFocus, verifyUI} from '@mizchi/veriss-adapter-core';
+import {expect} from '@playwright/test';
+import {captureViewport, captureClosedScopeTabFocus, captureModalTabFocus} from '@mizchi/veriss-adapter-core';
 
-// page: the Playwright Page returned by your own authenticated E2E setup.
+// page is from the application's own authenticated Playwright test.
 const viewport = await captureViewport(page, {state:'dashboard',profile:'phone'});
-// For menus, call only while this specific scope is CLOSED.
+expect(viewport.frame.documentWidth).toBeLessThanOrEqual(viewport.frame.viewport);
+
+// This UI's drawer is explicitly known to be closed at this point.
 const focus = await captureClosedScopeTabFocus(page, {
-  state:'dashboard', profile:'phone',
   anchor:'[aria-label="Open menu"]', closedScope:'#sidebar', steps:6
 });
-const model = {
-  version:1, initial:'dashboard', states:['dashboard'],
-  transitions:[{from:'dashboard',event:'keyboard-focus-visible',to:'dashboard'}],
-  profiles:[{id:'phone',viewport:{min:320,max:1280,height:{min:844,max:844}}}],
-  contracts:[
-    {id:'root-fit',kind:'predicate',predicate:{op:'compare',relation:'le',
-      left:{target:'scrollExtent',field:'inlineEnd'},right:{environment:'safeRight'}}},
-    {id:'focus',kind:'action',event:'keyboard-focus-visible'}
-  ]
-};
-const report = verifyUI({model,observations:[viewport.observation,focus.observation]});
-// Check sampled failures separately from the static proof status.
-if (report.observationStatus === 'failed') throw new Error('Observed UI contract violation');
-// Without closed CSS/geometry evidence, report.status is UNKNOWN, even if samples pass.
-```
+expect(focus.passed).toBe(true);
 
-For a genuinely **open** accessible modal (`role=dialog`, `aria-modal=true`), audit background focus escape without clicking Save or reading form values:
-
-```js
-import {captureModalTabFocus} from '@mizchi/veriss-adapter-core';
-// In the caller's test, open the modal first and wait until visible.
+// After opening a real visible role=dialog / aria-modal=true modal:
 const modal = await captureModalTabFocus(page, {
-  state:'query-dialog-open', profile:'phone', steps:8
+  steps:8
 });
-const modalModel = {
-  version:1,initial:'query-dialog-open',states:['query-dialog-open'],
-  transitions:[{from:'query-dialog-open',event:'modal-focus-contained',to:'query-dialog-open'}],
-  profiles:[{id:'phone',viewport:{min:320,max:1280,height:{min:844,max:844}}}],
-  contracts:[{id:'dialog-focus',kind:'action',event:'modal-focus-contained'}]
-};
-const modalReport = verifyUI({model:modalModel,observations:[modal.observation]});
-if (modalReport.observationStatus === 'failed') throw new Error('Background focus leaked from modal');
-// A passing sample still has static status UNKNOWN.
+expect(modal.passed).toBe(true);
 ```
 
-A nonmodal popover or missing dialog is rejected rather than accepted. If a browser transiently reports document `body` focus (observed with native `<dialog>`), the sample is **inconclusive**, not an asserted background escape. This is a finite Tab observation, not full focus-trap or static proof.
-
-For **role-dependent UI availability** on an existing authenticated screen, declare the controls that must be allowed or blocked. Do not click destructive controls in the audit:
+The focus helpers actually press Tab and return sampled steps and a direct `passed` result; they do **not** fabricate a state-graph transition or claim static proof. A native modal that temporarily focuses `body` without a definite focus escape is inconclusive. Use Playwright assertions for RBAC control availability rather than a custom veriss permission verifier:
 
 ```js
-import {captureControlAvailability} from '@mizchi/veriss-adapter-core';
-const permissions = await captureControlAvailability(page, {
-  state:'viewer-users', profile:'phone', controls:[
-    {id:'edit',selector:'button[data-action="edit"]',expect:'all-blocked'},
-    {id:'suspend',selector:'button[data-action="suspend"]',expect:'all-blocked'}
-  ]
-});
-const roleModel={version:1,initial:'viewer-users',states:['viewer-users'],
-  transitions:[{from:'viewer-users',event:'role-controls-match',to:'viewer-users'}],
-  profiles:[{id:'phone',viewport:{min:320,max:1280,height:{min:844,max:844}}}],
-  contracts:[{id:'role-controls',kind:'action',event:'role-controls-match'}]};
-const roleResult=verifyUI({model:roleModel,observations:[permissions.observation]});
-if(roleResult.observationStatus==='failed')throw new Error('Unexpected accessible UI action');
+const edit = page.getByRole('button',{name:'Edit example user'});
+await expect(edit).toBeDisabled();
+// If your app requires native disabling rather than aria-disabled only:
+expect(await edit.evaluate(el=>el.matches(':disabled') || !!el.closest('[inert]'))).toBe(true);
 ```
 
-Each declared selector must match at least one control. `all-enabled`, `some-enabled`, and `all-blocked` can be combined (e.g. Admin may edit all users but may not suspend themselves). Native `disabled` and `inert` are treated as blocked; an `aria-disabled`-only or pointer-events-only control is **inconclusive** instead of assumed secure. Results contain only caller-chosen group IDs and counts, not screen text, user rows, cookies, or input values. **Server-side authorization cannot be established from the DOM**; test APIs independently. As with every runtime observation, a passing sample does not change the static verdict from UNKNOWN.
+For role-specific tests, assert **each target's** expected permissions, not merely a count of enabled buttons. The public demo test [`e2e/external-authenticated-ui.spec.mts`](e2e/external-authenticated-ui.spec.mts) uses [`e2e/rbac-role-assertions.mts`](e2e/rbac-role-assertions.mts): Admin can edit all eight public demo users but cannot suspend their own account; Manager and Viewer cannot edit or suspend/reactivate users. UI-disabled state does not prove server-side authorization.
 
-`captureViewport` returns `frame.documentWidth`, `frame.main` and structural selectors for overflow contributors; `captureClosedScopeTabFocus` returns the sampled Tab steps and an action observation. For SPA navigation or animation, **wait for the relevant state to settle** before capturing. Use separate `state` names for each list/dialog/menu configuration and declare their transitions in the model. You can review the complete login → dashboard → menu → list examples in [`e2e/external-authenticated-ui.spec.mts`](e2e/external-authenticated-ui.spec.mts); the repeatable offline control is [`e2e/layout-browser-observations.spec.mts`](e2e/layout-browser-observations.spec.mts).
+`captureViewport` also returns a **point** `observation` for comparing sampled geometry with `verifyUI`; this is useful when a closed CSS/DOM/state model independently supplies `GeometryEvidence`. `verifyUI` remains the static relational checker, not a boolean wrapper for ordinary Playwright assertions. To prove a layout property over a declared viewport interval, use the actual complete author CSS and `domGeometry` → `verifyUI`; missing relevant CSS or unmodeled state must remain `UNKNOWN`. A passing browser sample alone never becomes a static `VERIFIED` result.
 
 ## Expanded verification targets (upstream 2026-11-22)
 

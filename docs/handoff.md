@@ -488,3 +488,9 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - fork実装 main `98795c2`、公開Pages `4f53fe5`。正式gate exit0（root+全5パッケージ単体 fail0、既存3ブラウザ552 E2E）。独立して外部ログイン済みUI15 E2E、オフライン9 E2Eも成功。Git-pinned adapter-coreとveriss本体を別プロジェクトへ導入し、観測失敗と静的Unknownを確認。公開サイトもSHA一致、3権限比較と既存デモ、390px幅で実受入済み。
 - 製品価値は**ログイン後のUIがロールによって意図に反し操作可能になった回帰を、既存E2Eから観測契約として検出**できること。API側の認可と全幅静的証明は未達。次はフォーム入力エラーや権限別遷移など実アプリ状態の観測を継続するか、CSS/JS状態の静的閉包へ戻るか検討。詳細は `docs/product-real-ui-evidence.md`。
+
+
+### Phase 2f P0: E2Eと静的証明の分離（2026-11-23）
+
+- 設計は [ADR-0021](adr/0021-browser-observation-proof-boundary.md)。Playwright E2Eの権限・フォーカス成功/失敗を合成 `Observation.passed` / action自己遷移 `verifyUI` に包む重複を撤去。`verifyUI` / `domGeometry` は本来の静的幾何・幾何観測で維持。権限は公開デモの8人全員の操作ごとにPlaywright assertionで検査し、Admin本人の停止禁止を区別。
+- 使われなくなった公開SDK `captureControlAvailability`, `controlAvailabilityObservation`, `focusObservation`, `modalFocusObservation` と関連型を削除し、フォーカス補助は `{steps,passed}` を直接返す。P1矩形観測の統合・P2実装ソース由来CSS閉包は未着手。
