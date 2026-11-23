@@ -149,3 +149,9 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - `@mizchi/veriss-adapter-core` のモーダル観測APIはパッケージ化して別プロジェクトから呼び出し成功。フォークのGitコミット `14a8e85` からveriss本体+adapter-coreを外部空プロジェクトへ直接インストールした場合も、正常/違反を区別できることを確認。
 - <https://kikutadev.github.io/veriss/#real-ui> で追加のモーダル対照説明、既存2サイトのログイン後UI実測表、NG→OK→Unknown、390pxの横はみ出しなし、不要なファイル選択/Worker機能の未復活を実ブラウザで確認。配信HTMLはビルド済み`_site/index.html`とSHA-256一致。
 - **残余:** 実サイトに元からある未知のモーダル不具合を検出したとの主張ではない。React-adminのモーダルは正常対照であり、人工的な背景フォーカス漏れは負例。全状態・全幅の静的証明は未完了（Unknown）。
+
+### Phase 2e: RBAC管理画面の権限別UIと対照（2026-11-23）
+
+- 公開デモのUsers画面へ**Admin / Manager / Viewer**それぞれでログインし、390px/1280px × Chromium/Firefox/WebKitの18測定点で観測。表示ページの8人分を対象に `Edit` と `Suspend` / `Reactivate` のネイティブボタン状態を比較した。Admin: Edit **8/8有効**、Status **7/8有効・1件無効**（自分自身への停止を避けるUI例外）。ManagerとViewer: Edit **0/8有効**、Status **0/8有効**。ブラウザ上でdisabledボタンがフォーカスを受け付けないことも検算した。
+- `captureControlAvailability` / `controlAvailabilityObservation` を`@mizchi/veriss-adapter-core`へ追加。既存Playwrightのログイン後ページから、開発者が指定したセレクタに対し `all-enabled` / `some-enabled` / `all-blocked` の期待を宣言。matched/enabled/blocked/uncertain の**件数とグループIDのみ**返し、DOMテキスト・属性値・個人情報を収集しない。`verifyUI` action観測では期待外のUI操作可能性を失敗として扱い、静的全状態 `status=unknown` は維持。
+- 3ブラウザのオフラインE2Eで、disabled/inertの正常例、閲覧専用の編集ボタンが有効になる反例、`aria-disabled`のみ・セレクタに要素がない場合の不確定を検査。**UIの有効状態とサーバの認可は別問題**であり、APIの権限チェックや変更操作の送信は検査していない。

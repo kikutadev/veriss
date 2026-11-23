@@ -78,3 +78,37 @@ test('managed modal traps Tab; ARIA-only impostor leaks to background in all eng
     await page.locator('[role=dialog]').evaluate(el => el.removeAttribute('aria-modal'));
     await expect(captureModalTabFocus(page, { state: 'dialog-open', profile: 'browser' })).rejects.toThrow(/Open visible aria-modal/);
 });
+test('role-based controls: disabled and inert block, visible enabled fails viewer contract, aria-disabled alone inconclusive', async ({ page, browserName }) => {
+    const { captureControlAvailability } = await import('../packages/adapter-core/src/browser-observations.mjs');
+    const state = 'viewer-users';
+    const model = { version: 1, initial: state, states: [state],
+        transitions: [{ from: state, event: 'role-controls-match', to: state }],
+        profiles: [{ id: 'browser', viewport: { min: 390, max: 390, height: { min: 844, max: 844 } } }],
+        contracts: [{ id: 'permissions', kind: 'action', event: 'role-controls-match' }] };
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setContent('<button id="edit" disabled>Edit</button><button id="stop" disabled>Stop</button>');
+    const opts = { state, profile: 'browser', controls: [
+            { id: 'edit', selector: '#edit', expect: 'all-blocked' },
+            { id: 'stop', selector: '#stop', expect: 'all-blocked' }
+        ] };
+    const good = await captureControlAvailability(page, opts);
+    expect(good.controls.map(c => c.blocked), browserName).toEqual([1, 1]);
+    const accepted = verifyUI({ model, observations: [good.observation] });
+    expect(accepted.status).toBe('unknown');
+    expect(accepted.observationStatus).toBe('sampled');
+    await page.locator('#edit').evaluate(el => el.removeAttribute('disabled'));
+    const leak = await captureControlAvailability(page, opts);
+    expect(leak.controls[0]?.enabled).toBe(1);
+    const failed = verifyUI({ model, observations: [leak.observation] });
+    expect(failed.status).toBe('unknown');
+    expect(failed.observationStatus).toBe('failed');
+    await page.locator('#edit').evaluate(el => { el.setAttribute('aria-disabled', 'true'); });
+    await expect(captureControlAvailability(page, opts)).rejects.toThrow(/Inconclusive/);
+    await page.locator('#edit').evaluate(el => { el.removeAttribute('aria-disabled'); el.setAttribute('disabled', ''); });
+    await page.locator('#stop').evaluate(el => { el.removeAttribute('disabled'); el.closest('body')?.setAttribute('inert', ''); });
+    const inert = await captureControlAvailability(page, opts);
+    expect(inert.observation.passed).toBe(true);
+    await page.locator('body').evaluate(el => el.removeAttribute('inert'));
+    await page.locator('#stop').evaluate(el => el.remove());
+    await expect(captureControlAvailability(page, opts)).rejects.toThrow(/Inconclusive/);
+});

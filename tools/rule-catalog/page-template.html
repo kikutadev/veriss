@@ -153,6 +153,14 @@ tr[hidden]{display:none}
     <tr><td><a href="https://jorgeariosg.github.io/react-admin-rbac/">RBAC管理画面デモ</a></td><td>ログイン後／スマホ／メニューを閉じる</td><td>画面外のナビゲーションへTabで移動。Chromium・Firefox・WebKitで再現</td><td>Unknown</td></tr>
     <tr><td><a href="https://marmelab.com/react-admin-demo/">React-admin公式デモ</a></td><td>ログイン後／注文一覧／320px幅</td><td>ページ幅が約334pxとなり横にはみ出す。Chromium・Firefox・WebKitで再現</td><td>Unknown</td></tr>
   </tbody></table></div>
+  <h3>権限別のログイン後UI：同じUsers画面で比較</h3>
+  <p class="demo-intro">公開RBAC管理画面のAdmin・Manager・Viewerで実際にログインし、Users一覧の操作ボタンを390px・1280px × 3ブラウザで測定。表示される8人分の操作を検査しました。</p>
+  <div class="tw"><table><thead><tr><th>ログイン権限</th><th>編集</th><th>停止・再有効化</th><th>観測契約</th></tr></thead><tbody>
+    <tr><td>Admin</td><td>8 / 8 有効</td><td>7 / 8 有効（自分自身の停止は不可）</td><td>一致</td></tr>
+    <tr><td>Manager</td><td>0 / 8 有効</td><td>0 / 8 有効</td><td>一致</td></tr>
+    <tr><td>Viewer</td><td>0 / 8 有効</td><td>0 / 8 有効</td><td>一致</td></tr>
+  </tbody></table></div>
+  <p class="demo-intro">管理者でも自身の停止ボタンは無効という例外を含めて判定します。意図的に閲覧専用の編集ボタンを有効化した負例では違反を検出。これはクライアントUIの状態検査であり、サーバ側の権限制御の証明ではありません。全幅静的判定はUnknownです。</p>
   <p class="demo-intro">正常系の対照として、React-admin公式デモのOrders → Add filter → Save current queryで開くモーダルも検査。320 / 390 / 768px × 3ブラウザで、Tab移動がモーダル内に収まることと、保存せず閉じられることを確認しました。フォーカス制御のない模擬モーダルでは、背面への操作漏れを3ブラウザで検出します。</p>
   <p class="demo-intro">閉じたメニューが画面外にあるだけなら不具合とは判定しません。実際のTab移動でフォーカスが届くことを区別し、注文一覧の内側スクロールとページ全体の横はみ出しも別々に計測しています。ブラウザ観測は静的証明ではないため、verissの全幅判定はUnknownを維持します。開発者は自分のPlaywrightのログイン済み画面に<a href="https://github.com/kikutadev/veriss#check-an-authenticated-web-app-from-an-existing-playwright-test">共通observerを組み込み</a>、同じ状態別検証を実行できます。<a href="https://github.com/kikutadev/veriss/blob/main/docs/product-real-ui-evidence.md">検証条件・再実行手順</a></p>
   <h3>静的HTML/CSS入力：従来の3サイト</h3>

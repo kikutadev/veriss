@@ -3,7 +3,7 @@
 // This is an external network audit, NOT a universal static proof or release gate.
 import {test,expect} from '@playwright/test';
 import type {Page} from '@playwright/test';
-import {captureViewport,captureClosedScopeTabFocus,captureModalTabFocus,type BrowserFrame,type BrowserFocusStep} from '../packages/adapter-core/src/browser-observations.mjs';
+import {captureViewport,captureClosedScopeTabFocus,captureModalTabFocus,captureControlAvailability,type BrowserFrame,type ControlSelector,type BrowserFocusStep} from '../packages/adapter-core/src/browser-observations.mjs';
 import {verifyUI} from '../packages/adapter-core/src/ui-contracts.mjs';
 import type {Observation,UIModel} from '../packages/veriss/src/relational-contract.mjs';
 
@@ -161,3 +161,62 @@ test('react-admin official demo: authenticated dashboard, drawer, orders table',
  }
  result('react-admin official demo',browserName,frames,closed,observations);
 });
+
+// Role-aware UI capability comparison on the same authenticated Users screen.
+// Only public demo accounts; does not submit edits, suspensions, or user creation.
+for(const role of ['Admin','Manager','Viewer'] as const){
+ test(`RBAC public demo: ${role} Users permissions match controls without changing data`,async({page,browserName})=>{
+  await page.setViewportSize({width:390,height});
+  await page.goto('https://jorgeariosg.github.io/react-admin-rbac/',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('input[name=email]')).toBeVisible();
+  await page.getByRole('button',{name:new RegExp('^'+role+' ','i')}).click();
+  await page.getByRole('button',{name:'Sign in'}).click();
+  await expect(page.getByRole('heading',{name:'Dashboard'})).toBeVisible();
+  await page.goto('https://jorgeariosg.github.io/react-admin-rbac/users',{waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('heading',{name:'Users'})).toBeVisible();
+  await expect.poll(()=>page.locator('button[aria-label^="Edit "]').count()).toBeGreaterThan(2);
+  const state=`${role.toLowerCase()}-users`;
+  const profileId='role';
+  const controls:ControlSelector[]=[
+   {id:'edit',selector:'button[aria-label^="Edit "]',expect:role==='Admin'?'all-enabled':'all-blocked'},
+   {id:'user-status',selector:'button[aria-label^="Suspend "],button[aria-label^="Reactivate "]',expect:role==='Admin'?'some-enabled':'all-blocked'}
+  ];
+  const profile={id:profileId,ua:browserName as 'chromium'|'firefox'|'webkit',viewport:{min:390,max:1280,height:{min:844,max:844}}};
+  const model:UIModel={version:1,initial:state,states:[state],
+   transitions:[{from:state,event:'role-controls-match',to:state}],profiles:[profile],
+   contracts:[{id:'role-controls',kind:'action',event:'role-controls-match'}]};
+  const samples:Observation[]=[];
+  const measured=[];
+  for(const width of [390,1280]){
+   await page.setViewportSize({width,height});
+   const capture=await captureControlAvailability(page,{state,profile:profileId,controls});
+   samples.push(capture.observation);
+   measured.push({width,controls:capture.controls});
+   expect(capture.observation.passed,`${role} ${browserName} ${width}: ${JSON.stringify(capture.controls)}`).toBe(true);
+   const edits=capture.controls.find(c=>c.id==='edit')!;
+   const statuses=capture.controls.find(c=>c.id==='user-status')!;
+   expect(edits.matched).toBeGreaterThan(2);
+   expect(statuses.matched).toBeGreaterThan(2);
+   if(role==='Admin'){
+    // Admin cannot suspend themselves; all-edit-enabled is correct, all-status-
+    // enabled would be a false positive for intentional self-protection.
+    expect(edits.enabled).toBe(edits.matched);
+    expect(statuses.enabled).toBeGreaterThan(0);
+    expect(statuses.blocked).toBeGreaterThan(0);
+   }else {
+    expect(edits.blocked).toBe(edits.matched);
+    expect(statuses.blocked).toBe(statuses.matched);
+   }
+   // Native disabled buttons cannot receive focus. Check actual browser focus
+   // behavior, not just a CSS class or aria-disabled decoration.
+   await page.locator('body').focus();
+   await page.locator('button[aria-label^="Edit "]').first().focus();
+   const focused=await page.locator('button[aria-label^="Edit "]').first().evaluate(el=>document.activeElement===el);
+   expect(focused).toBe(role==='Admin');
+  }
+  const proof=verifyUI({model,observations:samples});
+  expect(proof.status).toBe('unknown');
+  expect(proof.observationStatus).toBe('sampled');
+  console.log('AUTH_ROLE_AUDIT '+JSON.stringify({role,browser:browserName,states:measured,proof:proof.status,observation:proof.observationStatus}));
+ });
+}

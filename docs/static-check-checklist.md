@@ -508,3 +508,5 @@
 独立した inventory UI の単体テストと Chromium/Firefox/WebKit の hover 操作で対照を確認。
 
 - [x] **ログイン後のモーダル（実測ベース）**: 公開 React-admin公式デモ Orders → Add filter → Save current query の `aria-modal=true` でTabを8回押し、320/390/768px・Chromium/Firefox/WebKitの計9点で背景のフォーカス逃げなし、Cancelで閉じる。ARIAだけの非トラップモーダルでは背景フォーカスを検出する対照（3エンジン）、フォーカス制御のある対照は通過。native `<dialog>` で `document.activeElement=BODY` となるブラウザ差は**実際の操作漏れと同一視せず不確定扱い**（`e2e/layout-browser-observations.spec.mts`、`e2e/external-authenticated-ui.spec.mts`、`packages/adapter-core/test/browser-observations.test.mts`）。これは静的CSS警告を増やすものではなく、ログイン済みPlaywrightの `Observation` に限る。
+
+- [x] **ログイン後の権限別UI（実測ベース）**: 公開RBACデモのAdmin/Manager/Viewer×390/1280px×Chromium/Firefox/WebKitで、Admin編集8/8有効、Status系7/8有効（自身を除外）、Manager/Viewerは同操作0/8有効。disabledボタンへのフォーカス不可も比較（`e2e/external-authenticated-ui.spec.mts`）。オフライン対照ではdisabled/inert正常、閲覧専用ボタンの有効化違反、`aria-disabled`のみの不確定を全3ブラウザで検算（`e2e/layout-browser-observations.spec.mts`）。**静的CSS警告ではない**。ブラウザDOMの実測に限定し、サーバ認可について結論しない。

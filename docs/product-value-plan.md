@@ -161,3 +161,9 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - **完了条件:** 公開RBACデモで権限別に同一セレクタを検査し、Adminは操作可能、権限のない役割はネイティブdisabled・inert・非表示など実際のUI阻止を示す。誤設定した対照で観測違反を検出する。Chrome/Firefox/WebKitで比較し、`verifyUI`は実測の成功/失敗と静的Unknownを分離する。
 - **設計境界:** これは**フロントエンドのUI操作可能性**であって、サーバAPIの認可強度の証明ではない。`aria-disabled`のみ・CSS `pointer-events:none` の見た目だけを確実なアクセス禁止と認めない。第三者のデータ操作・変更・Worker・新しいファイル/URL入力UIを増やさない。検証対象のセレクタ/状態名以外のDOM本文、ユーザー情報、認証情報は観測結果に残さない。
 - **作業順:** 実デモの実測 → TDDで小さい共通観測API → 負例/対照を3ブラウザで検査 → 実デモを同じAPIで横断 → 正式ゲート→フォークmain/公開ページへ反映。
+
+### Phase 2e 実装結果（2026-11-23）
+
+- [x] RBAC公開デモのAdmin・Manager・Viewer 3権限を390/1280px×3ブラウザで実測。Adminの編集8/8有効と停止7/8有効という例外を識別し、Manager/Viewerは両操作群がすべてdisabled。外部E2E 9件で状態別の操作可能性を照合。
+- [x] `captureControlAvailability` の共通observerで `all-enabled` / `some-enabled` / `all-blocked` を既存のveriss `Observation` 契約へ渡す。disabled/inert以外の見た目だけによる禁止は不確定、閲覧専用で有効化された対照は失敗。3ブラウザのオフライン負例で検算。静的全状態証明・サーバ認可は対象外。
+- [ ] 次の候補: 権限別UIの**操作後に見せる画面**や、フォーム入力エラー状態の検証。現在の導入はE2E手動状態定義に依存しており、JS実装から全遷移の自動列挙は未対応。

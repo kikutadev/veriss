@@ -49,4 +49,7 @@ test('the public real-UI evidence distinguishes authenticated browser observatio
  assert.match(html,/Bootstrap公式サンプル/);
  assert.match(html,/共通observerを組み込み/);
  assert.match(html,/模擬モーダル/);
+ assert.match(html,/Admin・Manager・Viewer/);
+ assert.match(html,/7 \/ 8 有効/);
+ assert.match(html,/クライアントUIの状態検査/);
 });

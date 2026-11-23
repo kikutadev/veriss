@@ -65,3 +65,20 @@ test('a modal keyboard contract fails for background focus, not for a contained 
     assert.equal(captured.observation.passed, false);
     assert.equal(captured.steps.length, 3);
 });
+test('role expectations classify all disabled and at least one enabled, with missing/ambiguous controls inconclusive', async () => {
+    const { controlAvailabilityObservation } = await import('../src/browser-observations.mjs');
+    const controls = [{ id: 'edit', matched: 8, enabled: 0, blocked: 8, uncertain: 0 }, { id: 'status', matched: 8, enabled: 7, blocked: 1, uncertain: 0 }];
+    const viewer = controlAvailabilityObservation('viewer-users', 'p', 390, 844, [controls[0]], { edit: 'all-blocked' });
+    assert.equal(viewer.passed, true);
+    const admin = controlAvailabilityObservation('admin-users', 'p', 390, 844, controls, { edit: 'some-enabled', status: 'some-enabled' });
+    assert.equal(admin.passed, false, 'all-disabled edit must fail admin expectation');
+    const adminOk = controlAvailabilityObservation('admin-users', 'p', 390, 844, [{ ...controls[0], enabled: 8, blocked: 0 }, controls[1]], { edit: 'some-enabled', status: 'some-enabled' });
+    assert.equal(adminOk.passed, true);
+    assert.equal(controlAvailabilityObservation('admin-users', 'p', 390, 844, [{ ...controls[0], enabled: 8, blocked: 0 }], { edit: 'all-enabled' }).passed, true);
+    assert.equal(controlAvailabilityObservation('admin-users', 'p', 390, 844, [{ ...controls[0], enabled: 7, blocked: 1 }], { edit: 'all-enabled' }).passed, false);
+    const leaked = controlAvailabilityObservation('viewer-users', 'p', 390, 844, [{ ...controls[0], enabled: 1, blocked: 7 }], { edit: 'all-blocked' });
+    assert.equal(leaked.passed, false);
+    assert.throws(() => controlAvailabilityObservation('viewer-users', 'p', 390, 844, [{ ...controls[0], matched: 0, blocked: 0 }], { edit: 'all-blocked' }), /inconclusive/i);
+    assert.throws(() => controlAvailabilityObservation('viewer-users', 'p', 390, 844, [{ ...controls[0], enabled: 0, blocked: 7, uncertain: 1 }], { edit: 'all-blocked' }), /inconclusive/i);
+    assert.throws(() => controlAvailabilityObservation('viewer-users', 'p', 390, 844, [{ ...controls[0], matched: 8, enabled: 0, blocked: 9 }], { edit: 'all-blocked' }), /Invalid/i);
+});

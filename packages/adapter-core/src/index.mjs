@@ -3,7 +3,7 @@
 // analyses every state with the generic core and reports what holds per state. The core knows nothing of components.
 import { analyzeHTML, phrasingTags } from '@mizchi/veriss/html';
 import { parseFragment, serialize } from 'parse5';
-export { captureViewport, captureClosedScopeTabFocus, captureModalTabFocus, viewportObservation, focusObservation, modalFocusObservation } from './browser-observations.mjs';
+export { captureViewport, captureClosedScopeTabFocus, captureModalTabFocus, captureControlAvailability, controlAvailabilityObservation, viewportObservation, focusObservation, modalFocusObservation } from './browser-observations.mjs';
 const objectRecord = (n) => n !== null && typeof n === 'object';
 const nodeList = (n) => Array.isArray(n);
 const isElement = (n) => 'tagName' in n;

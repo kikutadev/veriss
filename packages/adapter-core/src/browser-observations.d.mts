@@ -77,3 +77,37 @@ export declare function captureModalTabFocus(page: BrowserObservationPage, { sta
     steps: BrowserFocusStep[];
     observation: Observation;
 }>;
+/** UI-level permission checks: never a substitute for server authorization.
+ * Counts only: no labels, text, attributes, credentials, or user rows are returned. */
+export type ControlExpectation = 'some-enabled' | 'all-enabled' | 'all-blocked';
+export interface ControlAvailability {
+    id: string;
+    matched: number;
+    enabled: number;
+    blocked: number;
+    uncertain: number;
+}
+export interface ControlSelector {
+    id: string;
+    selector: string;
+    expect: ControlExpectation;
+}
+export declare function controlAvailabilityObservation(state: string, profile: string, width: number, height: number, controls: readonly ControlAvailability[], expected: Readonly<Record<string, ControlExpectation>>, event?: string): Observation;
+/** Observe an already-authenticated role-specific view. We only classify
+ * native controls with enforced disabled/inert or rendered, enabled UI. An
+ * aria-disabled-only or pointer-events-only pattern is inconclusive. */
+export declare function captureControlAvailability(page: BrowserObservationPage, { state, profile, controls, event }: {
+    state: string;
+    profile: string;
+    controls: readonly ControlSelector[];
+    event?: string;
+}): Promise<{
+    controls: {
+        id: any;
+        matched: number;
+        enabled: number;
+        blocked: number;
+        uncertain: number;
+    }[];
+    observation: Observation;
+}>;

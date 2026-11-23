@@ -477,3 +477,9 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - 新しい `captureModalTabFocus` と `modalFocusObservation` は `@mizchi/veriss-adapter-core` から利用可能。ログイン後の実React-admin Ordersでフィルターメニュー→Save current queryのモーダルを開き、3ブラウザ×3幅でTabの背面漏れなしを確認、保存せずCancel。意図的な漏れ負例をオフライン3ブラウザで検出し、制御あり対照は通過。body/htmlの一時フォーカスだけでは違反にせず不確定とする。全幅静的証明はUnknown。
 - fork main実装 `14a8e85`、GitHub Pages `98ad6ef`。公式ゲート exit0（単体 fail0、既存552 E2E）、独立オフライン6 E2E・実アプリ6 E2E成功。Git-pinnedインストールと公開サイトの実ブラウザ受入を確認。検証条件は `docs/product-real-ui-evidence.md`、導入例は `README.md`。
 - 次の価値検証候補: RBACデモのViewerではUsersの編集/停止ボタンが無効（実画面で確認）。Adminとの権限別状態契約を検証すること。フォームバリデーション/エラー状態も対象候補。外部認証の自動収集やWorkerの追加は不要。
+
+### Phase 2e 権限別ログイン後UI観測（2026-11-23）
+
+- RBAC公開デモでAdmin/Manager/Viewerへ個別にログインし、UsersのEdit・Suspend/Reactivate操作を390/1280px×Chromium/Firefox/WebKitで照合。Admin: 編集8/8有効、状態変更7/8有効（自分自身の停止は無効）。Manager/Viewer: 両操作群とも0/8有効。各対象のブラウザ上のフォーカス可能性も確認。
+- `@mizchi/veriss-adapter-core` に `captureControlAvailability` / `controlAvailabilityObservation` を追加。`all-enabled` / `some-enabled` / `all-blocked`を状態名付きObservationへ変換。結果はグループIDと件数だけで、属性・本文・ユーザー情報を保持しない。`aria-disabled`などUI抑制が未確定の場合や対象不在は不確定、静的な全状態の判定はUnknown。API認可を証明したと主張しない。
+- 外部ログイン済みUI 3ブラウザ **15 E2E passed**（既存2件×3ブラウザと権限別新規3件×3ブラウザ）、オフライン対照 **9 E2E passed**（既存2件×3と新規権限対照1件×3）。正式ゲート・公開の受入は別記録。詳細は `docs/product-real-ui-evidence.md`、導入例は `README.md`。

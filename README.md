@@ -84,6 +84,26 @@ if (modalReport.observationStatus === 'failed') throw new Error('Background focu
 
 A nonmodal popover or missing dialog is rejected rather than accepted. If a browser transiently reports document `body` focus (observed with native `<dialog>`), the sample is **inconclusive**, not an asserted background escape. This is a finite Tab observation, not full focus-trap or static proof.
 
+For **role-dependent UI availability** on an existing authenticated screen, declare the controls that must be allowed or blocked. Do not click destructive controls in the audit:
+
+```js
+import {captureControlAvailability} from '@mizchi/veriss-adapter-core';
+const permissions = await captureControlAvailability(page, {
+  state:'viewer-users', profile:'phone', controls:[
+    {id:'edit',selector:'button[data-action="edit"]',expect:'all-blocked'},
+    {id:'suspend',selector:'button[data-action="suspend"]',expect:'all-blocked'}
+  ]
+});
+const roleModel={version:1,initial:'viewer-users',states:['viewer-users'],
+  transitions:[{from:'viewer-users',event:'role-controls-match',to:'viewer-users'}],
+  profiles:[{id:'phone',viewport:{min:320,max:1280,height:{min:844,max:844}}}],
+  contracts:[{id:'role-controls',kind:'action',event:'role-controls-match'}]};
+const roleResult=verifyUI({model:roleModel,observations:[permissions.observation]});
+if(roleResult.observationStatus==='failed')throw new Error('Unexpected accessible UI action');
+```
+
+Each declared selector must match at least one control. `all-enabled`, `some-enabled`, and `all-blocked` can be combined (e.g. Admin may edit all users but may not suspend themselves). Native `disabled` and `inert` are treated as blocked; an `aria-disabled`-only or pointer-events-only control is **inconclusive** instead of assumed secure. Results contain only caller-chosen group IDs and counts, not screen text, user rows, cookies, or input values. **Server-side authorization cannot be established from the DOM**; test APIs independently. As with every runtime observation, a passing sample does not change the static verdict from UNKNOWN.
+
 `captureViewport` returns `frame.documentWidth`, `frame.main` and structural selectors for overflow contributors; `captureClosedScopeTabFocus` returns the sampled Tab steps and an action observation. For SPA navigation or animation, **wait for the relevant state to settle** before capturing. Use separate `state` names for each list/dialog/menu configuration and declare their transitions in the model. You can review the complete login → dashboard → menu → list examples in [`e2e/external-authenticated-ui.spec.mts`](e2e/external-authenticated-ui.spec.mts); the repeatable offline control is [`e2e/layout-browser-observations.spec.mts`](e2e/layout-browser-observations.spec.mts).
 
 ## Expanded verification targets (upstream 2026-11-22)
