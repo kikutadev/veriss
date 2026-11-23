@@ -155,3 +155,10 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 - 公開デモのUsers画面へ**Admin / Manager / Viewer**それぞれでログインし、390px/1280px × Chromium/Firefox/WebKitの18測定点で観測。表示ページの8人分を対象に `Edit` と `Suspend` / `Reactivate` のネイティブボタン状態を比較した。Admin: Edit **8/8有効**、Status **7/8有効・1件無効**（自分自身への停止を避けるUI例外）。ManagerとViewer: Edit **0/8有効**、Status **0/8有効**。ブラウザ上でdisabledボタンがフォーカスを受け付けないことも検算した。
 - `captureControlAvailability` / `controlAvailabilityObservation` を`@mizchi/veriss-adapter-core`へ追加。既存Playwrightのログイン後ページから、開発者が指定したセレクタに対し `all-enabled` / `some-enabled` / `all-blocked` の期待を宣言。matched/enabled/blocked/uncertain の**件数とグループIDのみ**返し、DOMテキスト・属性値・個人情報を収集しない。`verifyUI` action観測では期待外のUI操作可能性を失敗として扱い、静的全状態 `status=unknown` は維持。
 - 3ブラウザのオフラインE2Eで、disabled/inertの正常例、閲覧専用の編集ボタンが有効になる反例、`aria-disabled`のみ・セレクタに要素がない場合の不確定を検査。**UIの有効状態とサーバの認可は別問題**であり、APIの権限チェックや変更操作の送信は検査していない。
+
+### Phase 2e 公開受入（2026-11-23）
+
+- 実装はfork `main` `98795c2`、公開GitHub Pagesは `gh-pages` `4f53fe5`。`node tools/gate-guarded.mjs`の正式ゲート **exit 0**、rootと全5パッケージunit fail0、既存Chromium/Firefox/WebKit必須E2E **552 passed**。新しい権限テストを含む外部ログイン済みアプリE2E **15 passed** と、オフライン対照E2E **9 passed** は別実行で、正式552件とは混同しない。
+- Pagesの公開HTMLは同じ`_site/index.html`とSHA-256一致。<https://kikutadev.github.io/veriss/#real-ui> でAdmin/Manager/Viewer比較、既存のNG→OK→Unknownデモ、390px横はみ出しなし、ファイルアップロード/Worker未復活を実ブラウザで確認。第三者サイト側データの更新は行っていない。
+- 本体とadapter-coreのtarballを空の別プロジェクトにインストールしてAPIが読み込めることを確認。さらに**Gitコミット `98795c2` を指定した両パッケージ**を別の空プロジェクトへ導入し、`captureControlAvailability`、正常の観測通過／違反の観測失敗、静的 `status=unknown` を確認。
+- 未対応: 本番のサーバ認可、JS/DOMの全遷移の自動導出、すべての画面幅・権限状態の静的な証明。ユーザーの既存Playwrightテストに埋め込んだ範囲でのフロントエンド実測に限定する。

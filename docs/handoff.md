@@ -483,3 +483,8 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 - RBAC公開デモでAdmin/Manager/Viewerへ個別にログインし、UsersのEdit・Suspend/Reactivate操作を390/1280px×Chromium/Firefox/WebKitで照合。Admin: 編集8/8有効、状態変更7/8有効（自分自身の停止は無効）。Manager/Viewer: 両操作群とも0/8有効。各対象のブラウザ上のフォーカス可能性も確認。
 - `@mizchi/veriss-adapter-core` に `captureControlAvailability` / `controlAvailabilityObservation` を追加。`all-enabled` / `some-enabled` / `all-blocked`を状態名付きObservationへ変換。結果はグループIDと件数だけで、属性・本文・ユーザー情報を保持しない。`aria-disabled`などUI抑制が未確定の場合や対象不在は不確定、静的な全状態の判定はUnknown。API認可を証明したと主張しない。
 - 外部ログイン済みUI 3ブラウザ **15 E2E passed**（既存2件×3ブラウザと権限別新規3件×3ブラウザ）、オフライン対照 **9 E2E passed**（既存2件×3と新規権限対照1件×3）。正式ゲート・公開の受入は別記録。詳細は `docs/product-real-ui-evidence.md`、導入例は `README.md`。
+
+### Phase 2e 公開受入（2026-11-23）
+
+- fork実装 main `98795c2`、公開Pages `4f53fe5`。正式gate exit0（root+全5パッケージ単体 fail0、既存3ブラウザ552 E2E）。独立して外部ログイン済みUI15 E2E、オフライン9 E2Eも成功。Git-pinned adapter-coreとveriss本体を別プロジェクトへ導入し、観測失敗と静的Unknownを確認。公開サイトもSHA一致、3権限比較と既存デモ、390px幅で実受入済み。
+- 製品価値は**ログイン後のUIがロールによって意図に反し操作可能になった回帰を、既存E2Eから観測契約として検出**できること。API側の認可と全幅静的証明は未達。次はフォーム入力エラーや権限別遷移など実アプリ状態の観測を継続するか、CSS/JS状態の静的閉包へ戻るか検討。詳細は `docs/product-real-ui-evidence.md`。
