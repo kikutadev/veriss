@@ -168,3 +168,10 @@ veriss の CLI を**ポートフォリオ / ブラウザゲーム / 第三者 UI
 
 - Phase2eで追加した `captureControlAvailability` はP0で撤去。ログイン後の公開RBACデモにおけるAdmin「全員編集可能・本人停止不可」、Manager/Viewer「編集/状態変更不可」を、**8人それぞれの対象に対して**Playwrightで検査する。件数のみの緩い `some-enabled` 条件では、別人の停止が誤って無効化されても検知できなかったため変更。
 - モーダル/閉じたdrawerのTab操作は `captureModalTabFocus` / `captureClosedScopeTabFocus` の直接 `passed` をassertし、actionの擬似自己遷移は削除。root/mainの**幾何の点観測**は既存 `verifyUI` に渡すが、静的な `status=unknown` は維持。以前のPhase2e記録は当時の経緯であり、現行SDKの仕様はREADMEとADR-0021を参照。
+
+### Phase 2f P0 移行後の検証記録（2026-11-23）
+
+- 実装/フォークmain: `363967f`。`pnpm run build:ts`, `pnpm run check:ts`成功。オフライン3ブラウザ E2E **9/9**。外部ネットワークに依存するログイン後2デモ E2E **15/15**。正式ゲート **exit0、root/全パッケージunit fail0、Chromium/Firefox/WebKit 552 passed**（外部15件とオフライン9件は正式552件と別検証）。
+- 現行RBACデモでAdminのEdit 8/8、状態操作7/8（本人Ada Lovelaceのみ停止不可）、Manager/Viewerは両操作0/8を、**全対象ごと**に2幅/3ブラウザで照合。負例は他人の停止を誤ってdisabled化、本人の停止をenabled化、ViewerのEditをenabled化、ARIA属性だけで無効に見せる状態。
+- 同じ外部実測で、RBAC閉drawerの画面外TabフォーカスはChromium/Firefox 4/6、WebKit 2/6（390px）。React-admin公式Ordersのroot横はみ出しは320px/768pxで3ブラウザのサンプルに存在。RBACのroot横はみ出しはFirefox/WebKitの320/390pxで観測され、Chromiumでは今回の測定で観測されなかった。**ブラウザによる差を無視した静的証明は主張しない**。
+- `363967f`の両Gitパッケージを新規consumerに直接インストールして`captureViewport`,`captureClosedScopeTabFocus`,`captureModalTabFocus`,`domGeometry`,`verifyUI`が利用可能、削除した4関数が公開されないことを確認。`viewportObservation`→`verifyUI`は実測違反を報告しつつ静的`unknown`を維持。公開サイト自体は今回更新なし。

@@ -494,3 +494,9 @@ Goal: resolve the 7 accessibility E2E, 6 CLS E2E, and 3 WebKit UA-profile discre
 
 - 設計は [ADR-0021](adr/0021-browser-observation-proof-boundary.md)。Playwright E2Eの権限・フォーカス成功/失敗を合成 `Observation.passed` / action自己遷移 `verifyUI` に包む重複を撤去。`verifyUI` / `domGeometry` は本来の静的幾何・幾何観測で維持。権限は公開デモの8人全員の操作ごとにPlaywright assertionで検査し、Admin本人の停止禁止を区別。
 - 使われなくなった公開SDK `captureControlAvailability`, `controlAvailabilityObservation`, `focusObservation`, `modalFocusObservation` と関連型を削除し、フォーカス補助は `{steps,passed}` を直接返す。P1矩形観測の統合・P2実装ソース由来CSS閉包は未着手。
+
+### Phase 2f P0 統合・受入（2026-11-23）
+
+- 実装はfork `main` `363967f`（別に`86ae65c`計画コミット）。TS型チェック/ビルド成功、オフライン9/9、実ログイン後アプリ15/15、正式gate exit0（unit全パッケージ fail0、既存3ブラウザ552件）。同コミットのgit-pinned本体/adapter-coreを新規consumerへ導入し、保持API／削除APIと実測・静的判定の分離を確認。
+- 既知実不具合は引き続き報告。RBAC drawerの閉状態Tab画面外フォーカスはChromium4/6, Firefox4/6, WebKit2/6のサンプル、公式React-admin Ordersは320/768pxのroot overflowを3ブラウザで観測。これは実測であって静的保証ではない。
+- 次はADR-0021のP1（`tools/capture-snapshots`と`captureViewport`の矩形取得重複削減）とP2（実装ソースに基づき閉じたCSSで1状態/1対象の静的証明）。今回の公開サイトHTMLの変更なし。

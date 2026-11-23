@@ -186,3 +186,10 @@ Status: **Phase 0/1リリース済み、Phase 2/3未完了** (2026-11-22)。現�
 - [x] 権限チェックの弱い`some-enabled`契約を撤去し、8人のデモアカウントごとにAdmin/Manager/Viewerの編集と状態変更の可否をPlaywrightで検査。自己停止不可の固有例外を含む。オフライン対照は別のユーザーを誤ってdisabledにした場合、Admin本人を有効にした場合、Viewerのボタンをenabledにした場合、`aria-disabled`のみの場合を検査する。
 - [x] メニュー/モーダルの実ブラウザ観測に不要なaction自己遷移`verifyUI`ラッパーを外し、真偽値→`Observation`変換の公開API/型/テストを整理。静的に意味のある幾何の証拠と`verifyUI`は維持。
 - [ ] P1: 点の矩形計測を重複削減。P2: 実アプリソースとCSS閉包の成立性を調べ、1状態/1対象の静的証明を試す。
+
+#### Phase 2f P0 検証・統合結果（2026-11-23）
+
+- [x] `pnpm run build:ts && pnpm run check:ts`成功、オフライン3ブラウザE2E **9/9**（正常・drawer/モーダル漏れ・権限対象入れ替わり・ARIAのみ）、外部ログイン後UI E2E **15/15**（3ブラウザ×RBAC/React-admin実サイト）成功。
+- [x] 正式リリースgate `node tools/gate-guarded.mjs` exit0。root・全パッケージunit fail0、既存CSS/実入力の3ブラウザE2E **552 passed**。
+- [x] フォークmainの実装コミット `363967f`。Git commit `363967f` を指定して本体/adapter-coreを空の別プロジェクトへ導入、残すAPIと削除4関数、および `static=unknown / observationStatus=failed`を確認。
+- [ ] P1矩形観測の重複削減、P2実アプリソース/状態のCSS閉包は別段階。静的証明の拡大をP0達成と混同しない。
